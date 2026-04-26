@@ -1,0 +1,1514 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>クリアレート管理アプリ</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background-color: #f9f9f9; margin: 0; }
+        h1 { font-size: 24px; margin-bottom: 15px; }
+        .controls { margin-bottom: 20px; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .flex-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+        textarea { width: 100%; height: 100px; margin-bottom: 10px; font-family: monospace; border: 1px solid #ccc; border-radius: 4px; padding: 8px; box-sizing: border-box; }
+        button { padding: 8px 16px; cursor: pointer; border: 1px solid #ccc; background-color: #eee; border-radius: 4px; }
+        button:hover { background-color: #ddd; }
+        select { padding: 6px 12px; font-size: 16px; border-radius: 4px; border: 1px solid #ccc; }
+        .btn-danger { color: #d32f2f; border-color: #d32f2f; background-color: #ffebee; }
+        .btn-danger:hover { background-color: #ffcdd2; }
+        .btn-image { background-color: #4caf50; color: white; border: none; font-weight: bold; }
+        .btn-image:hover { background-color: #45a049; }
+        
+        /* 検索ボックスのスタイル */
+        .search-box { padding: 6px 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 4px; width: 260px; box-sizing: border-box; }
+
+        /* 追従（スティッキー）設定 */
+        .view-header { 
+            display: flex; justify-content: space-between; align-items: flex-end; 
+            margin-bottom: 10px; padding-bottom: 10px; padding-top: 15px; 
+            border-bottom: 2px solid #ddd; flex-wrap: wrap; gap: 15px; 
+            position: sticky; top: 0; z-index: 1000; background-color: #f9f9f9; 
+        }
+        
+        .stats-container { display: flex; flex-wrap: wrap; gap: 15px; align-items: baseline; justify-content: flex-end; margin-left: auto; background: #fff; padding: 10px 15px; border-radius: 8px; border: 1px solid #eee; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .stats-group { display: flex; align-items: baseline; gap: 8px; }
+        .stats-title { font-size: 14px; color: #666; font-weight: bold; }
+        .stats-fraction { font-size: 18px; font-weight: bold; color: #333; }
+        .stats-remain { font-size: 0.85em; font-weight: normal; color: #555; }
+        .stats-easypercentage { font-size: 1.6em; font-weight: bold; color: #2cbc21; }
+        .stats-percentage { font-size: 1.6em; font-weight: bold; color: #d32f2f; }
+        .stats-level { font-size: 1.2em; font-weight: bold; color: #0056b3; background: #e3f2fd; padding: 4px 10px; border-radius: 20px; }
+
+        table { width: 100%; border-collapse: collapse; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: middle; }
+        th { background-color: #f2f2f2; cursor: pointer; }
+        .spicy-gauge { background-color: #ffe6e6; }
+        .cleared-row { opacity: 0.8; }
+        
+        .edit-btn { cursor: pointer; font-size: 0.85em; padding: 4px 8px; background: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; display: inline-block; font-weight: bold; white-space: nowrap; }
+        .edit-btn:hover { background: #e0e0e0; }
+        
+        .ver-badge { font-weight: bold; color: #555; background: #eee; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; display: inline-block; }
+        .level-badge { font-weight: bold; color: #fff; background: #555; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; display: inline-block; }
+        
+        /* コンパクト編集・メダル選択モーダル用のスタイル */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); z-index: 2000;
+            display: flex; justify-content: center; align-items: center;
+        }
+        .modal-content {
+            background: #fff; padding: 15px; border-radius: 8px; width: 90%; max-width: 450px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .modal-content h3 { margin-top: 0; margin-bottom: 10px; font-size: 16px; }
+        .input-group { display: flex; gap: 8px; margin-bottom: 8px; }
+        .input-item { flex: 1; display: flex; flex-direction: column; }
+        .input-item label { font-size: 12px; margin-bottom: 2px; color: #555; font-weight: bold; }
+        .input-item input { 
+            width: 100%; padding: 4px 8px; font-size: 13px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;
+        }
+        .modal-actions { margin-top: 15px; display: flex; justify-content: space-between; gap: 8px; }
+        .modal-actions button { padding: 6px 12px; font-size: 13px; cursor: pointer; border-radius: 4px; }
+        
+        /* メダル選択グリッド */
+        .medal-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
+        .medal-item { cursor: pointer; text-align: center; padding: 10px; border: 1px solid #eee; border-radius: 8px; transition: background 0.2s; }
+        .medal-item:hover { background: #f0f8ff; border-color: #2196F3; }
+        .medal-item img { width: 36px; height: 36px; object-fit: contain; display: block; margin: 0 auto 5px; }
+        .medal-item .fallback-text { height: 36px; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #555; font-size: 0.9em; margin-bottom: 5px; }
+
+        /* 出力設定などのプルダウン（▼マーク）を消す */
+        details > summary { list-style: none; }
+        details > summary::-webkit-details-marker { display: none; }
+
+        /* ロード画面 */
+        .loading-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.8); z-index: 9999;
+            display: none; justify-content: center; align-items: center;
+            font-size: 1.5em; font-weight: bold; color: #333; flex-direction: column;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3; border-top: 4px solid #3498db;
+            border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 10px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body>
+
+    <div id="loading" class="loading-overlay">
+        <div class="spinner"></div>
+        <div id="loading-text">クラウドと通信中...</div>
+    </div>
+
+    <div style="padding: 20px;">
+        <h1>楽曲クリアレート管理</h1>
+
+        <div class="controls">
+            <div class="flex-row">
+                <label style="font-weight: bold;">追加するレベル: 
+                    <select id="import-level" style="padding: 10px;">
+                        <option value="50">Lv 50</option>
+                        <option value="49">Lv 49</option>
+                        <option value="48" selected>Lv 48</option>
+                        <option value="47">Lv 47</option>
+                        <option value="46">Lv 46</option>
+                        <option value="45">Lv 45</option>
+                        <option value="44">Lv 44</option>
+                        <option value="43">Lv 43</option>
+                        <option value="42">Lv 42</option>
+                        <option value="41">Lv 41</option>
+                        <option value="40">Lv 40</option>
+                        <option value="その他">その他</option>
+                    </select>
+                </label>
+                <button onclick="importFromClipboard()" style="background-color: #2196F3; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">📋 コピーしたデータを追加</button>
+                <button onclick="syncLocalToCloud()" style="background-color: #4caf50; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">⬆️ ローカルからクラウドへ同期</button>
+                <button onclick="downloadSongsAndClearsJson()" style="background-color: #ff9800; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">💾 バックアップ (データ＋クリア)</button>
+                <button onclick="downloadSongsJsonOnly()" style="background-color: #795548; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">💾 バックアップ (楽曲のみ)</button>
+            </div>
+            
+            <details style="margin-top: 10px; cursor: pointer;">
+                <summary style="font-size: 0.9em; color: #666;">手動でペーストして追加する場合はこちら</summary>
+                <div style="margin-top: 10px; cursor: default;">
+                    <textarea id="import-text" placeholder="Wikiでコピーしたテキストをここにペーストしてください..."></textarea>
+                    <button onclick="importDataManual()">手動ペーストで追加</button>
+                </div>
+            </details>
+            
+            <hr style="border: none; border-top: 1px solid #eee; margin: 15px 0;">
+            
+            <div class="flex-row" style="margin-bottom: 0;">
+                <label style="font-weight: bold; color: #d32f2f;">レベル一括削除: 
+                    <select id="delete-level" style="border-color: #d32f2f;">
+                        <option value="50">Lv 50</option>
+                        <option value="49">Lv 49</option>
+                        <option value="48" selected>Lv 48</option>
+                        <option value="47">Lv 47</option>
+                        <option value="46">Lv 46</option>
+                        <option value="45">Lv 45</option>
+                        <option value="44">Lv 44</option>
+                        <option value="43">Lv 43</option>
+                        <option value="42">Lv 42</option>
+                        <option value="41">Lv 41</option>
+                        <option value="40">Lv 40</option>
+                        <option value="その他">その他</option>
+                    </select>
+                </label>
+                <button onclick="deleteLevelData()" style="color: #d32f2f; border-color: #d32f2f; background-color: #fff;">削除実行</button>
+                
+                <div style="margin-left: auto; display: flex; gap: 10px;">
+                    <button onclick="clearRecordsOnly()">クリア記録のみリセット</button>
+                    <button onclick="initializeData()" class="btn-danger">全データ完全初期化</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="view-header">
+            <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                <label style="font-weight: bold; font-size: 1.1em;">表示レベル: 
+                    <select id="view-level" onchange="changeViewLevel()">
+                        <option value="ALL">すべて表示</option>
+                        <option value="50">Lv 50</option>
+                        <option value="49">Lv 49</option>
+                        <option value="48" selected>Lv 48</option>
+                        <option value="47">Lv 47</option>
+                        <option value="46">Lv 46</option>
+                        <option value="45">Lv 45</option>
+                        <option value="44">Lv 44</option>
+                        <option value="43">Lv 43</option>
+                        <option value="42">Lv 42</option>
+                        <option value="41">Lv 41</option>
+                        <option value="40">Lv 40</option>
+                        <option value="その他">その他</option>
+                    </select>
+                </label>
+                
+                <div style="display: flex; align-items: center; gap: 5px;">
+                    <input type="text" id="search-input" class="search-box" placeholder="🔍 ジャンル・曲名で全レベル検索..." oninput="handleSearch()">
+                    <button onclick="clearSearch()" style="padding: 6px 12px; border: 1px solid #ccc; background: #eee; cursor: pointer;">クリア</button>
+                </div>
+
+                <div class="controls" style="margin: 0; padding: 0; box-shadow: none; background: transparent; display: flex; align-items: center; gap: 5px;">
+                    <button onclick="sortBy('clear')">クリア順</button>
+                    <button onclick="sortBy('level')">Lv順</button>
+                    <button onclick="sortBy('version')">Ver順</button>
+                    <button onclick="sortBy('bpm')">BPM順</button>
+                    <button onclick="sortBy('notes')">ノーツ順</button>
+                    <button onclick="sortBy('diff')">指数順</button>
+
+                    <details style="position: relative; margin-left: 10px;">
+                        <summary style="padding: 6px 12px; border: 1px solid #ccc; background-color: #fff; border-radius: 4px; cursor: pointer; font-size: 0.9em; font-weight: bold; color: #555;">⚙️ 出力設定</summary>
+                        <div style="position: absolute; top: 100%; right: 0; background: #fff; border: 1px solid #ccc; border-radius: 6px; padding: 12px; z-index: 2000; box-shadow: 0 4px 10px rgba(0,0,0,0.2); width: max-content; display: grid; gap: 8px; margin-top: 5px; text-align: left;">
+                            <div style="font-size: 0.85em; color: #666; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 4px; margin-bottom: 4px;">画像に含める項目</div>
+                            <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="0" checked> メダル</label>
+                            <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="1" checked> Lv</label>
+                            <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="2" checked> Ver</label>
+                            <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="3" checked> バナー</label>
+                            <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="4" checked> ジャンル / 曲名</label>
+                            <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="5" checked> BPM</label>
+                            <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="6" checked> ノーツ</label>
+                            <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="7" checked> 難易度</label>
+                        </div>
+                    </details>
+                    
+                    <button onclick="exportAsImage()" class="btn-image" style="padding: 8px 16px;">画像として保存</button>
+                </div>
+            </div>
+            
+            <details style="width: 100%; margin-bottom: 15px; background: #fff; padding: 8px 15px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box;">
+                <summary style="cursor: pointer; font-weight: bold; color: #555; user-select: none;">🔍 さらに条件で絞り込む</summary>
+                <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 10px; font-size: 0.9em; border-top: 1px dashed #eee; padding-top: 10px;">
+                    <div style="display: flex; flex-direction: column;">
+                        <label style="font-size: 0.8em; font-weight: bold; color: #666; margin-bottom: 2px;">クリア状態</label>
+                        <select id="filter-clear" onchange="renderTable()" style="padding: 4px;">
+                            <option value="ALL">すべて</option>
+                            <option value="uncleared">未クリアのみ</option>
+                            <option value="cleared">クリア済 (イージー以上)</option>
+                            <option value="normal_cleared">クリア済 (ノーマル以上)</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; flex-direction: column;">
+                        <label style="font-size: 0.8em; font-weight: bold; color: #666; margin-bottom: 2px;">メダル別</label>
+                        <select id="filter-medal" onchange="renderTable()" style="padding: 4px;">
+                            <option value="ALL">すべて</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; flex-direction: column;">
+                        <label style="font-size: 0.8em; font-weight: bold; color: #666; margin-bottom: 2px;">バージョン</label>
+                        <select id="filter-version" onchange="renderTable()" style="padding: 4px;">
+                            <option value="ALL">すべて</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; flex-direction: column;">
+                        <label style="font-size: 0.8em; font-weight: bold; color: #666; margin-bottom: 2px;">難易度</label>
+                        <select id="filter-diff" onchange="renderTable()" style="padding: 4px;">
+                            <option value="ALL">すべて</option>
+                            <option value="危険">危険</option>
+                            <option value="別格">別格</option>
+                            <option value="詐称">詐称</option>
+                            <option value="強">強</option>
+                            <option value="中(全体)">中 (すべて)</option>
+                            <option value="中(+)">中(+)</option>
+                            <option value="中(-)">中(-)</option>
+                            <option value="弱">弱</option>
+                            <option value="逆詐称">逆詐称</option>
+                            <option value="入門">入門</option>
+                            <option value="未分類">未分類</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; align-items: flex-end;">
+                        <button onclick="resetFilters()" style="padding: 4px 12px; height: 28px; background: #eee; border: 1px solid #ccc;">リセット</button>
+                    </div>
+                </div>
+            </details>
+
+            <div class="stats-container" id="stats-display"></div>
+        </div>
+
+        <div id="capture-area" style="background-color: #f9f9f9; padding: 10px;">
+            <div id="capture-stats-placeholder"></div>
+            <table id="song-table">
+                <thead>
+                    <tr>
+                        <th style="width: 8%; text-align: center;">メダル</th>
+                        <th style="width: 5%; text-align: center;">Lv</th>
+                        <th style="width: 5%; text-align: center;">Ver</th>
+                        <th style="width: 12%; text-align: center;">バナー</th>
+                        <th style="width: 24%;">ジャンル / 曲名</th>
+                        <th style="width: 7%; text-align: right;">BPM</th>
+                        <th style="width: 7%; text-align: right;">ノーツ</th>
+                        <th style="width: 22%;">難易度 (指数)</th>
+                        <th style="width: 10%; text-align: center;" class="no-export">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="song-list"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="edit-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h3>楽曲データの編集</h3>
+            <input type="hidden" id="edit-original-id">
+            
+            <div class="input-item" style="margin-bottom: 8px;">
+                <label>ジャンル</label>
+                <input type="text" id="edit-genre">
+            </div>
+            <div class="input-item" style="margin-bottom: 8px;">
+                <label>曲名</label>
+                <input type="text" id="edit-title">
+            </div>
+            
+            <div class="input-group">
+                <div class="input-item"><label>Lv</label><input type="text" id="edit-level"></div>
+                <div class="input-item"><label>Ver</label><input type="text" id="edit-version"></div>
+                <div class="input-item"><label>BPM</label><input type="text" id="edit-bpm"></div>
+                <div class="input-item"><label>ノーツ数</label><input type="number" id="edit-notes"></div>
+            </div>
+            
+            <div class="input-item" style="margin-bottom: 8px;">
+                <label>難易度 (例: 別格(+1.5) や 弱(-0.5))</label>
+                <input type="text" id="edit-diff">
+            </div>
+
+            <div class="input-item" style="margin-bottom: 8px;">
+                <label>バナー画像URL (任意)</label>
+                <input type="text" id="edit-banner-url" placeholder="https://...">
+            </div>
+            
+            <div class="modal-actions">
+                <button onclick="deleteSong()" style="background-color: #f44336; color: white; border: 1px solid #d32f2f;">削除</button>
+                <div style="display: flex; gap: 8px;">
+                    <button onclick="closeEditModal()" style="border: 1px solid #ccc; background: #eee;">キャンセル</button>
+                    <button onclick="saveEditModal()" style="background-color: #4caf50; color: white; font-weight: bold; border: 1px solid #388e3c;">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="medal-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 400px;">
+            <h3 style="text-align: center; color: #555; border-bottom: 1px solid #eee; padding-bottom: 10px;">メダルを選択</h3>
+            <div id="medal-grid" class="medal-grid"></div>
+            <div class="modal-actions" style="justify-content: center; margin-top: 20px;">
+                <button onclick="closeMedalModal()" style="border: 1px solid #ccc; background: #eee; padding: 8px 30px;">キャンセル</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // ★クラウド同期設定（GAS）
+        // ==========================================
+        const GAS_URL = 'https://script.google.com/macros/s/AKfycbxG7adhBmaZT_JkuyThNTyOswuf7Y8SuvHt1mPjph9UcFgC71LItqvBN9eeqPBRHjN_5w/exec';
+        // ==========================================
+
+        const STORAGE_KEY_SONGS = 'popn_songs_data_v2';
+        const STORAGE_KEY_CLEARS = 'popn_clear_data_v2';
+
+        const MEDAL_TYPES = {
+            '':         { imgUrl: 'URLをペースト', label: '未プレイ', rank: 0, isEasyClear: false, isNormalClear: false },
+            '黒丸':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/groove_02.png', label: '黒丸', rank: 1, isEasyClear: false, isNormalClear: false },
+            '黒菱':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/groove_01.png', label: '黒菱', rank: 2, isEasyClear: false, isNormalClear: false },
+            '黒星':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/groove_00.png', label: '黒星', rank: 3, isEasyClear: false, isNormalClear: false },
+            'イージー': { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/easy.png', label: 'イージー', rank: 4, isEasyClear: true, isNormalClear: false },
+            'ロングオフ': { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/long_off.png', label: 'ロングオフ', rank: 5, isEasyClear: true, isNormalClear: true },
+            '銅丸':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/bad_02.png', label: '銅丸', rank: 6, isEasyClear: true, isNormalClear: true },
+            '銅菱':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/bad_01.png', label: '銅菱', rank: 7, isEasyClear: true, isNormalClear: true },
+            '銅星':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/bad_00.png', label: '銅星', rank: 8, isEasyClear: true, isNormalClear: true },
+            '銀丸':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/full_combo_02.png', label: '銀丸', rank: 9, isEasyClear: true, isNormalClear: true },
+            '銀菱':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/full_combo_01.png', label: '銀菱', rank: 10, isEasyClear: true, isNormalClear: true },
+            '銀星':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/full_combo_00.png', label: '銀星', rank: 11, isEasyClear: true, isNormalClear: true },
+            '金星':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/perfect_00.png', label: '金星', rank: 12, isEasyClear: true, isNormalClear: true }
+        };
+
+        let currentMedalEditId = null;
+
+        function showLoading(show, text = 'クラウドと通信中...') {
+            document.getElementById('loading-text').innerText = text;
+            document.getElementById('loading').style.display = show ? 'flex' : 'none';
+        }
+
+        function initFilters() {
+            const medalSelect = document.getElementById('filter-medal');
+            medalSelect.innerHTML = '<option value="ALL">すべて</option>';
+            Object.keys(MEDAL_TYPES).forEach(k => {
+                if (k === '') return;
+                const option = document.createElement('option');
+                option.value = k;
+                option.text = MEDAL_TYPES[k].label;
+                medalSelect.appendChild(option);
+            });
+            const optionUnplayed = document.createElement('option');
+            optionUnplayed.value = 'unplayed';
+            optionUnplayed.text = '未プレイ';
+            medalSelect.appendChild(optionUnplayed);
+
+            updateVersionFilter();
+        }
+
+        function updateVersionFilter() {
+            const versionSelect = document.getElementById('filter-version');
+            if (!versionSelect) return;
+            const currentVal = versionSelect.value;
+            
+            versionSelect.innerHTML = '<option value="ALL">すべて</option>';
+            
+            const versions = [...new Set(songs.map(s => s.version))].filter(v => v).sort((a, b) => getVersionSortValue(a) - getVersionSortValue(b));
+            versions.forEach(v => {
+                const option = document.createElement('option');
+                option.value = v;
+                option.text = v;
+                versionSelect.appendChild(option);
+            });
+            
+            if (versions.includes(currentVal)) {
+                versionSelect.value = currentVal;
+            }
+        }
+
+        function resetFilters() {
+            document.getElementById('filter-clear').value = 'ALL';
+            document.getElementById('filter-medal').value = 'ALL';
+            document.getElementById('filter-version').value = 'ALL';
+            document.getElementById('filter-diff').value = 'ALL';
+            renderTable();
+        }
+
+        function initMedalGrid() {
+            const grid = document.getElementById('medal-grid');
+            let html = '';
+            Object.keys(MEDAL_TYPES).forEach(k => {
+                const m = MEDAL_TYPES[k];
+                const isValidUrl = m.imgUrl.startsWith('http') || m.imgUrl.startsWith('data:');
+                const display = isValidUrl 
+                    ? `<img src="${m.imgUrl}" alt="${m.label}">` 
+                    : `<div class="fallback-text">${m.label}</div>`;
+                
+                html += `
+                    <div class="medal-item" onclick="selectMedal('${k}')">
+                        ${display}
+                        <div style="font-size: 0.8em; color: #555; font-weight: bold;">${m.label}</div>
+                    </div>
+                `;
+            });
+            grid.innerHTML = html;
+        }
+
+        function openMedalModal(id) {
+            currentMedalEditId = id;
+            document.getElementById('medal-modal').style.display = 'flex';
+        }
+
+        function closeMedalModal() {
+            currentMedalEditId = null;
+            document.getElementById('medal-modal').style.display = 'none';
+        }
+
+        async function selectMedal(medalKey) {
+            if (currentMedalEditId) {
+                if (medalKey === '') {
+                    delete clearRecords[currentMedalEditId];
+                } else {
+                    clearRecords[currentMedalEditId] = medalKey;
+                }
+                localStorage.setItem(STORAGE_KEY_CLEARS, JSON.stringify(clearRecords));
+                renderTable();
+                closeMedalModal();
+                
+                // ★クラウド自動保存処理
+                await saveToCloud();
+            }
+        }
+
+        function parseDifficulty(rawStr) {
+            if (!rawStr) return { diffClass: '未分類', diffIndex: null };
+            
+            let diffClass = '未分類';
+            let diffIndex = null;
+
+            let normalizedStr = rawStr
+                .replace(/[＋]/g, '+')
+                .replace(/[－]/g, '-')
+                .replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
+                .replace(/．/g, '.');
+
+            const match = normalizedStr.match(/([-+]?\d*\.?\d+)/);
+            if (match) {
+                diffIndex = parseFloat(match[1]);
+            }
+
+            if (rawStr.includes('危険')) diffClass = '危険';
+            else if (rawStr.includes('別格')) diffClass = '別格';
+            else if (rawStr.includes('逆詐称')) diffClass = '逆詐称';
+            else if (rawStr.includes('詐称')) diffClass = '詐称';
+            else if (rawStr.includes('入門')) diffClass = '入門';
+            else if (rawStr.includes('強')) diffClass = '強';
+            else if (rawStr.includes('中')) diffClass = '中';
+            else if (rawStr.includes('弱')) diffClass = '弱';
+
+            return { diffClass, diffIndex };
+        }
+
+        // ---------- データ初期化・読み込み処理 ----------
+        let songs = [];
+        let clearRecords = JSON.parse(localStorage.getItem(STORAGE_KEY_CLEARS)) || {};
+        let needsClearSave = false;
+        
+        let currentSort = 'version';
+        let sortDesc = false;
+        let currentViewLevel = '48';
+
+        window.onload = async () => {
+            if (GAS_URL && GAS_URL.trim() !== '') {
+                showLoading(true, 'クラウドからデータを取得中...');
+                try {
+                    const response = await fetch(GAS_URL);
+                    if (!response.ok) throw new Error('Network error');
+                    const fetchedData = await response.json();
+                    
+                    if (fetchedData && fetchedData.songs) {
+                        songs = fetchedData.songs;
+                        if (fetchedData.clearRecords) {
+                            clearRecords = fetchedData.clearRecords;
+                        }
+                    }
+                } catch (error) {
+                    console.warn('クラウドからの読み込みに失敗しました。ローカルデータを使用します。', error);
+                    songs = JSON.parse(localStorage.getItem(STORAGE_KEY_SONGS)) || [];
+                }
+                showLoading(false);
+            } else {
+                // クラウドURLがない場合は、今まで通り songs.json か localStorageから
+                try {
+                    const response = await fetch('songs.json');
+                    if (response.ok) {
+                        const fetchedData = await response.json();
+                        if (Array.isArray(fetchedData)) {
+                            songs = fetchedData;
+                        } else if (fetchedData && fetchedData.songs) {
+                            songs = fetchedData.songs;
+                            if (fetchedData.clearRecords) {
+                                clearRecords = { ...clearRecords, ...fetchedData.clearRecords };
+                                needsClearSave = true;
+                            }
+                        }
+                    }
+                } catch (error) {
+                    songs = JSON.parse(localStorage.getItem(STORAGE_KEY_SONGS)) || [];
+                }
+            }
+
+            // マイグレーション
+            songs.forEach(s => {
+                if (!s.level) { s.level = '48'; }
+                const reporsed = parseDifficulty(s.diffRaw);
+                if(s.diffClass !== reporsed.diffClass || s.diffIndex !== reporsed.diffIndex) {
+                    s.diffClass = reporsed.diffClass;
+                    s.diffIndex = reporsed.diffIndex;
+                }
+                const expectedId = s.genre + "_" + s.title + "_" + s.notes;
+                if (s.id !== expectedId) {
+                    if (clearRecords[s.id] !== undefined) {
+                        clearRecords[expectedId] = clearRecords[s.id];
+                        delete clearRecords[s.id];
+                        needsClearSave = true;
+                    }
+                    s.id = expectedId;
+                }
+            });
+
+            for (let key in clearRecords) {
+                if (clearRecords[key] === true) { clearRecords[key] = '銅丸'; needsClearSave = true; } 
+                else if (clearRecords[key] === false) { delete clearRecords[key]; needsClearSave = true; } 
+                else if (clearRecords[key] === '緑丸') { clearRecords[key] = 'イージー'; needsClearSave = true; }
+            }
+            if (needsClearSave) {
+                localStorage.setItem(STORAGE_KEY_CLEARS, JSON.stringify(clearRecords));
+                saveToCloud(); // 修正があった場合はクラウドにも反映
+            }
+
+            initFilters();
+            initMedalGrid();
+            document.getElementById('view-level').value = currentViewLevel;
+            renderTable();
+        };
+
+        // ★ クラウド（GAS）にデータを送信する関数
+        async function saveToCloud() {
+            if (!GAS_URL || GAS_URL.trim() === '') return;
+            showLoading(true, 'クラウドに保存中...');
+            try {
+                const exportData = { songs: songs, clearRecords: clearRecords };
+                await fetch(GAS_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(exportData)
+                });
+            } catch (e) {
+                console.error("クラウド保存エラー:", e);
+            }
+            showLoading(false);
+        }
+
+        // ★ 初回のみ：ローカルの全データをクラウドに強制アップロードする関数
+        async function syncLocalToCloud() {
+            if (!GAS_URL || GAS_URL.trim() === '') {
+                alert("GAS_URLが設定されていません。先にGASのデプロイとURLの貼り付けを行ってください。");
+                return;
+            }
+
+            // LocalStorageから今のデータを取得
+            const localSongs = JSON.parse(localStorage.getItem(STORAGE_KEY_SONGS)) || [];
+            const localClears = JSON.parse(localStorage.getItem(STORAGE_KEY_CLEARS)) || {};
+
+            if (localSongs.length === 0 && Object.keys(localClears).length === 0) {
+                alert("ブラウザ（ローカル）にデータが見つかりません。すでに移行済みか、別のブラウザで開いている可能性があります。");
+                return;
+            }
+
+            if (!confirm("ブラウザに保存されている「" + localSongs.length + "件の楽曲」と「クリア記録」をクラウドにアップロードしますか？\n（クラウド側の既存データは上書きされます）")) {
+                return;
+            }
+
+            showLoading(true, 'クラウドへ移行中...');
+            try {
+                const exportData = {
+                    songs: localSongs,
+                    clearRecords: localClears
+                };
+
+                const res = await fetch(GAS_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(exportData)
+                });
+
+                if (res.ok) {
+                    alert("クラウドへの移行が完了しました！\n今後は自動的にクラウドと同期されるため、このボタンはもう使わなくてOKです。");
+                    // 移行が終わったら再読み込みして最新状態にする
+                    location.reload();
+                } else {
+                    throw new Error('Upload failed');
+                }
+            } catch (e) {
+                alert("同期に失敗しました。GASのURLが正しいか、権限設定が「全員」になっているか確認してください。");
+                console.error(e);
+            }
+            showLoading(false);
+        }
+
+        // ---------- JSONダウンロード用の処理 ----------
+        function downloadSongsAndClearsJson() {
+            const exportData = { songs: songs, clearRecords: clearRecords };
+            const dataStr = JSON.stringify(exportData, null, 2);
+            triggerDownload(dataStr, 'songs.json', 'クリア記録を含めて');
+        }
+
+        function downloadSongsJsonOnly() {
+            const dataStr = JSON.stringify(songs, null, 2);
+            triggerDownload(dataStr, 'songs.json', '楽曲データのみで');
+        }
+
+        function triggerDownload(dataStr, filename, typeMessage) {
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            alert(`「${filename}」として${typeMessage}保存しました。\nアプリフォルダのファイルをこのファイルで上書きしてください。`);
+        }
+        // --------------------------------------------------
+
+        async function importFromClipboard() {
+            try {
+                const text = await navigator.clipboard.readText();
+                if (!text || text.trim() === '') {
+                    alert("クリップボードにデータがありません。\nWikiで「魔法のボタン」を押してから実行してください。");
+                    return;
+                }
+                const targetLevel = document.getElementById('import-level').value;
+                await processImportText(text, targetLevel);
+            } catch (err) {
+                alert("クリップボードの読み取りが許可されなかったか、失敗しました。\n「手動でペーストして追加する場合はこちら」を開いて、手動で貼り付けてください。");
+                console.error(err);
+            }
+        }
+
+        async function importDataManual() {
+            const text = document.getElementById('import-text').value;
+            if (!text.trim()) {
+                alert("テキストエリアが空です。");
+                return;
+            }
+            const targetLevel = document.getElementById('import-level').value;
+            await processImportText(text, targetLevel);
+            document.getElementById('import-text').value = '';
+        }
+
+        async function processImportText(text, targetLevel) {
+            const lines = text.split('\n');
+            let newSongsAdded = 0;
+            let songsUpdated = 0;
+
+            lines.forEach(line => {
+                let cleanLine = line.replace(/<[^>]*>?/gm, '');
+                cleanLine = cleanLine.replace(/\[\[[^\]]*?\|([^\]]*?)\]\]/g, '$1');
+                cleanLine = cleanLine.replace(/\[\[(.*?)\]\]/g, '$1');
+
+                let p = cleanLine.replace(/^\|/, '').replace(/\|$/, '').split('|').map(s => s.trim());
+                if (p.length < 5) return; 
+
+                let notesIndex = -1;
+                for (let i = p.length - 1; i >= 2; i--) {
+                    if (/^\d+$/.test(p[i]) && parseInt(p[i], 10) > 50) {
+                        notesIndex = i;
+                        break;
+                    }
+                }
+
+                if (notesIndex === -1) return;
+
+                const notes = parseInt(p[notesIndex], 10);
+                const diffRaw = p[notesIndex + 1] || "";
+
+                let bpmIndex = notesIndex - 1;
+                if (p[bpmIndex] !== undefined && (p[bpmIndex].includes(':') || p[bpmIndex] === "")) {
+                    bpmIndex = notesIndex - 2;
+                }
+
+                const bpm = p[bpmIndex] || "";
+                const title = p[bpmIndex - 1] || "";
+                const genre = p[bpmIndex - 2] || "";
+                
+                const versionRaw = p[0] || "";
+                const version = versionRaw.replace(/\[|\]/g, '').trim();
+
+                const parsed = parseDifficulty(diffRaw);
+                const diffClass = parsed.diffClass;
+                const diffIndex = parsed.diffIndex;
+
+                const id = genre + "_" + title + "_" + notes;
+                const existingIndex = songs.findIndex(s => s.id === id);
+
+                if (existingIndex === -1) {
+                    songs.push({ 
+                        id, level: targetLevel, version, genre, title, bpm, notes, diffClass, diffIndex, diffRaw, bannerUrl: "", originalOrder: songs.length 
+                    });
+                    newSongsAdded++;
+                } else {
+                    let hasChanged = false;
+                    const song = songs[existingIndex];
+
+                    if (song.level !== targetLevel) {
+                        song.level = targetLevel;
+                        hasChanged = true;
+                    }
+                    
+                    if (song.diffRaw !== diffRaw || song.diffClass !== diffClass || song.diffIndex !== diffIndex) {
+                        song.diffRaw = diffRaw;
+                        song.diffClass = diffClass;
+                        song.diffIndex = diffIndex;
+                        hasChanged = true;
+                    }
+
+                    if (hasChanged) {
+                        songsUpdated++;
+                    }
+                }
+            });
+
+            localStorage.setItem(STORAGE_KEY_SONGS, JSON.stringify(songs));
+            localStorage.setItem(STORAGE_KEY_CLEARS, JSON.stringify(clearRecords));
+            
+            updateVersionFilter();
+            document.getElementById('search-input').value = '';
+            currentViewLevel = targetLevel;
+            document.getElementById('view-level').value = targetLevel;
+            renderTable();
+            
+            await saveToCloud(); // ★クラウド保存
+            
+            alert(`レベル${targetLevel}として、${newSongsAdded}件を新規追加、${songsUpdated}件を更新しました。`);
+        }
+
+        async function updateBannerFromClipboard(id) {
+            try {
+                const text = await navigator.clipboard.readText();
+                if (!text || text.trim() === '') {
+                    alert("クリップボードに画像のURLがありません。\n画像のURLをコピーしてから再度クリックしてください。");
+                    return;
+                }
+                const songIndex = songs.findIndex(s => s.id === id);
+                if (songIndex === -1) return;
+
+                songs[songIndex].bannerUrl = text.trim();
+                localStorage.setItem(STORAGE_KEY_SONGS, JSON.stringify(songs));
+                renderTable();
+                await saveToCloud(); // ★クラウド保存
+            } catch (err) {
+                const songIndex = songs.findIndex(s => s.id === id);
+                if (songIndex === -1) return;
+                const currentUrl = songs[songIndex].bannerUrl || "";
+                const newUrl = prompt(`【自動取得ブロック】\nブラウザの設定でクリップボードの自動読み取りがブロックされています。\nここにバナー画像のアドレス（URL）を手動で貼り付けてください:`, currentUrl);
+                
+                if (newUrl !== null) { 
+                    songs[songIndex].bannerUrl = newUrl.trim();
+                    localStorage.setItem(STORAGE_KEY_SONGS, JSON.stringify(songs));
+                    renderTable(); 
+                    await saveToCloud(); // ★クラウド保存
+                }
+            }
+        }
+
+        function handleSearch() {
+            renderTable();
+        }
+
+        function clearSearch() {
+            document.getElementById('search-input').value = '';
+            renderTable();
+        }
+
+        async function exportAsImage() {
+            const btn = document.querySelector('.btn-image');
+            const originalText = btn.innerText;
+            
+            const activeCheckboxes = Array.from(document.querySelectorAll('.export-col-toggle'));
+            const activeIndices = activeCheckboxes.filter(cb => cb.checked).map(cb => parseInt(cb.value));
+
+            if (activeIndices.length === 0) {
+                alert("画像に出力する項目を1つ以上選択してください。");
+                return;
+            }
+
+            btn.innerText = "生成中... (画像読込待機)";
+            
+            const exportContainer = document.createElement('div');
+            exportContainer.style.position = 'absolute';
+            exportContainer.style.left = '-9999px';
+            exportContainer.style.top = '0';
+            exportContainer.style.backgroundColor = '#f9f9f9';
+            exportContainer.style.padding = '20px';
+            exportContainer.style.width = 'max-content';
+            exportContainer.style.fontFamily = 'sans-serif';
+            document.body.appendChild(exportContainer);
+
+            const statsClone = document.getElementById('stats-display').cloneNode(true);
+            statsClone.style.marginBottom = '20px';
+            statsClone.style.fontSize = '1.3em';
+            statsClone.style.padding = '20px'; 
+
+            const statGroups = statsClone.querySelectorAll('.stats-group');
+            statGroups.forEach(group => { group.style.gap = '15px'; });
+
+            const statTitles = statsClone.querySelectorAll('.stats-title');
+            statTitles.forEach(title => { title.style.fontSize = '1.1em'; });
+
+            const statFractions = statsClone.querySelectorAll('.stats-fraction');
+            statFractions.forEach(frac => { frac.style.fontSize = '1.3em'; });
+
+            const statRemains = statsClone.querySelectorAll('.stats-remain');
+            statRemains.forEach(rem => { rem.style.fontSize = '0.9em'; });
+
+            const easyPercs = statsClone.querySelectorAll('.stats-easypercentage');
+            easyPercs.forEach(perc => { perc.style.fontSize = '2.3em'; });
+
+            const percs = statsClone.querySelectorAll('.stats-percentage');
+            percs.forEach(perc => { perc.style.fontSize = '2.3em'; });
+
+            const levelBadges = statsClone.querySelectorAll('.stats-level');
+            levelBadges.forEach(badge => {
+                badge.style.fontSize = '1.9em';
+                badge.style.padding = '10px 25px'; 
+            });
+
+            const detailsElement = statsClone.querySelector('details');
+            if (detailsElement) {
+                const contentDiv = detailsElement.querySelector('.details-content');
+                if (detailsElement.hasAttribute('open')) {
+                    if (contentDiv) contentDiv.style.display = 'block'; 
+                } else {
+                    if (contentDiv) contentDiv.style.display = 'none'; 
+                }
+            }
+            
+            const statsImages = Array.from(statsClone.querySelectorAll('img'));
+            statsImages.forEach(img => {
+                const originalSrc = img.getAttribute('src');
+                if (originalSrc && originalSrc.startsWith('http') && !originalSrc.includes('wsrv.nl')) {
+                    img.setAttribute('crossOrigin', 'anonymous');
+                    img.src = `https://wsrv.nl/?url=${encodeURIComponent(originalSrc)}`;
+                }
+            });
+
+            exportContainer.appendChild(statsClone);
+
+            const tablesWrapper = document.createElement('div');
+            tablesWrapper.style.display = 'flex';
+            tablesWrapper.style.gap = '20px';
+            tablesWrapper.style.alignItems = 'flex-start';
+            exportContainer.appendChild(tablesWrapper);
+
+            const originalRows = Array.from(document.querySelectorAll('#song-list tr'));
+            const chunkSize = 30;
+
+            const colWidths = [8, 5, 5, 12, 30, 8, 8, 24];
+            let totalPct = 0;
+            activeIndices.forEach(idx => totalPct += colWidths[idx]);
+            const totalWidth = totalPct * 10; 
+
+            const colProps = [
+                { id: 0, html: `<th style="width: ${colWidths[0]}%; text-align: center; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">メダル</th>` },
+                { id: 1, html: `<th style="width: ${colWidths[1]}%; text-align: center; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">Lv</th>` },
+                { id: 2, html: `<th style="width: ${colWidths[2]}%; text-align: center; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">Ver</th>` },
+                { id: 3, html: `<th style="width: ${colWidths[3]}%; text-align: center; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">バナー</th>` },
+                { id: 4, html: `<th style="width: ${colWidths[4]}%; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2; text-align: left;">ジャンル / 曲名</th>` },
+                { id: 5, html: `<th style="width: ${colWidths[5]}%; text-align: right; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">BPM</th>` },
+                { id: 6, html: `<th style="width: ${colWidths[6]}%; text-align: right; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">ノーツ</th>` },
+                { id: 7, html: `<th style="width: ${colWidths[7]}%; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2; text-align: left;">難易度</th>` }
+            ];
+
+            for (let i = 0; i < originalRows.length; i += chunkSize) {
+                const chunk = originalRows.slice(i, i + chunkSize);
+
+                const table = document.createElement('table');
+                table.style.borderCollapse = 'collapse';
+                table.style.backgroundColor = '#fff';
+                table.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                table.style.width = `${totalWidth}px`;
+
+                const thead = document.createElement('thead');
+                let theadHtml = '<tr>';
+                colProps.forEach(prop => {
+                    if (activeIndices.includes(prop.id)) {
+                        theadHtml += prop.html;
+                    }
+                });
+                theadHtml += '</tr>';
+                thead.innerHTML = theadHtml;
+                table.appendChild(thead);
+
+                const tbody = document.createElement('tbody');
+                chunk.forEach(row => {
+                    const clonedRow = row.cloneNode(true);
+                    
+                    if (clonedRow.lastElementChild) {
+                        clonedRow.removeChild(clonedRow.lastElementChild);
+                    }
+
+                    const cells = Array.from(clonedRow.children);
+                    
+                    cells.forEach((cell, index) => {
+                        cell.style.border = '1px solid #ddd';
+                        cell.style.padding = '8px';
+                        cell.style.verticalAlign = 'middle';
+
+                        if (index === 0 || index === 3) {
+                            const img = cell.querySelector('img');
+                            if (img) {
+                                const originalSrc = img.getAttribute('src');
+                                if (originalSrc && originalSrc.startsWith('http') && !originalSrc.includes('wsrv.nl')) {
+                                    img.setAttribute('crossOrigin', 'anonymous');
+                                    img.src = `https://wsrv.nl/?url=${encodeURIComponent(originalSrc)}`;
+                                }
+                            }
+                        }
+                    });
+
+                    for (let c = cells.length - 1; c >= 0; c--) {
+                        if (!activeIndices.includes(c)) {
+                            clonedRow.removeChild(cells[c]);
+                        }
+                    }
+
+                    tbody.appendChild(clonedRow);
+                });
+                
+                table.appendChild(tbody);
+                tablesWrapper.appendChild(table);
+            }
+
+            const exportImages = Array.from(exportContainer.querySelectorAll('img'));
+            await Promise.all(exportImages.map(img => {
+                return new Promise(resolve => {
+                    if (img.complete) {
+                        resolve();
+                    } else {
+                        img.onload = resolve;
+                        img.onerror = resolve; 
+                    }
+                });
+            }));
+
+            btn.innerText = "生成中... (描画中)";
+
+            const searchInput = document.getElementById('search-input');
+            const isSearching = searchInput && searchInput.value.trim() !== '';
+            const fileNameLevel = isSearching ? 'Search' : currentViewLevel;
+
+            try {
+                const canvas = await html2canvas(exportContainer, {
+                    backgroundColor: "#f9f9f9",
+                    useCORS: true,
+                    scale: 2 
+                });
+                const link = document.createElement('a');
+                const date = new Date().toISOString().slice(0,10);
+                link.download = `popn_clearrate_Lv${fileNameLevel}_${date}.png`;
+                link.href = canvas.toDataURL("image/png");
+                link.click();
+            } catch (err) {
+                alert("画像の生成に失敗しました。（一部の画像URLがセキュリティ制限に引っかかっている可能性があります）");
+                console.error(err);
+            } finally {
+                document.body.removeChild(exportContainer);
+                btn.innerText = originalText;
+            }
+        }
+
+        async function deleteLevelData() {
+            const targetLevel = document.getElementById('delete-level').value;
+            const songsToDelete = songs.filter(s => s.level === targetLevel);
+            
+            if (songsToDelete.length === 0) {
+                alert(`レベル${targetLevel}の楽曲データはありません。`);
+                return;
+            }
+
+            if(confirm(`【警告】レベル${targetLevel}の楽曲データ（${songsToDelete.length}件）をすべて削除しますか？\n（クリア記録も削除されます。この操作は元に戻せません）`)) {
+                const deleteIds = songsToDelete.map(s => s.id);
+                
+                songs = songs.filter(s => s.level !== targetLevel);
+                
+                deleteIds.forEach(id => {
+                    delete clearRecords[id];
+                });
+
+                localStorage.setItem(STORAGE_KEY_SONGS, JSON.stringify(songs));
+                localStorage.setItem(STORAGE_KEY_CLEARS, JSON.stringify(clearRecords));
+                
+                updateVersionFilter();
+                renderTable();
+                await saveToCloud(); // ★クラウド保存
+                
+                alert(`レベル${targetLevel}の楽曲データとクリア記録を削除しました。`);
+            }
+        }
+
+        function openEditModal(id) {
+            const song = songs.find(s => s.id === id);
+            if (!song) return;
+            
+            document.getElementById('edit-original-id').value = song.id;
+            document.getElementById('edit-genre').value = song.genre;
+            document.getElementById('edit-title').value = song.title;
+            document.getElementById('edit-level').value = song.level || "";
+            document.getElementById('edit-version').value = song.version || "";
+            document.getElementById('edit-bpm').value = song.bpm || "";
+            document.getElementById('edit-notes').value = song.notes || 0;
+            document.getElementById('edit-diff').value = song.diffRaw || "";
+            document.getElementById('edit-banner-url').value = song.bannerUrl || "";
+            
+            document.getElementById('edit-modal').style.display = 'flex';
+        }
+
+        function closeEditModal() {
+            document.getElementById('edit-modal').style.display = 'none';
+        }
+
+        async function deleteSong() {
+            if(confirm("この楽曲をリストから削除しますか？\n（クリア記録も同時に削除されます）")) {
+                const originalId = document.getElementById('edit-original-id').value;
+                songs = songs.filter(s => s.id !== originalId);
+                delete clearRecords[originalId];
+                
+                localStorage.setItem(STORAGE_KEY_SONGS, JSON.stringify(songs));
+                localStorage.setItem(STORAGE_KEY_CLEARS, JSON.stringify(clearRecords));
+                
+                updateVersionFilter();
+                renderTable();
+                closeEditModal();
+                await saveToCloud(); // ★クラウド保存
+            }
+        }
+
+        async function saveEditModal() {
+            const originalId = document.getElementById('edit-original-id').value;
+            const songIndex = songs.findIndex(s => s.id === originalId);
+            if (songIndex === -1) return;
+
+            const newGenre = document.getElementById('edit-genre').value.trim();
+            const newTitle = document.getElementById('edit-title').value.trim();
+            const newNotes = parseInt(document.getElementById('edit-notes').value, 10) || 0;
+            
+            const newId = newGenre + "_" + newTitle + "_" + newNotes;
+
+            if (newId !== originalId) {
+                if (clearRecords[originalId] !== undefined) {
+                    clearRecords[newId] = clearRecords[originalId];
+                    delete clearRecords[originalId];
+                    localStorage.setItem(STORAGE_KEY_CLEARS, JSON.stringify(clearRecords));
+                }
+                songs[songIndex].id = newId;
+            }
+
+            songs[songIndex].genre = newGenre;
+            songs[songIndex].title = newTitle;
+            songs[songIndex].level = document.getElementById('edit-level').value.trim();
+            songs[songIndex].version = document.getElementById('edit-version').value.trim();
+            songs[songIndex].bpm = document.getElementById('edit-bpm').value.trim();
+            songs[songIndex].notes = newNotes;
+            songs[songIndex].bannerUrl = document.getElementById('edit-banner-url').value.trim();
+            
+            const newDiffRaw = document.getElementById('edit-diff').value.trim();
+            const parsed = parseDifficulty(newDiffRaw);
+            songs[songIndex].diffRaw = newDiffRaw;
+            songs[songIndex].diffClass = parsed.diffClass;
+            songs[songIndex].diffIndex = parsed.diffIndex;
+
+            localStorage.setItem(STORAGE_KEY_SONGS, JSON.stringify(songs));
+            updateVersionFilter();
+            renderTable();
+            closeEditModal();
+            await saveToCloud(); // ★クラウド保存
+        }
+
+        async function clearRecordsOnly() {
+            if(confirm("すべてのクリア記録のみをリセットしますか？\n（楽曲リストや編集した情報は保持されます）")) {
+                clearRecords = {};
+                localStorage.setItem(STORAGE_KEY_CLEARS, JSON.stringify(clearRecords));
+                renderTable();
+                await saveToCloud(); // ★クラウド保存
+            }
+        }
+
+        async function initializeData() {
+            if(confirm("【警告】楽曲データ・クリア記録のすべてを削除し、完全に初期化しますか？\n（この操作は元に戻せません）")) {
+                songs = [];
+                clearRecords = {};
+                localStorage.removeItem(STORAGE_KEY_SONGS);
+                localStorage.removeItem(STORAGE_KEY_CLEARS);
+                updateVersionFilter();
+                renderTable();
+                await saveToCloud(); // ★クラウド保存
+                alert("アプリを初期化しました。");
+            }
+        }
+
+        function changeViewLevel() {
+            document.getElementById('search-input').value = '';
+            currentViewLevel = document.getElementById('view-level').value;
+            renderTable();
+        }
+
+        function sortBy(key) {
+            if (currentSort === key) {
+                sortDesc = !sortDesc;
+            } else {
+                currentSort = key;
+                sortDesc = (key === 'notes' || key === 'diff' || key === 'bpm' || key === 'level' || key === 'clear') ? true : false;
+            }
+            renderTable();
+        }
+
+        function getDifficultyColor(diffClass, index) {
+            let effIndex = index;
+            if (index === null || isNaN(index)) {
+                if (diffClass === '危険') effIndex = 2.5; 
+                else if (diffClass === '別格') effIndex = 2.0;
+                else if (diffClass === '強' || diffClass === '詐称') effIndex = 1.0;
+                else if (diffClass === '弱' || diffClass === '逆詐称') effIndex = -1.0;
+                else if (diffClass === '入門') effIndex = -2.0; 
+                else effIndex = 0.0;
+            }
+
+            const absIndex = Math.abs(effIndex);
+            const alpha = 0.3 + Math.min(1.0, absIndex) * 0.7;
+
+            if (diffClass === '危険') {
+                return { 
+                    color: '#FFD700', 
+                    shadow: '1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000' 
+                };
+            }
+            if (diffClass === '入門') {
+                return { color: `rgba(0, 128, 0, ${alpha})`, shadow: 'none' }; 
+            }
+            if (diffClass === '別格') {
+                return { color: `rgba(128, 0, 128, ${alpha})`, shadow: 'none' };
+            }
+            if (diffClass === '強' || diffClass === '詐称') {
+                return { color: `rgba(255, 0, 0, ${alpha})`, shadow: 'none' };
+            }
+            if (diffClass === '弱' || diffClass === '逆詐称') {
+                return { color: `rgba(0, 0, 255, ${alpha})`, shadow: 'none' };
+            }
+            
+            return { color: `rgba(0, 0, 0, 1.0)`, shadow: 'none' };
+        }
+
+        function getVersionSortValue(ver) {
+            if (!ver) return 9999;
+            let v = ver.toLowerCase();
+            if (!isNaN(v)) return parseInt(v, 10);
+            const acOrder = { 'sp': 21, 'lt': 22, 'écl': 23, 'うさ': 24, 'pe': 25, '解': 26, 'ul': 27, 'jf': 28 };
+            if (acOrder[v] !== undefined) return acOrder[v];
+            if (v.startsWith('cs')) return 100 + parseInt(v.replace('cs', ''), 10) || 199;
+            if (v.startsWith('pmp')) return 200 + parseInt(v.replace('pmp', ''), 10) || 299;
+            if (v === 'ee') return 300;
+            if (v === 'hc') return 400;
+            return 999; 
+        }
+
+        function getBpmSortValue(bpmStr) {
+            if (!bpmStr || bpmStr === '-') return 0;
+            const matches = bpmStr.match(/\d+/g);
+            if (matches) {
+                return Math.max(...matches.map(Number));
+            }
+            return 0;
+        }
+
+        function renderTable() {
+            const searchInput = document.getElementById('search-input');
+            const searchQuery = searchInput ? searchInput.value.trim().toLowerCase() : "";
+
+            const filterClear = document.getElementById('filter-clear') ? document.getElementById('filter-clear').value : 'ALL';
+            const filterMedal = document.getElementById('filter-medal') ? document.getElementById('filter-medal').value : 'ALL';
+            const filterVersion = document.getElementById('filter-version') ? document.getElementById('filter-version').value : 'ALL';
+            const filterDiff = document.getElementById('filter-diff') ? document.getElementById('filter-diff').value : 'ALL';
+
+            let displaySongs = songs.filter(s => {
+                if (currentViewLevel !== 'ALL' && s.level !== currentViewLevel) return false;
+                if (searchQuery && !(s.genre.toLowerCase().includes(searchQuery) || s.title.toLowerCase().includes(searchQuery))) return false;
+
+                const medalKey = clearRecords[s.id] || '';
+                const medalInfo = MEDAL_TYPES[medalKey];
+
+                if (filterClear === 'uncleared' && medalInfo && medalInfo.isEasyClear) return false;
+                if (filterClear === 'cleared' && (!medalInfo || !medalInfo.isEasyClear)) return false;
+                if (filterClear === 'normal_cleared' && (!medalInfo || !medalInfo.isNormalClear)) return false;
+
+                if (filterMedal !== 'ALL') {
+                    if (filterMedal === 'unplayed' && medalKey !== '') return false;
+                    if (filterMedal !== 'unplayed' && medalKey !== filterMedal) return false;
+                }
+
+                if (filterVersion !== 'ALL' && s.version !== filterVersion) return false;
+
+                if (filterDiff !== 'ALL') {
+                    let dClass = s.diffClass || '未分類';
+                    if (dClass === '中') {
+                        dClass = (s.diffIndex !== null && s.diffIndex < 0) ? '中(-)' : '中(+)';
+                    }
+                    if (filterDiff === '中(全体)') {
+                        if (!dClass.startsWith('中')) return false;
+                    } else {
+                        if (dClass !== filterDiff) return false;
+                    }
+                }
+
+                return true;
+            });
+
+            if (currentSort === 'clear') {
+                displaySongs.sort((a, b) => {
+                    let valA = MEDAL_TYPES[clearRecords[a.id] || ''].rank;
+                    let valB = MEDAL_TYPES[clearRecords[b.id] || ''].rank;
+                    if (valA === valB) return a.originalOrder - b.originalOrder;
+                    return sortDesc ? valB - valA : valA - valB;
+                });
+            } else if (currentSort === 'notes') {
+                displaySongs.sort((a, b) => sortDesc ? b.notes - a.notes : a.notes - b.notes);
+            } else if (currentSort === 'diff') {
+                displaySongs.sort((a, b) => {
+                    const getVal = (song) => {
+                        if (song.diffIndex !== null && !isNaN(song.diffIndex)) return parseFloat(song.diffIndex);
+                        if (song.diffClass === '危険') return 2.5; 
+                        if (song.diffClass === '別格') return 2.0;
+                        if (song.diffClass === '詐称') return 1.5;
+                        if (song.diffClass === '強') return 1.0;
+                        if (song.diffClass === '中') return 0.0;
+                        if (song.diffClass === '弱') return -1.0;
+                        if (song.diffClass === '逆詐称') return -1.5;
+                        if (song.diffClass === '入門') return -2.0; 
+                        return -999;
+                    };
+                    let valA = getVal(a);
+                    let valB = getVal(b);
+                    if (valA === valB) return a.originalOrder - b.originalOrder;
+                    return sortDesc ? valB - valA : valA - valB;
+                });
+            } else if (currentSort === 'bpm') {
+                displaySongs.sort((a, b) => {
+                    let valA = getBpmSortValue(a.bpm);
+                    let valB = getBpmSortValue(b.bpm);
+                    return sortDesc ? valB - valA : valA - valB;
+                });
+            } else if (currentSort === 'version') {
+                displaySongs.sort((a, b) => {
+                    let valA = getVersionSortValue(a.version);
+                    let valB = getVersionSortValue(b.version);
+                    if (valA === valB) return a.originalOrder - b.originalOrder;
+                    return sortDesc ? valB - valA : valA - valB;
+                });
+            } else if (currentSort === 'level') {
+                displaySongs.sort((a, b) => {
+                    let valA = parseInt(a.level, 10) || 0;
+                    let valB = parseInt(b.level, 10) || 0;
+                    if (valA === valB) return a.originalOrder - b.originalOrder;
+                    return sortDesc ? valB - valA : valA - valB;
+                });
+            }
+
+            const tbody = document.getElementById('song-list');
+            tbody.innerHTML = '';
+
+            let easyClearCount = 0; 
+            let normalClearCount = 0; 
+            
+            let medalCounts = {};
+            Object.keys(MEDAL_TYPES).forEach(k => {
+                medalCounts[k] = 0;
+            });
+
+            let diffStats = {
+                '危険': { total: 0, easy: 0, normal: 0 },
+                '別格': { total: 0, easy: 0, normal: 0 },
+                '詐称': { total: 0, easy: 0, normal: 0 },
+                '強': { total: 0, easy: 0, normal: 0 },
+                '中(+)': { total: 0, easy: 0, normal: 0 },
+                '中(-)': { total: 0, easy: 0, normal: 0 },
+                '弱': { total: 0, easy: 0, normal: 0 },
+                '逆詐称': { total: 0, easy: 0, normal: 0 },
+                '入門': { total: 0, easy: 0, normal: 0 },
+                '未分類': { total: 0, easy: 0, normal: 0 }
+            };
+
+            displaySongs.forEach(song => {
+                const medalKey = clearRecords[song.id] || '';
+                const medalInfo = MEDAL_TYPES[medalKey];
+                
+                medalCounts[medalKey]++;
+                
+                let dClass = song.diffClass || '未分類';
+                if (dClass === '中') {
+                    if (song.diffIndex !== null && song.diffIndex < 0) {
+                        dClass = '中(-)';
+                    } else {
+                        dClass = '中(+)';
+                    }
+                }
+                
+                if (!diffStats[dClass]) dClass = '未分類';
+                diffStats[dClass].total++;
+                
+                if (medalInfo.isEasyClear) {
+                    easyClearCount++;
+                    diffStats[dClass].easy++;
+                }
+                if (medalInfo.isNormalClear) {
+                    normalClearCount++;
+                    diffStats[dClass].normal++;
+                }
+
+                const tr = document.createElement('tr');
+                if (song.notes >= 1537) tr.classList.add('spicy-gauge');
+                if (medalInfo.isEasyClear) tr.classList.add('cleared-row');
+
+                const styleObj = getDifficultyColor(song.diffClass, song.diffIndex);
+                const diffHtml = `<span style="color: ${styleObj.color}; text-shadow: ${styleObj.shadow}; font-weight: bold;">${song.diffRaw}</span>`;
+                
+                const safeId = song.id.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;");
+
+                const isValidMedalUrl = medalInfo.imgUrl.startsWith('http') || medalInfo.imgUrl.startsWith('data:');
+                const medalDisplayHtml = isValidMedalUrl
+                    ? `<img src="${medalInfo.imgUrl}" style="width: 32px; height: 32px; object-fit: contain; cursor: pointer; display: block; margin: 0 auto;" onclick="openMedalModal('${safeId}')" title="${medalInfo.label}">`
+                    : `<div onclick="openMedalModal('${safeId}')" style="cursor: pointer; font-weight: bold; padding: 4px; border: 1px solid #ccc; border-radius: 4px; background: #fff; font-size: 0.8em; color: #555; white-space: nowrap;" title="クリックして変更">${medalInfo.label}</div>`;
+
+                const bannerHtml = song.bannerUrl && song.bannerUrl.trim() !== ''
+                    ? `<img src="${song.bannerUrl}" style="max-width: 100%; height: auto; max-height: 50px; border-radius: 4px; cursor: pointer;" onclick="updateBannerFromClipboard('${safeId}')" title="クリックしてコピーしたURLで上書き" onerror="this.style.display='none'" />`
+                    : `<span style="color: #aaa; font-size: 0.85em; font-weight: bold; text-decoration: underline; cursor: pointer;" onclick="updateBannerFromClipboard('${safeId}')" title="クリックしてコピーしたURLを自動ペースト">No Image</span>`;
+
+                tr.innerHTML = `
+                    <td style="text-align: center; vertical-align: middle;">
+                        ${medalDisplayHtml}
+                    </td>
+                    <td style="text-align: center;">
+                        <span class="level-badge">${song.level || '-'}</span>
+                    </td>
+                    <td style="text-align: center;">
+                        <span class="ver-badge">${song.version || '-'}</span>
+                    </td>
+                    <td style="text-align: center;">
+                        ${bannerHtml}
+                    </td>
+                    <td>
+                        <div style="font-size: 0.85em; color: #666;">${song.genre}</div>
+                        <div style="font-weight: bold;">${song.title}</div>
+                    </td>
+                    <td style="text-align: right;">
+                        <span>${song.bpm || '-'}</span>
+                    </td>
+                    <td style="text-align: right;">
+                        <span>${song.notes}</span>
+                    </td>
+                    <td>
+                        ${diffHtml}
+                    </td>
+                    <td style="text-align: center;" class="no-export">
+                        <button class="edit-btn" onclick="openEditModal('${safeId}')">✏️編集</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            const total = displaySongs.length;
+            const easyPerc = total === 0 ? 0 : ((easyClearCount / total) * 100).toFixed(1);
+            const normalPerc = total === 0 ? 0 : ((normalClearCount / total) * 100).toFixed(1);
+            
+            const easyRemain = total - easyClearCount;
+            const normalRemain = total - normalClearCount;
+
+            let levelLabel = currentViewLevel === 'ALL' ? '全体' : `Lv${currentViewLevel}`;
+            if (searchQuery) {
+                levelLabel = `検索結果 ("${searchQuery}")`;
+            }
+            if (filterClear !== 'ALL' || filterMedal !== 'ALL' || filterVersion !== 'ALL' || filterDiff !== 'ALL') {
+                levelLabel += ' (絞り込み中)';
+            }
+            
+            let detailsHtml = `
+                <details style="width: 100%; margin-top: 10px;">
+                    <summary style="cursor: pointer; font-size: 0.9em; font-weight: bold; color: #555; padding: 6px; border-top: 1px dashed #ddd; outline: none; user-select: none;">
+                        📊 メダル・難易度別クリア内訳を表示
+                    </summary>
+                    <div class="details-content" style="padding: 12px; background: #f1f8ff; border-radius: 6px; border: 1px solid #e3f2fd; margin-top: 8px;">
+                        
+                        <div style="font-weight: bold; color: #555; margin-bottom: 6px; font-size: 0.9em;">🏅 メダル別内訳</div>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 15px;">
+            `;
+            Object.keys(MEDAL_TYPES).forEach(k => {
+                const m = MEDAL_TYPES[k];
+                const count = medalCounts[k];
+                const perc = total === 0 ? 0 : ((count / total) * 100).toFixed(1);
+                
+                const isValidMedalUrl = m.imgUrl.startsWith('http') || m.imgUrl.startsWith('data:');
+                const iconHtml = isValidMedalUrl 
+                    ? `<img src="${m.imgUrl}" style="width: 20px; height: 20px; object-fit: contain; vertical-align: middle; margin-right: 4px;">` 
+                    : `<span style="font-weight: bold; color: #555; margin-right: 4px;">[${m.label}]</span>`;
+
+                detailsHtml += `
+                    <div style="background: #fff; padding: 6px 10px; border-radius: 4px; border: 1px solid #ddd; font-size: 0.85em; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                        <span style="display: flex; align-items: center;">${iconHtml} <span style="color:#333;">${m.label}</span></span>
+                        <span style="color: #333; font-weight: bold;">${count} <span style="color: #888; font-weight: normal; font-size: 0.9em;">(${perc}%)</span></span>
+                    </div>
+                `;
+            });
+            detailsHtml += `</div>`;
+
+            detailsHtml += `<div style="font-weight: bold; color: #555; margin-bottom: 6px; font-size: 0.9em; border-top: 1px dashed #ccc; padding-top: 10px;">🎯 難易度（指数）別クリア率</div>`;
+            detailsHtml += `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px;">`;
+            
+            const diffOrder = ['危険', '別格', '詐称', '強', '中(+)', '中(-)', '弱', '逆詐称', '入門', '未分類'];
+            diffOrder.forEach(dKey => {
+                const stat = diffStats[dKey];
+                if (stat.total === 0) return; 
+                
+                const ePerc = ((stat.easy / stat.total) * 100).toFixed(1);
+                const nPerc = ((stat.normal / stat.total) * 100).toFixed(1);
+                
+                let baseClass = dKey.startsWith('中') ? '中' : dKey;
+                let baseIndex = dKey === '中(+)' ? 0.5 : (dKey === '中(-)' ? -0.5 : 0);
+                
+                const styleObj = getDifficultyColor(baseClass, baseIndex);
+                let borderColor = styleObj.color.replace('0.3', '0.8').replace('1.0', '0.8');
+                if (dKey === '危険') borderColor = '#333';
+                
+                detailsHtml += `
+                    <div style="background: #fff; padding: 8px; border-radius: 4px; border: 1px solid #ddd; border-left: 4px solid ${borderColor}; box-shadow: 0 1px 2px rgba(0,0,0,0.05); font-size: 0.85em;">
+                        <div style="display: flex; justify-content: space-between; border-bottom: 1px dotted #eee; padding-bottom: 4px; margin-bottom: 4px;">
+                            <span style="font-weight: bold; color: ${dKey === '危険' ? '#FFD700' : '#333'}; text-shadow: ${dKey === '危険' ? styleObj.shadow : 'none'};">${dKey}</span>
+                            <span style="color: #666;">全${stat.total}曲</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                            <span style="color: #2cbc21; font-weight: bold;">イージー以上 <span style="color: #333;">${stat.easy}/${stat.total}</span></span>
+                            <span style="color: #666;">${ePerc}%</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="color: #d32f2f; font-weight: bold;">ノーマル以上 <span style="color: #333;">${stat.normal}/${stat.total}</span></span>
+                            <span style="color: #666;">${nPerc}%</span>
+                        </div>
+                    </div>
+                `;
+            });
+            detailsHtml += `</div></div></details>`;
+            
+            document.getElementById('stats-display').innerHTML = `
+                <div style="display: flex; flex-wrap: wrap; gap: 15px; width: 100%; justify-content: flex-end; align-items: baseline;">
+                    <div class="stats-level">【${levelLabel}】</div>
+                    <div class="stats-group">
+                        <span class="stats-title">イージークリア以上:</span>
+                        <span class="stats-fraction">${easyClearCount} / ${total} <span class="stats-remain">(未クリア: ${easyRemain})</span></span>
+                        <span class="stats-easypercentage">${easyPerc}%</span>
+                    </div>
+                    <div class="stats-group" style="margin-left: 10px;">
+                        <span class="stats-title">ノーマルクリア以上:</span>
+                        <span class="stats-fraction">${normalClearCount} / ${total} <span class="stats-remain">(未クリア: ${normalRemain})</span></span>
+                        <span class="stats-percentage">${normalPerc}%</span>
+                    </div>
+                </div>
+                ${detailsHtml}
+            `;
+        }
+    </script>
+</body>
+</html>
