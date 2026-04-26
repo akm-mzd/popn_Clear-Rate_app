@@ -95,6 +95,48 @@
             border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 10px;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* =========================================
+           📱 スマホ向け最適化（レスポンシブデザイン）
+           ========================================= */
+        @media screen and (max-width: 768px) {
+            /* 全体の余白を狭くして画面を広く使う */
+            body { padding: 10px; }
+            
+            /* 横並びのメニューを縦積みにする */
+            .flex-row { flex-direction: column; align-items: stretch; gap: 5px; }
+            
+            /* ボタンと入力欄を大きくしてタップしやすくする */
+            button, select, input.search-box { 
+                width: 100%; 
+                padding: 12px; 
+                font-size: 16px; /* 16px以上にするとiPhoneでズームされない */
+                box-sizing: border-box; 
+                margin-bottom: 5px;
+            }
+            
+            /* 「さらに条件で絞り込む」の中身を2列にする */
+            details > div > div { width: 48%; flex: 1 1 48%; }
+            
+            /* ヘッダーの固定を解除（スマホの貴重な縦幅を確保するため） */
+            .view-header { position: static; padding-top: 5px; }
+
+            /* ★ テーブルの最適化 ★ */
+            /* 優先度の低い「Ver」「BPM」「ノーツ数」列をスマホでは非表示にして横幅に収める */
+            th:nth-child(3), td:nth-child(3), /* Ver */
+            th:nth-child(6), td:nth-child(6), /* BPM */
+            th:nth-child(7), td:nth-child(7)  /* ノーツ */ {
+                display: none;
+            }
+            
+            /* セル内の文字サイズと余白を調整 */
+            td { font-size: 0.85em; padding: 6px 4px; }
+            th { font-size: 0.9em; padding: 6px 4px; }
+            
+            /* メダル選択のモーダル画面をスマホ向けに調整 */
+            .modal-content { width: 95%; padding: 15px; }
+            .medal-item { padding: 8px; }
+        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
