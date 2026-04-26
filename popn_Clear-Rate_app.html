@@ -128,36 +128,79 @@
     <div style="padding: 20px;">
         <h1>楽曲クリアレート管理</h1>
 
-        <div class="controls">
-            <div class="flex-row">
-                <label style="font-weight: bold;">追加するレベル: 
-                    <select id="import-level" style="padding: 10px;">
-                        <option value="50">Lv 50</option>
-                        <option value="49">Lv 49</option>
-                        <option value="48" selected>Lv 48</option>
-                        <option value="47">Lv 47</option>
-                        <option value="46">Lv 46</option>
-                        <option value="45">Lv 45</option>
-                        <option value="44">Lv 44</option>
-                        <option value="43">Lv 43</option>
-                        <option value="42">Lv 42</option>
-                        <option value="41">Lv 41</option>
-                        <option value="40">Lv 40</option>
-                        <option value="その他">その他</option>
-                    </select>
-                </label>
-                <button onclick="importFromClipboard()" style="background-color: #2196F3; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">📋 コピーしたデータを追加</button>
-                <button onclick="syncLocalToCloud()" style="background-color: #4caf50; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">⬆️ ローカルからクラウドへ同期</button>
-                <button onclick="downloadSongsAndClearsJson()" style="background-color: #ff9800; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">💾 バックアップ (データ＋クリア)</button>
-                <button onclick="downloadSongsJsonOnly()" style="background-color: #795548; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">💾 バックアップ (楽曲のみ)</button>
-            </div>
+<details class="controls" style="cursor: pointer;">
+            <summary style="font-weight: bold; font-size: 1.1em; color: #333; user-select: none; outline: none; padding-bottom: 5px; border-bottom: 1px dashed #ccc;">
+                ⚙️ データ追加・管理・バックアップ (タップして開く)
+            </summary>
             
-            <details style="margin-top: 10px; cursor: pointer;">
-                <summary style="font-size: 0.9em; color: #666;">手動でペーストして追加する場合はこちら</summary>
-                <div style="margin-top: 10px; cursor: default;">
-                    <textarea id="import-text" placeholder="Wikiでコピーしたテキストをここにペーストしてください..."></textarea>
-                    <button onclick="importDataManual()">手動ペーストで追加</button>
+            <div style="margin-top: 15px; cursor: default;">
+                <div class="flex-row">
+                    <label style="font-weight: bold;">追加するレベル: 
+                        <select id="import-level" style="padding: 10px;">
+                            <option value="50">Lv 50</option>
+                            <option value="49">Lv 49</option>
+                            <option value="48" selected>Lv 48</option>
+                            <option value="47">Lv 47</option>
+                            <option value="46">Lv 46</option>
+                            <option value="45">Lv 45</option>
+                            <option value="44">Lv 44</option>
+                            <option value="43">Lv 43</option>
+                            <option value="42">Lv 42</option>
+                            <option value="41">Lv 41</option>
+                            <option value="40">Lv 40</option>
+                            <option value="その他">その他</option>
+                        </select>
+                    </label>
+                    <button onclick="importFromClipboard()" style="background-color: #2196F3; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">📋 コピーしたデータを追加</button>
+                    <button onclick="syncLocalToCloud()" style="background-color: #4caf50; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">⬆️ ローカルからクラウドへ同期</button>
+                    <button onclick="downloadSongsAndClearsJson()" style="background-color: #ff9800; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">💾 バックアップ (データ＋クリア)</button>
+                    <button onclick="downloadSongsJsonOnly()" style="background-color: #795548; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">💾 バックアップ (楽曲のみ)</button>
                 </div>
+                
+                <details style="margin-top: 10px; cursor: pointer; background: #f5f5f5; padding: 10px; border-radius: 4px;">
+                    <summary style="font-size: 0.9em; color: #666; font-weight: bold;">📝 手動でペーストして追加する場合はこちら</summary>
+                    <div style="margin-top: 10px; cursor: default;">
+                        <textarea id="import-text" placeholder="Wikiでコピーしたテキストをここにペーストしてください..."></textarea>
+                        <button onclick="importDataManual()">手動ペーストで追加</button>
+                    </div>
+                </details>
+                
+                <hr style="border: none; border-top: 1px solid #eee; margin: 15px 0;">
+                
+                <div class="flex-row" style="margin-bottom: 0;">
+                    <label style="font-weight: bold; color: #d32f2f;">レベル一括削除: 
+                        <select id="delete-level" style="border-color: #d32f2f; padding: 6px;">
+                            <option value="50">Lv 50</option>
+                            <option value="49">Lv 49</option>
+                            <option value="48" selected>Lv 48</option>
+                            <option value="47">Lv 47</option>
+                            <option value="46">Lv 46</option>
+                            <option value="45">Lv 45</option>
+                            <option value="44">Lv 44</option>
+                            <option value="43">Lv 43</option>
+                            <option value="42">Lv 42</option>
+                            <option value="41">Lv 41</option>
+                            <option value="40">Lv 40</option>
+                            <option value="その他">その他</option>
+                        </select>
+                    </label>
+                    <button onclick="deleteLevelData()" style="color: #d32f2f; border-color: #d32f2f; background-color: #fff;">削除実行</button>
+                    
+                    <div style="margin-left: auto; display: flex; flex-wrap: wrap; gap: 10px;">
+                        <button onclick="clearRecordsOnly()" style="padding: 8px 12px;">クリア記録のみリセット</button>
+                        <button onclick="initializeData()" class="btn-danger" style="padding: 8px 12px;">全データ完全初期化</button>
+                    </div>
+                </div>
+            </div>
+        </details>
+        ```
+
+### 💡 この変更によるメリット
+* 通常時は「⚙️ データ追加・管理・バックアップ」という1行のタイトルだけになり、**画面上部が非常にコンパクト**になります。
+* 楽曲を追加したい時や、初期化したい時だけタップして開けば、いままで通りのボタンが現れます。
+* 先ほど追加した「スマホ用CSS」とも連動し、開いた時もスマホの画面幅に綺麗に収まります。
+
+書き換えたら上書き保存し、GitHubにアップロード（Commit）してスマホから確認してみてください！かなりアプリっぽい見た目に近づくはずです。
             </details>
             
             <hr style="border: none; border-top: 1px solid #eee; margin: 15px 0;">
