@@ -215,8 +215,6 @@
             .user-selector-area button { width: 100%; margin: 5px 0 0 0 !important; padding: 10px !important; font-size: 1em !important; box-sizing: border-box; }
         }
     </style>
-    </style>
-    </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
@@ -470,9 +468,12 @@
 
     <script>
         // ==========================================
-        // ★クラウド同期設定（GAS）
+        // ★クラウド同期設定（GAS）と管理者パスワード
         // ==========================================
         const GAS_URL = 'https://script.google.com/macros/s/AKfycbw_kPkSkFy-vBqh_7CP01svNYPqkhirh6T9s4ocF4yUktkDqzWYT3oH_3Or9sBb-kRv6A/exec';
+        
+        // ★ データの追加や管理，削除，編集に必要なマスターパスワード
+        const ADMIN_PASSWORD = "admin"; 
         // ==========================================
 
         const STORAGE_KEY_SONGS = 'popn_songs_data_v2';
@@ -485,6 +486,22 @@
         
         // セッションストレージでパスワードを保持
         let userPasswords = JSON.parse(sessionStorage.getItem('popn_pwds')) || {};
+
+        // セッション中の管理者認証状態
+        let isAdminAuthenticated = false;
+
+        // ★ 管理者認証チェック処理
+        function checkAdminAuth() {
+            if (isAdminAuthenticated) return true;
+            const pwd = prompt("この操作には管理者用パスワードが必要です．パスワードを入力してください:");
+            if (pwd === ADMIN_PASSWORD) {
+                isAdminAuthenticated = true;
+                return true;
+            } else {
+                alert("パスワードが違います．操作はキャンセルされました．");
+                return false;
+            }
+        }
 
         const MEDAL_TYPES = {
             '':         { imgUrl: 'URLをペースト', label: '未プレイ', rank: 0, isEasyClear: false, isNormalClear: false },
@@ -590,16 +607,13 @@
                         songs = fetchedData.songs;
                         allUsersData = fetchedData.users || {};
                         
-                        // ユーザーデータが存在しない場合はGuestを作成
                         if (Object.keys(allUsersData).length === 0) {
                             allUsersData["Guest"] = { clearRecords: {} };
                         }
                         
-                        // 現在のユーザーのデータをセット
                         if (allUsersData[currentUser]) {
                             clearRecords = allUsersData[currentUser].clearRecords || {};
                         } else {
-                            // LocalStorageにあるがクラウドにない場合はGuestに戻す
                             currentUser = "Guest";
                             localStorage.setItem('popn_current_user', currentUser);
                             if(!allUsersData["Guest"]) allUsersData["Guest"] = { clearRecords: {} };
@@ -609,14 +623,12 @@
                 } catch (error) {
                     console.warn('クラウドからの読み込みに失敗しました。ローカルデータを使用します。', error);
                     songs = JSON.parse(localStorage.getItem(STORAGE_KEY_SONGS)) || [];
-                    // フォールバック用のダミーデータ
                     allUsersData = { "Guest": { clearRecords: JSON.parse(localStorage.getItem('popn_clear_data_v2')) || {} } };
                     currentUser = "Guest";
                     clearRecords = allUsersData["Guest"].clearRecords;
                 }
                 showLoading(false);
             } else {
-                // GASがない場合はローカル動作
                 songs = JSON.parse(localStorage.getItem(STORAGE_KEY_SONGS)) || [];
                 allUsersData = { "Guest": { clearRecords: JSON.parse(localStorage.getItem('popn_clear_data_v2')) || {} } };
                 currentUser = "Guest";
@@ -646,7 +658,6 @@
             renderTable();
         };
 
-        // ★ ユーザー切り替えUIの初期化
         function initUserSelector() {
             const select = document.getElementById('current-user-select');
             select.innerHTML = "";
@@ -661,7 +672,6 @@
             });
         }
 
-        // ★ ユーザー切り替え処理
         function switchUser() {
             currentUser = document.getElementById('current-user-select').value;
             localStorage.setItem('popn_current_user', currentUser);
@@ -669,7 +679,6 @@
             renderTable();
         }
 
-        // ★ 新規ユーザー追加処理
         function addNewUser() {
             const name = prompt("新しいユーザー名を入力してください:\n（例: お名前、ライバルの名前など）");
             if (!name) return;
@@ -685,14 +694,12 @@
             alert(`ユーザー [${name}] を作成しました！\n最初にメダルを変更する際に、専用のパスワードを設定してください。`);
         }
 
-        // ★ クラウド保存処理（isSongUpdate: true=楽曲全体更新, false=個人のクリア更新）
         async function saveToCloud(isSongUpdate = false) {
             if (!GAS_URL || GAS_URL.trim() === '') return;
             
             let pwd;
             if (isSongUpdate) {
-                pwd = prompt("楽曲リストを更新するための「マスターパスワード」を入力してください:");
-                if (!pwd) return;
+                pwd = ADMIN_PASSWORD; // ★ 管理者認証は既にエントリポイントで確認済み
             } else {
                 if (!checkUserAuth()) return;
                 pwd = userPasswords[currentUser];
@@ -721,7 +728,6 @@
                         sessionStorage.setItem('popn_pwds', JSON.stringify(userPasswords));
                     }
                 } else {
-                    // 成功したらローカルの全ユーザーデータも更新
                     if (!isSongUpdate) {
                         if (!allUsersData[currentUser]) allUsersData[currentUser] = {};
                         allUsersData[currentUser].clearRecords = clearRecords;
@@ -734,7 +740,6 @@
             showLoading(false);
         }
 
-        // ★ 今のデバイスのデータをユーザーに上書き移行（同期）する処理
         async function syncLocalToCloud() {
             if (!GAS_URL || GAS_URL.trim() === '') {
                 alert("GAS_URLが設定されていません。先にGASのデプロイとURLの貼り付けを行ってください。");
@@ -754,17 +759,17 @@
                 return;
             }
 
-            const mode = prompt(`何をクラウドに同期（上書き）しますか？\n\n1 : 現在のユーザー [${currentUser}] のクリア記録だけを移行\n2 : 楽曲リスト全体を移行（※マスターパスワード必須）\n3 : 両方移行\n\n半角数字の 1, 2, 3 のいずれかを入力してください。`, "1");
+            const mode = prompt(`何をクラウドに同期（上書き）しますか？\n\n1 : 現在のユーザー [${currentUser}] のクリア記録だけを移行\n2 : 楽曲リスト全体を移行（※管理者パスワード必須）\n3 : 両方移行\n\n半角数字の 1, 2, 3 のいずれかを入力してください。`, "1");
 
             if (mode !== "1" && mode !== "2" && mode !== "3") {
-                return; // キャンセル扱い
+                return; 
             }
 
             // 1. クリア記録の移行
             if (mode === "1" || mode === "3") {
                 if (!confirm(`このデバイスに保存されているクリア記録（${Object.keys(localClears).length}件）を、ユーザー [${currentUser}] のデータとしてクラウドに上書きしますか？`)) return;
                 
-                if (!checkUserAuth()) return; // ユーザーパスワード確認
+                if (!checkUserAuth()) return;
                 
                 showLoading(true, `ユーザー [${currentUser}] の記録を移行中...`);
                 try {
@@ -782,7 +787,7 @@
                         delete userPasswords[currentUser];
                         sessionStorage.setItem('popn_pwds', JSON.stringify(userPasswords));
                         showLoading(false);
-                        return; // エラーなら中断
+                        return;
                     } else {
                         clearRecords = localClears;
                         if (!allUsersData[currentUser]) allUsersData[currentUser] = {};
@@ -798,8 +803,8 @@
 
             // 2. 楽曲リストの移行
             if (mode === "2" || mode === "3") {
-                const masterPwd = prompt("楽曲リスト全体を上書きするための「マスターパスワード」を入力してください:");
-                if (!masterPwd) {
+                // ★ 楽曲リストの上書きは管理者権限を要求
+                if (!checkAdminAuth()) {
                     showLoading(false);
                     renderTable();
                     return;
@@ -810,7 +815,7 @@
                     const payload = {
                         type: "updateSongs",
                         targetUser: currentUser, 
-                        password: masterPwd,
+                        password: ADMIN_PASSWORD,
                         songs: localSongs
                     };
                     const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
@@ -937,7 +942,6 @@
         }
 
         async function selectMedal(medalKey) {
-            // ここでのAuthは個人のクリア情報更新
             if (currentMedalEditId) {
                 if (medalKey === '') {
                     delete clearRecords[currentMedalEditId];
@@ -946,7 +950,7 @@
                 }
                 renderTable();
                 closeMedalModal();
-                await saveToCloud(false); // isSongUpdate = false
+                await saveToCloud(false);
             }
         }
 
@@ -997,6 +1001,9 @@
         }
 
         async function importFromClipboard() {
+            // ★ 管理者認証
+            if (!checkAdminAuth()) return;
+
             try {
                 const text = await navigator.clipboard.readText();
                 if (!text || text.trim() === '') {
@@ -1006,12 +1013,15 @@
                 const targetLevel = document.getElementById('import-level').value;
                 await processImportText(text, targetLevel);
             } catch (err) {
-                alert("クリップボードの読み取りが許可されなかったか、失敗しました。\n「手動でペーストして追加する場合はこちら」を開いて、手動で貼り付けてください。");
+                alert("クリップボードの読み取りが許可されなかったか、失敗しました。\n「手持でペーストして追加する場合はこちら」を開いて、手動で貼り付けてください。");
                 console.error(err);
             }
         }
 
         async function importDataManual() {
+            // ★ 管理者認証
+            if (!checkAdminAuth()) return;
+
             const text = document.getElementById('import-text').value;
             if (!text.trim()) {
                 alert("テキストエリアが空です。");
@@ -1099,12 +1109,14 @@
             document.getElementById('search-input').value = '';
             renderTable();
             
-            // ★ 楽曲リストの更新なので isSongUpdate = true
             await saveToCloud(true);
             alert(`レベル${targetLevel}として、${newSongsAdded}件を新規追加、${songsUpdated}件を更新しました。`);
         }
 
         async function updateBannerFromClipboard(id) {
+            // ★ 管理者認証
+            if (!checkAdminAuth()) return;
+
             try {
                 const text = await navigator.clipboard.readText();
                 if (!text || text.trim() === '') {
@@ -1116,7 +1128,7 @@
 
                 songs[songIndex].bannerUrl = text.trim();
                 renderTable();
-                await saveToCloud(true); // 楽曲情報の更新
+                await saveToCloud(true);
             } catch (err) {
                 const songIndex = songs.findIndex(s => s.id === id);
                 if (songIndex === -1) return;
@@ -1126,7 +1138,7 @@
                 if (newUrl !== null) { 
                     songs[songIndex].bannerUrl = newUrl.trim();
                     renderTable(); 
-                    await saveToCloud(true); // 楽曲情報の更新
+                    await saveToCloud(true);
                 }
             }
         }
@@ -1158,7 +1170,6 @@
             exportContainer.style.fontFamily = 'sans-serif';
             document.body.appendChild(exportContainer);
 
-            // ★ 出力画像にユーザー名を付与する
             const userHeader = document.createElement('h2');
             userHeader.style.margin = '0 0 10px 0';
             userHeader.style.color = '#333';
@@ -1316,6 +1327,9 @@
         }
 
         async function deleteLevelData() {
+            // ★ 管理者認証
+            if (!checkAdminAuth()) return;
+
             const targetLevel = document.getElementById('delete-level').value;
             const songsToDelete = songs.filter(s => s.level === targetLevel);
             
@@ -1328,7 +1342,6 @@
                 const deleteIds = songsToDelete.map(s => s.id);
                 songs = songs.filter(s => s.level !== targetLevel);
                 
-                // 全ユーザーの該当楽曲のクリアデータを消す
                 for(let u in allUsersData) {
                     deleteIds.forEach(id => {
                         delete allUsersData[u].clearRecords[id];
@@ -1338,12 +1351,15 @@
                 
                 updateDynamicFilters();
                 renderTable();
-                await saveToCloud(true); // 楽曲の削除なので isSongUpdate = true
+                await saveToCloud(true);
                 alert(`レベル${targetLevel}の楽曲データと全ユーザーのクリア記録を削除しました。`);
             }
         }
 
         function openEditModal(id) {
+            // ★ 編集モーダルを開く前に管理者認証
+            if (!checkAdminAuth()) return;
+
             const song = songs.find(s => s.id === id);
             if (!song) return;
             document.getElementById('edit-original-id').value = song.id;
@@ -1363,6 +1379,9 @@
         }
 
         async function deleteSong() {
+            // ★ 管理者認証 (念のため)
+            if (!checkAdminAuth()) return;
+
             if(confirm("この楽曲をリストから削除しますか？\n（全ユーザーのクリア記録も同時に削除されます）")) {
                 const originalId = document.getElementById('edit-original-id').value;
                 songs = songs.filter(s => s.id !== originalId);
@@ -1380,6 +1399,9 @@
         }
 
         async function saveEditModal() {
+            // ★ 管理者認証 (念のため)
+            if (!checkAdminAuth()) return;
+
             const originalId = document.getElementById('edit-original-id').value;
             const songIndex = songs.findIndex(s => s.id === originalId);
             if (songIndex === -1) return;
