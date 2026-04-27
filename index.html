@@ -29,6 +29,15 @@
             position: sticky; top: 0; z-index: 1000; background-color: #f9f9f9; 
         }
         
+        /* ★ 統計表示のトグルボタンスタイル ★ */
+        .stats-toggles {
+            width: 100%; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; align-items: center; margin-bottom: 5px; margin-top: 10px;
+        }
+        .stats-toggles label {
+            cursor: pointer; font-size: 0.85em; font-weight: bold; color: #555; background: #fff; border: 1px solid #ccc; padding: 6px 10px; border-radius: 4px; display: flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); user-select: none;
+        }
+        .stats-toggles label:hover { background: #f0f8ff; border-color: #2196F3; }
+
         .stats-container { display: flex; flex-wrap: wrap; gap: 15px; align-items: baseline; justify-content: flex-end; margin-left: auto; background: #fff; padding: 10px 15px; border-radius: 8px; border: 1px solid #eee; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         .stats-group { display: flex; align-items: baseline; gap: 8px; }
         .stats-title { font-size: 14px; color: #666; font-weight: bold; }
@@ -44,7 +53,7 @@
         .spicy-gauge { background-color: #ffe6e6; }
         .cleared-row { opacity: 0.8; }
         
-        /* ★ テーブルのソート用ヘッダーのスタイル ★ */
+        /* テーブルのソート用ヘッダーのスタイル */
         th[onclick] { cursor: pointer; user-select: none; transition: background-color 0.2s; }
         th[onclick]:hover { background-color: #e0e0e0; }
         
@@ -120,6 +129,11 @@
             button[onclick="clearSearch()"] { width: auto; padding: 12px 16px; flex-shrink: 0; }
             #search-input { flex-grow: 1; }
             
+            /* 表示トグルのスマホ最適化 */
+            .stats-toggles { justify-content: flex-start; gap: 6px; }
+            .stats-toggles > span { width: 100%; margin-bottom: 2px; }
+            .stats-toggles label { flex: 1 1 45%; justify-content: center; padding: 8px 4px; font-size: 0.9em; margin: 0; }
+
             .stats-container { 
                 flex-direction: column; align-items: flex-start !important; 
                 gap: 8px !important; padding: 12px !important; width: 100%; box-sizing: border-box;
@@ -147,7 +161,7 @@
             th:nth-child(8), td:nth-child(8) { width: 18% !important; padding: 4px 2px !important; text-align: center !important; } 
             
             td { font-size: 0.8em; word-break: break-all !important; overflow-wrap: break-word !important; }
-            th { font-size: 0.8em; }
+            th { font-size: 0.8em; padding: 8px 2px; }
             
             td:nth-child(4) img { width: 100% !important; height: auto !important; max-height: 35px !important; object-fit: contain !important; }
             
@@ -169,7 +183,6 @@
                 opacity: 0.85; 
             }
 
-            /* スマホで表示設定メニューを開いたときにはみ出さないように調整 */
             details > div[style*="position: absolute"] { right: 0; left: auto; max-width: 90vw; }
         }
     </style>
@@ -280,16 +293,9 @@
                     <button onclick="exportAsImage()" class="btn-image" style="padding: 8px 16px; margin-right: 10px;">画像として保存</button>
 
                     <details style="position: relative;">
-                        <summary style="padding: 6px 12px; border: 1px solid #ccc; background-color: #fff; border-radius: 4px; cursor: pointer; font-size: 0.9em; font-weight: bold; color: #555;">⚙️ 表示・出力設定</summary>
+                        <summary style="padding: 6px 12px; border: 1px solid #ccc; background-color: #fff; border-radius: 4px; cursor: pointer; font-size: 0.9em; font-weight: bold; color: #555;">⚙️ 画像の列設定</summary>
                         <div style="position: absolute; top: 100%; right: 0; background: #fff; border: 1px solid #ccc; border-radius: 6px; padding: 12px; z-index: 2000; box-shadow: 0 4px 10px rgba(0,0,0,0.2); width: max-content; display: grid; gap: 8px; margin-top: 5px; text-align: left;">
-                            
-                            <div style="font-size: 0.85em; color: #666; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 4px; margin-bottom: 4px;">📊 統計の表示</div>
-                            <label style="cursor: pointer;"><input type="checkbox" id="show-easy-rate" checked onchange="renderTable()"> イージークリア以上</label>
-                            <label style="cursor: pointer;"><input type="checkbox" id="show-normal-rate" checked onchange="renderTable()"> ノーマルクリア以上</label>
-                            <label style="cursor: pointer;"><input type="checkbox" id="show-medal-stats" checked onchange="renderTable()"> メダル別内訳</label>
-                            <label style="cursor: pointer;"><input type="checkbox" id="show-diff-stats" checked onchange="renderTable()"> 難易度別クリア率</label>
-
-                            <div style="font-size: 0.85em; color: #666; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 4px; margin-bottom: 4px; margin-top: 8px;">📷 画像に出力する列</div>
+                            <div style="font-size: 0.85em; color: #666; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 4px; margin-bottom: 4px;">📷 画像に出力する列</div>
                             <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="0" checked> メダル</label>
                             <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="1" checked> Lv</label>
                             <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="2" checked> Ver</label>
@@ -350,6 +356,14 @@
                 </div>
             </details>
 
+            <div class="stats-toggles">
+                <span style="font-size: 0.9em; font-weight: bold; color: #666; margin-right: auto;">📊 統計表示:</span>
+                <label><input type="checkbox" id="show-easy-rate" onchange="renderTable()" style="margin:0;"> イージー</label>
+                <label><input type="checkbox" id="show-normal-rate" checked onchange="renderTable()" style="margin:0;"> ノーマル</label>
+                <label><input type="checkbox" id="show-medal-stats" onchange="renderTable()" style="margin:0;"> メダル内訳</label>
+                <label><input type="checkbox" id="show-diff-stats" onchange="renderTable()" style="margin:0;"> 難易度別</label>
+            </div>
+            
             <div class="stats-container" id="stats-display"></div>
         </div>
 
@@ -435,7 +449,6 @@
         const STORAGE_KEY_SONGS = 'popn_songs_data_v2';
         const STORAGE_KEY_CLEARS = 'popn_clear_data_v2';
 
-        // ★ 認証用の一時パスワード保持変数
         let currentPassword = sessionStorage.getItem('admin_pwd') || "";
 
         const MEDAL_TYPES = {
@@ -975,7 +988,7 @@
                 { id: 4, html: `<th style="width: ${colWidths[4]}%; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2; text-align: left;">ジャンル / 曲名</th>` },
                 { id: 5, html: `<th style="width: ${colWidths[5]}%; text-align: right; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">BPM</th>` },
                 { id: 6, html: `<th style="width: ${colWidths[6]}%; text-align: right; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">ノーツ</th>` },
-                { id: 7, html: `<th style="width: ${colWidths[7]}%; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2; text-align: left;">難易度</th>` }
+                { id: 7, html: `<th style="width: ${colWidths[7]}%; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2; text-align: center;">難易度</th>` }
             ];
 
             for (let i = 0; i < originalRows.length; i += chunkSize) {
@@ -1201,7 +1214,6 @@
             renderTable();
         }
 
-        // ★ ソート機能の更新
         function sortBy(key) {
             if (currentSort === key) {
                 sortDesc = !sortDesc;
@@ -1212,7 +1224,6 @@
             renderTable();
         }
 
-        // ★ ソート状態をヘッダーの「▲/▼」で表示する関数
         function updateSortHeaders() {
             const headers = {
                 'clear': 'メダル',
@@ -1323,7 +1334,6 @@
                 return true;
             });
 
-            // ★ ソート処理に「曲名」を追加
             if (currentSort === 'clear') {
                 displaySongs.sort((a, b) => {
                     let valA = MEDAL_TYPES[clearRecords[a.id] || ''].rank;
@@ -1475,10 +1485,8 @@
                 tbody.appendChild(tr);
             });
 
-            // ★ ヘッダーのソート矢印を更新
             updateSortHeaders();
 
-            // ★ チェックボックスの状態を取得して表示を切り替える
             const total = displaySongs.length;
             const easyPerc = total === 0 ? 0 : ((easyClearCount / total) * 100).toFixed(1);
             const normalPerc = total === 0 ? 0 : ((normalClearCount / total) * 100).toFixed(1);
@@ -1491,10 +1499,10 @@
                 levelLabel += ' (絞り込み中)';
             }
             
-            const showEasy = document.getElementById('show-easy-rate') ? document.getElementById('show-easy-rate').checked : true;
+            const showEasy = document.getElementById('show-easy-rate') ? document.getElementById('show-easy-rate').checked : false;
             const showNormal = document.getElementById('show-normal-rate') ? document.getElementById('show-normal-rate').checked : true;
-            const showMedal = document.getElementById('show-medal-stats') ? document.getElementById('show-medal-stats').checked : true;
-            const showDiff = document.getElementById('show-diff-stats') ? document.getElementById('show-diff-stats').checked : true;
+            const showMedal = document.getElementById('show-medal-stats') ? document.getElementById('show-medal-stats').checked : false;
+            const showDiff = document.getElementById('show-diff-stats') ? document.getElementById('show-diff-stats').checked : false;
 
             let statsHtml = `<div style="display: flex; flex-wrap: wrap; gap: 15px; width: 100%; justify-content: flex-end; align-items: baseline;">
                 <div class="stats-level">【${levelLabel}】</div>`;
@@ -1509,7 +1517,7 @@
             }
             if (showNormal) {
                 statsHtml += `
-                    <div class="stats-group" style="margin-left: 10px;">
+                    <div class="stats-group">
                         <span class="stats-title">ノーマルクリア以上:</span>
                         <span class="stats-fraction">${normalClearCount} / ${total} <span class="stats-remain">(未クリア: ${normalRemain})</span></span>
                         <span class="stats-percentage">${normalPerc}%</span>
@@ -1517,7 +1525,6 @@
             }
             statsHtml += `</div>`;
 
-            // メダル内訳・難易度別クリア率（<details>タグを外し、チェックされていれば常にブロックとして表示・出力されるように変更）
             if (showMedal || showDiff) {
                 statsHtml += `<div style="width: 100%; margin-top: 10px; padding: 12px; background: #f1f8ff; border-radius: 6px; border: 1px solid #e3f2fd; box-sizing: border-box;">`;
                 
