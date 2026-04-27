@@ -478,12 +478,9 @@
 
     <script>
         // ==========================================
-        // ★クラウド同期設定（GAS）と管理者パスワード
+        // ★クラウド同期設定（GAS）
         // ==========================================
-        const GAS_URL = 'https://script.google.com/macros/s/AKfycbz8Z-o_6shc_6cbq5JNckG-sFCMyDfxEQjZw9WyqokzWESOHgUe1LNT6IJnTiwtU4KXgQ/exec';
-        
-        // ★ 楽曲リストの編集用パスワード
-        const ADMIN_PASSWORD = "1005"; 
+        const GAS_URL = 'https://script.google.com/macros/s/AKfycbzEx9tpbcxbNWzL54wOn7EmYzoS2RzOaM3fJxXReN46CX9bJOrGjxpOe4tdVz7nPRs2bA/exec';
         // ==========================================
 
         const STORAGE_KEY_SONGS = 'popn_songs_data_v2';
@@ -496,21 +493,6 @@
         let clearRecords = {}; 
         let scoreRecords = {}; 
         
-        let isAdminAuthenticated = false;
-
-        // ★ マスターデータ編集時のパスワード確認関数
-        function checkAdminAuth() {
-            if (isAdminAuthenticated) return true;
-            const pwd = prompt("この操作には管理者用パスワードが必要です．パスワードを入力してください:");
-            if (pwd === ADMIN_PASSWORD) {
-                isAdminAuthenticated = true;
-                return true;
-            } else {
-                alert("パスワードが違います．操作はキャンセルされました．");
-                return false;
-            }
-        }
-
         const MEDAL_TYPES = {
             '':         { imgUrl: 'URLをペースト', label: '未プレイ', rank: 0, isEasyClear: false, isNormalClear: false },
             '未解禁':   { imgUrl: '', label: '未解禁', rank: -1, isEasyClear: false, isNormalClear: false, excludeFromRate: true },
@@ -740,11 +722,6 @@
                     scoreRecords: scoreRecords
                 };
 
-                // ★ マスターデータ編集時はパスワードを付与
-                if (isSongUpdate) {
-                    payload.password = ADMIN_PASSWORD;
-                }
-
                 const response = await fetch(GAS_URL, {
                     method: 'POST',
                     body: JSON.stringify(payload)
@@ -787,13 +764,12 @@
                 return;
             }
 
-            const mode = prompt(`何をクラウドに同期（上書き）しますか？\n\n1 : 現在のユーザー [${currentUser}] の記録だけを移行\n2 : 楽曲リスト全体を移行（※管理者パスワード必須）\n3 : 両方移行\n\n半角数字の 1, 2, 3 のいずれかを入力してください。`, "1");
+            const mode = prompt(`何をクラウドに同期（上書き）しますか？\n\n1 : 現在のユーザー [${currentUser}] の記録だけを移行\n2 : 楽曲リスト全体を移行\n3 : 両方移行\n\n半角数字の 1, 2, 3 のいずれかを入力してください。`, "1");
 
             if (mode !== "1" && mode !== "2" && mode !== "3") {
                 return; 
             }
 
-            // 個人の記録（パスワード不要）
             if (mode === "1" || mode === "3") {
                 if (!confirm(`このデバイスに保存されている記録を、ユーザー [${currentUser}] のデータとしてクラウドに上書きしますか？`)) return;
                 
@@ -827,20 +803,12 @@
                 }
             }
 
-            // 楽曲リスト（管理者パスワード必要）
             if (mode === "2" || mode === "3") {
-                if (!checkAdminAuth()) {
-                    showLoading(false);
-                    renderTable();
-                    return;
-                }
-
                 showLoading(true, '楽曲リスト全体を移行中...');
                 try {
                     const payload = {
                         type: "updateSongs",
                         targetUser: currentUser, 
-                        password: ADMIN_PASSWORD,
                         songs: localSongs
                     };
                     const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
@@ -975,7 +943,7 @@
                 }
                 renderTable();
                 closeMedalModal();
-                await saveToCloud(false); // 個人の記録更新なのでパスワード不要
+                await saveToCloud(false); 
             }
         }
 
@@ -1010,7 +978,7 @@
             
             closeScoreModal();
             renderTable();
-            await saveToCloud(false); // 個人の記録更新なのでパスワード不要
+            await saveToCloud(false); 
         }
 
         function parseDifficulty(rawStr) {
@@ -1060,9 +1028,6 @@
         }
 
         async function importFromClipboard() {
-            // ★ 管理者認証
-            if (!checkAdminAuth()) return;
-
             try {
                 const text = await navigator.clipboard.readText();
                 if (!text || text.trim() === '') {
@@ -1078,9 +1043,6 @@
         }
 
         async function importDataManual() {
-            // ★ 管理者認証
-            if (!checkAdminAuth()) return;
-
             const text = document.getElementById('import-text').value;
             if (!text.trim()) {
                 alert("テキストエリアが空です。");
@@ -1168,14 +1130,11 @@
             document.getElementById('search-input').value = '';
             renderTable();
             
-            await saveToCloud(true); // マスターデータ更新なので true
+            await saveToCloud(true);
             alert(`レベル${targetLevel}として、${newSongsAdded}件を新規追加、${songsUpdated}件を更新しました。`);
         }
 
         async function updateBannerFromClipboard(id) {
-            // ★ 管理者認証
-            if (!checkAdminAuth()) return;
-
             try {
                 const text = await navigator.clipboard.readText();
                 if (!text || text.trim() === '') {
@@ -1390,9 +1349,6 @@
         }
 
         async function deleteLevelData() {
-            // ★ 管理者認証
-            if (!checkAdminAuth()) return;
-
             const targetLevel = document.getElementById('delete-level').value;
             const songsToDelete = songs.filter(s => s.level === targetLevel);
             
@@ -1422,9 +1378,6 @@
         }
 
         function openEditModal(id) {
-            // ★ 管理者認証
-            if (!checkAdminAuth()) return;
-
             const song = songs.find(s => s.id === id);
             if (!song) return;
             document.getElementById('edit-original-id').value = song.id;
@@ -1444,9 +1397,6 @@
         }
 
         async function deleteSong() {
-            // ★ 管理者認証
-            if (!checkAdminAuth()) return;
-
             if(confirm("この楽曲をリストから削除しますか？\n（全ユーザーのクリア記録も同時に削除されます）")) {
                 const originalId = document.getElementById('edit-original-id').value;
                 songs = songs.filter(s => s.id !== originalId);
@@ -1466,9 +1416,6 @@
         }
 
         async function saveEditModal() {
-            // ★ 管理者認証
-            if (!checkAdminAuth()) return;
-
             const originalId = document.getElementById('edit-original-id').value;
             const songIndex = songs.findIndex(s => s.id === originalId);
             if (songIndex === -1) return;
@@ -1521,7 +1468,7 @@
                 clearRecords = allUsersData[currentUser].clearRecords;
                 scoreRecords = allUsersData[currentUser].scoreRecords;
                 renderTable();
-                await saveToCloud(false); // 個人の記録リセットなのでパスワード不要
+                await saveToCloud(false); 
             }
         }
 
