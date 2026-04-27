@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pop’n Clear Rate app</title>
+    <title>Pop’n Multi-User App</title>
     <style>
         body { font-family: sans-serif; padding: 20px; background-color: #f9f9f9; margin: 0; }
         h1 { font-size: 24px; margin-bottom: 15px; }
@@ -117,6 +117,15 @@
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
+        /* ★ ユーザー切り替えエリアのスタイル */
+        .user-selector-area {
+            background: #333; color: white; padding: 10px 20px;
+            display: flex; justify-content: space-between; align-items: center;
+            border-radius: 8px; margin-bottom: 15px;
+        }
+        .user-selector-area select { padding: 5px; border-radius: 4px; }
+        .user-label { font-weight: bold; margin-right: 10px; }
+
         /* =========================================
            📱 スマホ向け最適化（レスポンシブデザイン）
            ========================================= */
@@ -197,6 +206,11 @@
             .diff-header-sub { font-size: 0.8em; opacity: 0.9; }
 
             details > div[style*="position: absolute"] { right: 0; left: auto; max-width: 90vw; }
+            
+            /* スマホ時のユーザー切り替えエリア調整 */
+            .user-selector-area { flex-direction: column; align-items: flex-start; gap: 10px; }
+            .user-selector-area > div { width: 100%; display: flex; justify-content: space-between; align-items: center; }
+            .user-selector-area select { flex-grow: 1; margin: 0 10px; }
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -206,6 +220,16 @@
     <div id="loading" class="loading-overlay">
         <div class="spinner"></div>
         <div id="loading-text">クラウドと通信中...</div>
+    </div>
+
+    <div class="user-selector-area">
+        <div>
+            <span class="user-label">👤 ユーザー:</span>
+            <select id="current-user-select" onchange="switchUser()">
+                </select>
+            <button onclick="addNewUser()" style="padding: 6px 12px; margin-left: 10px; font-size: 0.9em; background: #4caf50; color: white; border: none; border-radius: 4px;">+ 新規追加</button>
+        </div>
+        <div id="user-display-name" style="font-weight: bold; color: #ffd700; display:none;">未ログイン</div>
     </div>
 
     <div style="padding: 20px;">
@@ -235,7 +259,6 @@
                         </select>
                     </label>
                     <button onclick="importFromClipboard()" style="background-color: #2196F3; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">📋 コピーしたデータを追加</button>
-                    <button onclick="syncLocalToCloud()" style="background-color: #4caf50; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">⬆️ ローカルからクラウドへ同期</button>
                     <button onclick="downloadSongsAndClearsJson()" style="background-color: #ff9800; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">💾 バックアップ (データ＋クリア)</button>
                     <button onclick="downloadSongsJsonOnly()" style="background-color: #795548; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">💾 バックアップ (楽曲のみ)</button>
                 </div>
@@ -270,9 +293,8 @@
                     <button onclick="deleteLevelData()" style="color: #d32f2f; border-color: #d32f2f; background-color: #fff;">削除実行</button>
                     
                     <div style="margin-left: auto; display: flex; flex-wrap: wrap; gap: 10px;">
-                        <button onclick="clearRecordsOnly()" style="padding: 8px 12px;">クリア記録のみリセット</button>
-                        <button onclick="initializeData()" class="btn-danger" style="padding: 8px 12px;">全データ完全初期化</button>
-                    </div>
+                        <button onclick="clearRecordsOnly()" style="padding: 8px 12px;">現在のユーザーのクリア記録リセット</button>
+                        </div>
                 </div>
             </div>
         </details>
@@ -442,20 +464,22 @@
     </div>
 
     <script>
-        // ==========================================
-        // ★クラウド同期設定（GAS）
-        // ==========================================
-        const GAS_URL = 'https://script.google.com/macros/s/AKfycbz3kRJO-DfaAKiPenGLrnB4D5BJ45eqOCwAoSyFDr-CDD2cbVI0jW580beHw2bjjoTGUw/exec';
-        // ==========================================
+        const GAS_URL = 'https://script.google.com/macros/s/AKfycbw_kPkSkFy-vBqh_7CP01svNYPqkhirh6T9s4ocF4yUktkDqzWYT3oH_3Or9sBb-kRv6A/exec';
 
+        // ローカルストレージのキーは一旦そのまま（※あとでマルチユーザー版に完全移行する場合は変更を検討）
         const STORAGE_KEY_SONGS = 'popn_songs_data_v2';
-        const STORAGE_KEY_CLEARS = 'popn_clear_data_v2';
-
-        let currentPassword = sessionStorage.getItem('admin_pwd') || "";
+        
+        let songs = [];
+        let allUsersData = {}; 
+        let currentUser = localStorage.getItem('popn_current_user') || "Guest";
+        let clearRecords = {}; 
+        
+        // セッションストレージでパスワードを保持
+        let userPasswords = JSON.parse(sessionStorage.getItem('popn_pwds')) || {};
 
         const MEDAL_TYPES = {
             '':         { imgUrl: 'URLをペースト', label: '未プレイ', rank: 0, isEasyClear: false, isNormalClear: false },
-            '未解禁':   { imgUrl: '', label: '未解禁', rank: -1, isEasyClear: false, isNormalClear: false, excludeFromRate: true },
+            '未解禁':   { imgUrl: '', label: '🔒未解禁', rank: -1, isEasyClear: false, isNormalClear: false, excludeFromRate: true },
             '黒丸':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/groove_02.png', label: '黒丸', rank: 1, isEasyClear: false, isNormalClear: false },
             '黒菱':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/groove_01.png', label: '黒菱', rank: 2, isEasyClear: false, isNormalClear: false },
             '黒星':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/groove_00.png', label: '黒星', rank: 3, isEasyClear: false, isNormalClear: false },
@@ -470,9 +494,8 @@
             '金星':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/perfect_00.png', label: '金星', rank: 12, isEasyClear: true, isNormalClear: true }
         };
 
-        // ★ 円グラフ用の公式風カラーパレット
         const MEDAL_COLORS = {
-            '': '#e0e0e0', // ★少し濃い灰色に変更して見やすく
+            '': '#e0e0e0',
             '未解禁': '#212121',
             '黒丸': '#283593', 
             '黒菱': '#1a237e', 
@@ -524,21 +547,184 @@
         }
 
         let currentMedalEditId = null;
+        let currentSort = window.innerWidth <= 768 ? 'diff' : 'version';
+        let sortDesc = window.innerWidth <= 768 ? true : false;
+        let currentViewLevel = '48';
 
-        function showLoading(show, text = 'クラウドと通信中...') {
+        function showLoading(show, text = '通信中...') {
             document.getElementById('loading-text').innerText = text;
             document.getElementById('loading').style.display = show ? 'flex' : 'none';
         }
 
-        function checkAuth() {
-            if (currentPassword !== "") return true;
-            const pwd = prompt("データの編集・追加を行うにはパスワードを入力してください:");
+        // ★ ユーザーパスワードの確認
+        function checkUserAuth() {
+            if (userPasswords[currentUser]) return true;
+            
+            const pwd = prompt(`ユーザー [${currentUser}] のパスワードを入力してください:\n（新規ユーザーの場合は、今入力したパスワードが登録されます）`);
             if (pwd) {
-                currentPassword = pwd;
-                sessionStorage.setItem('admin_pwd', currentPassword);
+                userPasswords[currentUser] = pwd;
+                sessionStorage.setItem('popn_pwds', JSON.stringify(userPasswords));
                 return true;
             }
             return false;
+        }
+
+        window.onload = async () => {
+            if (GAS_URL && GAS_URL.trim() !== '') {
+                showLoading(true, 'データを取得中...');
+                try {
+                    const response = await fetch(GAS_URL);
+                    if (!response.ok) throw new Error('Network error');
+                    const fetchedData = await response.json();
+                    
+                    if (fetchedData && fetchedData.songs) {
+                        songs = fetchedData.songs;
+                        allUsersData = fetchedData.users || {};
+                        
+                        // ユーザーデータが存在しない場合はGuestを作成
+                        if (Object.keys(allUsersData).length === 0) {
+                            allUsersData["Guest"] = { clearRecords: {} };
+                        }
+                        
+                        // 現在のユーザーのデータをセット
+                        if (allUsersData[currentUser]) {
+                            clearRecords = allUsersData[currentUser].clearRecords || {};
+                        } else {
+                            // LocalStorageにあるがクラウドにない場合はGuestに戻す
+                            currentUser = "Guest";
+                            localStorage.setItem('popn_current_user', currentUser);
+                            if(!allUsersData["Guest"]) allUsersData["Guest"] = { clearRecords: {} };
+                            clearRecords = allUsersData[currentUser].clearRecords;
+                        }
+                    }
+                } catch (error) {
+                    console.warn('クラウドからの読み込みに失敗しました。ローカルデータを使用します。', error);
+                    songs = JSON.parse(localStorage.getItem(STORAGE_KEY_SONGS)) || [];
+                    // フォールバック用のダミーデータ
+                    allUsersData = { "Guest": { clearRecords: JSON.parse(localStorage.getItem('popn_clear_data_v2')) || {} } };
+                    currentUser = "Guest";
+                    clearRecords = allUsersData["Guest"].clearRecords;
+                }
+                showLoading(false);
+            } else {
+                // GASがない場合はローカル動作
+                songs = JSON.parse(localStorage.getItem(STORAGE_KEY_SONGS)) || [];
+                allUsersData = { "Guest": { clearRecords: JSON.parse(localStorage.getItem('popn_clear_data_v2')) || {} } };
+                currentUser = "Guest";
+                clearRecords = allUsersData["Guest"].clearRecords;
+            }
+
+            songs.forEach(s => {
+                if (!s.level) { s.level = '48'; }
+                const reporsed = parseDifficulty(s.diffRaw);
+                if(s.diffClass !== reporsed.diffClass || s.diffIndex !== reporsed.diffIndex) {
+                    s.diffClass = reporsed.diffClass;
+                    s.diffIndex = reporsed.diffIndex;
+                }
+                const expectedId = s.genre + "_" + s.title + "_" + s.notes;
+                if (s.id !== expectedId) {
+                    if (clearRecords[s.id] !== undefined) {
+                        clearRecords[expectedId] = clearRecords[s.id];
+                        delete clearRecords[s.id];
+                    }
+                    s.id = expectedId;
+                }
+            });
+
+            initUserSelector();
+            initFilters();
+            initMedalGrid();
+            renderTable();
+        };
+
+        // ★ ユーザー切り替えUIの初期化
+        function initUserSelector() {
+            const select = document.getElementById('current-user-select');
+            select.innerHTML = "";
+            const users = Object.keys(allUsersData);
+            
+            users.forEach(u => {
+                const opt = document.createElement('option');
+                opt.value = u;
+                opt.text = u;
+                if (u === currentUser) opt.selected = true;
+                select.appendChild(opt);
+            });
+            // document.getElementById('user-display-name').innerText = currentUser; // 表示を消した場合は不要
+        }
+
+        // ★ ユーザー切り替え処理
+        function switchUser() {
+            currentUser = document.getElementById('current-user-select').value;
+            localStorage.setItem('popn_current_user', currentUser);
+            clearRecords = allUsersData[currentUser]?.clearRecords || {};
+            // document.getElementById('user-display-name').innerText = currentUser;
+            renderTable();
+        }
+
+        // ★ 新規ユーザー追加処理
+        function addNewUser() {
+            const name = prompt("新しいユーザー名を入力してください:\n（例: お名前、ライバルの名前など）");
+            if (!name) return;
+            if (allUsersData[name]) {
+                alert("その名前は既に存在します。");
+                return;
+            }
+            currentUser = name;
+            allUsersData[name] = { clearRecords: {} };
+            localStorage.setItem('popn_current_user', name);
+            initUserSelector();
+            switchUser();
+            alert(`ユーザー [${name}] を作成しました！\n最初にメダルを変更する際に、専用のパスワードを設定してください。`);
+        }
+
+        // ★ クラウド保存処理（isSongUpdate: true=楽曲全体更新, false=個人のクリア更新）
+        async function saveToCloud(isSongUpdate = false) {
+            if (!GAS_URL || GAS_URL.trim() === '') return;
+            
+            let pwd;
+            if (isSongUpdate) {
+                pwd = prompt("楽曲リストを更新するための「マスターパスワード」を入力してください:");
+                if (!pwd) return;
+            } else {
+                if (!checkUserAuth()) return;
+                pwd = userPasswords[currentUser];
+            }
+
+            showLoading(true, 'クラウドに保存中...');
+            try {
+                const payload = {
+                    type: isSongUpdate ? "updateSongs" : "updateClears",
+                    targetUser: currentUser,
+                    password: pwd,
+                    songs: songs,
+                    clearRecords: clearRecords
+                };
+
+                const response = await fetch(GAS_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await response.json();
+                if (result.status === 'error') {
+                    alert(result.message);
+                    if (!isSongUpdate) {
+                        delete userPasswords[currentUser];
+                        sessionStorage.setItem('popn_pwds', JSON.stringify(userPasswords));
+                    }
+                } else {
+                    // 成功したらローカルの全ユーザーデータも更新
+                    if (!isSongUpdate) {
+                        if (!allUsersData[currentUser]) allUsersData[currentUser] = {};
+                        allUsersData[currentUser].clearRecords = clearRecords;
+                    }
+                }
+            } catch (e) {
+                console.error("クラウド保存エラー:", e);
+                alert("通信エラーが発生しました。");
+            }
+            showLoading(false);
         }
 
         function initFilters() {
@@ -647,17 +833,16 @@
         }
 
         async function selectMedal(medalKey) {
-            if (!checkAuth()) return;
+            // ここでのAuthは個人のクリア情報更新
             if (currentMedalEditId) {
                 if (medalKey === '') {
                     delete clearRecords[currentMedalEditId];
                 } else {
                     clearRecords[currentMedalEditId] = medalKey;
                 }
-                localStorage.setItem(STORAGE_KEY_CLEARS, JSON.stringify(clearRecords));
                 renderTable();
                 closeMedalModal();
-                await saveToCloud();
+                await saveToCloud(false); // isSongUpdate = false
             }
         }
 
@@ -685,155 +870,13 @@
             return { diffClass, diffIndex };
         }
 
-        // ---------- データ初期化・読み込み処理 ----------
-        let songs = [];
-        let clearRecords = JSON.parse(localStorage.getItem(STORAGE_KEY_CLEARS)) || {};
-        let needsClearSave = false;
-        
-        let currentSort = window.innerWidth <= 768 ? 'diff' : 'version';
-        let sortDesc = window.innerWidth <= 768 ? true : false;
-        let currentViewLevel = '48';
-
-        window.onload = async () => {
-            if (GAS_URL && GAS_URL.trim() !== '') {
-                showLoading(true, 'クラウドからデータを取得中...');
-                try {
-                    const response = await fetch(GAS_URL);
-                    if (!response.ok) throw new Error('Network error');
-                    const fetchedData = await response.json();
-                    
-                    if (fetchedData && fetchedData.songs) {
-                        songs = fetchedData.songs;
-                        if (fetchedData.clearRecords) {
-                            clearRecords = fetchedData.clearRecords;
-                        }
-                    }
-                } catch (error) {
-                    console.warn('クラウドからの読み込みに失敗しました。ローカルデータを使用します。', error);
-                    songs = JSON.parse(localStorage.getItem(STORAGE_KEY_SONGS)) || [];
-                }
-                showLoading(false);
-            } else {
-                try {
-                    const response = await fetch('songs.json');
-                    if (response.ok) {
-                        const fetchedData = await response.json();
-                        if (Array.isArray(fetchedData)) {
-                            songs = fetchedData;
-                        } else if (fetchedData && fetchedData.songs) {
-                            songs = fetchedData.songs;
-                            if (fetchedData.clearRecords) {
-                                clearRecords = { ...clearRecords, ...fetchedData.clearRecords };
-                                needsClearSave = true;
-                            }
-                        }
-                    }
-                } catch (error) {
-                    songs = JSON.parse(localStorage.getItem(STORAGE_KEY_SONGS)) || [];
-                }
-            }
-
-            songs.forEach(s => {
-                if (!s.level) { s.level = '48'; }
-                const reporsed = parseDifficulty(s.diffRaw);
-                if(s.diffClass !== reporsed.diffClass || s.diffIndex !== reporsed.diffIndex) {
-                    s.diffClass = reporsed.diffClass;
-                    s.diffIndex = reporsed.diffIndex;
-                }
-                const expectedId = s.genre + "_" + s.title + "_" + s.notes;
-                if (s.id !== expectedId) {
-                    if (clearRecords[s.id] !== undefined) {
-                        clearRecords[expectedId] = clearRecords[s.id];
-                        delete clearRecords[s.id];
-                        needsClearSave = true;
-                    }
-                    s.id = expectedId;
-                }
-            });
-
-            for (let key in clearRecords) {
-                if (clearRecords[key] === true) { clearRecords[key] = '銅丸'; needsClearSave = true; } 
-                else if (clearRecords[key] === false) { delete clearRecords[key]; needsClearSave = true; } 
-                else if (clearRecords[key] === '緑丸') { clearRecords[key] = 'イージー'; needsClearSave = true; }
-            }
-            if (needsClearSave) {
-                localStorage.setItem(STORAGE_KEY_CLEARS, JSON.stringify(clearRecords));
-                if(currentPassword !== "") saveToCloud(); 
-            }
-
-            initFilters();
-            initMedalGrid();
-            renderTable();
-        };
-
-        async function saveToCloud() {
-            if (!GAS_URL || GAS_URL.trim() === '') return;
-            showLoading(true, 'クラウドに保存中...');
-            try {
-                const exportData = { songs: songs, clearRecords: clearRecords, password: currentPassword };
-                const response = await fetch(GAS_URL, {
-                    method: 'POST',
-                    body: JSON.stringify(exportData)
-                });
-                
-                const result = await response.json();
-                if (result.status === 'error') {
-                    alert(result.message + "\nページを再読み込みします。");
-                    sessionStorage.removeItem('admin_pwd');
-                    currentPassword = "";
-                    location.reload();
-                }
-            } catch (e) {
-                console.error("クラウド保存エラー:", e);
-                alert("通信エラーが発生しました。");
-            }
-            showLoading(false);
-        }
-
-        async function syncLocalToCloud() {
-            if (!checkAuth()) return;
-            if (!GAS_URL || GAS_URL.trim() === '') {
-                alert("GAS_URLが設定されていません。先にGASのデプロイとURLの貼り付けを行ってください。");
-                return;
-            }
-            const localSongs = JSON.parse(localStorage.getItem(STORAGE_KEY_SONGS)) || [];
-            const localClears = JSON.parse(localStorage.getItem(STORAGE_KEY_CLEARS)) || {};
-            if (localSongs.length === 0 && Object.keys(localClears).length === 0) {
-                alert("ブラウザ（ローカル）にデータが見つかりません。すでに移行済みか、別のブラウザで開いている可能性があります。");
-                return;
-            }
-            if (!confirm("ブラウザに保存されている「" + localSongs.length + "件の楽曲」と「クリア記録」をクラウドにアップロードしますか？\n（クラウド側の既存データは上書きされます）")) {
-                return;
-            }
-            showLoading(true, 'クラウドへ移行中...');
-            try {
-                const exportData = { songs: localSongs, clearRecords: localClears, password: currentPassword };
-                const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(exportData) });
-                const result = await res.json();
-                if (result.status === 'error') {
-                    alert(result.message);
-                    sessionStorage.removeItem('admin_pwd');
-                    currentPassword = "";
-                } else {
-                    alert("クラウドへの移行が完了しました！\n今後は自動的にクラウドと同期されるため、このボタンはもう使わなくてOKです。");
-                    location.reload();
-                }
-            } catch (e) {
-                alert("同期に失敗しました。GASのURLが正しいか確認してください。");
-                console.error(e);
-            }
-            showLoading(false);
-        }
-
         function downloadSongsAndClearsJson() {
-            if (!checkAuth()) return;
             const exportData = { songs: songs, clearRecords: clearRecords };
             const dataStr = JSON.stringify(exportData, null, 2);
-            triggerDownload(dataStr, 'songs.json', 'クリア記録を含めて');
+            triggerDownload(dataStr, `popn_data_${currentUser}.json`, 'クリア記録を含めて');
         }
 
         function downloadSongsJsonOnly() {
-            if (!checkAuth()) return;
             const dataStr = JSON.stringify(songs, null, 2);
             triggerDownload(dataStr, 'songs.json', '楽曲データのみで');
         }
@@ -850,7 +893,6 @@
         }
 
         async function importFromClipboard() {
-            if (!checkAuth()) return;
             try {
                 const text = await navigator.clipboard.readText();
                 if (!text || text.trim() === '') {
@@ -866,7 +908,6 @@
         }
 
         async function importDataManual() {
-            if (!checkAuth()) return;
             const text = document.getElementById('import-text').value;
             if (!text.trim()) {
                 alert("テキストエリアが空です。");
@@ -948,21 +989,18 @@
                     }
                 }
             });
-
-            localStorage.setItem(STORAGE_KEY_SONGS, JSON.stringify(songs));
-            localStorage.setItem(STORAGE_KEY_CLEARS, JSON.stringify(clearRecords));
             
             currentViewLevel = targetLevel;
             updateDynamicFilters();
             document.getElementById('search-input').value = '';
             renderTable();
             
-            await saveToCloud();
+            // ★ 楽曲リストの更新なので isSongUpdate = true
+            await saveToCloud(true);
             alert(`レベル${targetLevel}として、${newSongsAdded}件を新規追加、${songsUpdated}件を更新しました。`);
         }
 
         async function updateBannerFromClipboard(id) {
-            if (!checkAuth()) return;
             try {
                 const text = await navigator.clipboard.readText();
                 if (!text || text.trim() === '') {
@@ -973,9 +1011,8 @@
                 if (songIndex === -1) return;
 
                 songs[songIndex].bannerUrl = text.trim();
-                localStorage.setItem(STORAGE_KEY_SONGS, JSON.stringify(songs));
                 renderTable();
-                await saveToCloud();
+                await saveToCloud(true); // 楽曲情報の更新
             } catch (err) {
                 const songIndex = songs.findIndex(s => s.id === id);
                 if (songIndex === -1) return;
@@ -984,9 +1021,8 @@
                 
                 if (newUrl !== null) { 
                     songs[songIndex].bannerUrl = newUrl.trim();
-                    localStorage.setItem(STORAGE_KEY_SONGS, JSON.stringify(songs));
                     renderTable(); 
-                    await saveToCloud();
+                    await saveToCloud(true); // 楽曲情報の更新
                 }
             }
         }
@@ -1018,7 +1054,13 @@
             exportContainer.style.fontFamily = 'sans-serif';
             document.body.appendChild(exportContainer);
 
-            // stats-display（クリア率等の表示領域）をそのままコピーして画像化
+            // ★ 出力画像にユーザー名を付与する
+            const userHeader = document.createElement('h2');
+            userHeader.style.margin = '0 0 10px 0';
+            userHeader.style.color = '#333';
+            userHeader.innerText = `User: ${currentUser}`;
+            exportContainer.appendChild(userHeader);
+
             const statsClone = document.getElementById('stats-display').cloneNode(true);
             statsClone.style.marginBottom = '20px';
             statsClone.style.fontSize = '1.3em';
@@ -1045,7 +1087,6 @@
             const statsImages = Array.from(statsClone.querySelectorAll('img'));
             statsImages.forEach(img => {
                 const originalSrc = img.getAttribute('src');
-                // DataURL(Base64の円グラフなど)はそのままにする
                 if (originalSrc && originalSrc.startsWith('http') && !originalSrc.includes('wsrv.nl')) {
                     img.setAttribute('crossOrigin', 'anonymous');
                     img.src = `https://wsrv.nl/?url=${encodeURIComponent(originalSrc)}`;
@@ -1068,7 +1109,6 @@
             activeIndices.forEach(idx => totalPct += colWidths[idx]);
             const totalWidth = totalPct * 10; 
 
-            // ★ 画像出力時のヘッダー文字列の指定
             const colProps = [
                 { id: 0, html: `<th style="width: ${colWidths[0]}%; text-align: center; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">メダル</th>` },
                 { id: 1, html: `<th style="width: ${colWidths[1]}%; text-align: center; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">Lv</th>` },
@@ -1159,7 +1199,7 @@
                 });
                 const link = document.createElement('a');
                 const date = new Date().toISOString().slice(0,10);
-                link.download = `popn_clearrate_Lv${fileNameLevel}_${date}.png`;
+                link.download = `popn_clearrate_${currentUser}_Lv${fileNameLevel}_${date}.png`;
                 link.href = canvas.toDataURL("image/png");
                 link.click();
             } catch (err) {
@@ -1172,7 +1212,6 @@
         }
 
         async function deleteLevelData() {
-            if (!checkAuth()) return; 
             const targetLevel = document.getElementById('delete-level').value;
             const songsToDelete = songs.filter(s => s.level === targetLevel);
             
@@ -1184,16 +1223,19 @@
             if(confirm(`【警告】レベル${targetLevel}の楽曲データ（${songsToDelete.length}件）をすべて削除しますか？\n（クリア記録も削除されます。この操作は元に戻せません）`)) {
                 const deleteIds = songsToDelete.map(s => s.id);
                 songs = songs.filter(s => s.level !== targetLevel);
-                deleteIds.forEach(id => {
-                    delete clearRecords[id];
-                });
-                localStorage.setItem(STORAGE_KEY_SONGS, JSON.stringify(songs));
-                localStorage.setItem(STORAGE_KEY_CLEARS, JSON.stringify(clearRecords));
+                
+                // 全ユーザーの該当楽曲のクリアデータを消す
+                for(let u in allUsersData) {
+                    deleteIds.forEach(id => {
+                        delete allUsersData[u].clearRecords[id];
+                    });
+                }
+                clearRecords = allUsersData[currentUser].clearRecords;
                 
                 updateDynamicFilters();
                 renderTable();
-                await saveToCloud();
-                alert(`レベル${targetLevel}の楽曲データとクリア記録を削除しました。`);
+                await saveToCloud(true); // 楽曲の削除なので isSongUpdate = true
+                alert(`レベル${targetLevel}の楽曲データと全ユーザーのクリア記録を削除しました。`);
             }
         }
 
@@ -1217,23 +1259,23 @@
         }
 
         async function deleteSong() {
-            if (!checkAuth()) return;
-            if(confirm("この楽曲をリストから削除しますか？\n（クリア記録も同時に削除されます）")) {
+            if(confirm("この楽曲をリストから削除しますか？\n（全ユーザーのクリア記録も同時に削除されます）")) {
                 const originalId = document.getElementById('edit-original-id').value;
                 songs = songs.filter(s => s.id !== originalId);
-                delete clearRecords[originalId];
-                localStorage.setItem(STORAGE_KEY_SONGS, JSON.stringify(songs));
-                localStorage.setItem(STORAGE_KEY_CLEARS, JSON.stringify(clearRecords));
+                
+                for(let u in allUsersData) {
+                    delete allUsersData[u].clearRecords[originalId];
+                }
+                clearRecords = allUsersData[currentUser].clearRecords;
                 
                 updateDynamicFilters();
                 renderTable();
                 closeEditModal();
-                await saveToCloud();
+                await saveToCloud(true);
             }
         }
 
         async function saveEditModal() {
-            if (!checkAuth()) return; 
             const originalId = document.getElementById('edit-original-id').value;
             const songIndex = songs.findIndex(s => s.id === originalId);
             if (songIndex === -1) return;
@@ -1244,11 +1286,13 @@
             const newId = newGenre + "_" + newTitle + "_" + newNotes;
 
             if (newId !== originalId) {
-                if (clearRecords[originalId] !== undefined) {
-                    clearRecords[newId] = clearRecords[originalId];
-                    delete clearRecords[originalId];
-                    localStorage.setItem(STORAGE_KEY_CLEARS, JSON.stringify(clearRecords));
+                for(let u in allUsersData) {
+                    if (allUsersData[u].clearRecords[originalId] !== undefined) {
+                        allUsersData[u].clearRecords[newId] = allUsersData[u].clearRecords[originalId];
+                        delete allUsersData[u].clearRecords[originalId];
+                    }
                 }
+                clearRecords = allUsersData[currentUser].clearRecords;
                 songs[songIndex].id = newId;
             }
 
@@ -1266,34 +1310,18 @@
             songs[songIndex].diffClass = parsed.diffClass;
             songs[songIndex].diffIndex = parsed.diffIndex;
 
-            localStorage.setItem(STORAGE_KEY_SONGS, JSON.stringify(songs));
             updateDynamicFilters();
             renderTable();
             closeEditModal();
-            await saveToCloud();
+            await saveToCloud(true);
         }
 
         async function clearRecordsOnly() {
-            if (!checkAuth()) return; 
-            if(confirm("すべてのクリア記録のみをリセットしますか？\n（楽曲リストや編集した情報は保持されます）")) {
-                clearRecords = {};
-                localStorage.setItem(STORAGE_KEY_CLEARS, JSON.stringify(clearRecords));
+            if(confirm(`ユーザー [${currentUser}] のすべてのクリア記録をリセットしますか？\n（楽曲リストは保持されます）`)) {
+                allUsersData[currentUser].clearRecords = {};
+                clearRecords = allUsersData[currentUser].clearRecords;
                 renderTable();
-                await saveToCloud();
-            }
-        }
-
-        async function initializeData() {
-            if (!checkAuth()) return; 
-            if(confirm("【警告】楽曲データ・クリア記録のすべてを削除し、完全に初期化しますか？\n（この操作は元に戻せません）")) {
-                songs = [];
-                clearRecords = {};
-                localStorage.removeItem(STORAGE_KEY_SONGS);
-                localStorage.removeItem(STORAGE_KEY_CLEARS);
-                updateDynamicFilters();
-                renderTable();
-                await saveToCloud();
-                alert("アプリを初期化しました。");
+                await saveToCloud(false);
             }
         }
 
@@ -1642,12 +1670,10 @@
 
                     chartData.sort((a, b) => b.rank - a.rank);
 
-                    // ★ 凡例（文字被り防止のため、フレックスボックスでゆったり並べる）
                     let legendHtml = '';
                     chartData.forEach(d => {
                         let perc = totalForChart === 0 ? 0 : (d.count / totalForChart) * 100;
-                        let safeLabel = d.label.replace('🔒', ''); // 凡例からは絵文字を抜く
-                        // ★ 色の四角に枠線（border）をつけて、白っぽい色でも見えるようにする
+                        let safeLabel = d.label.replace('🔒', '');
                         legendHtml += `
                             <div style="display: flex; align-items: center; font-size: 0.85em; white-space: nowrap;">
                                 <span style="display: inline-block; width: 12px; height: 12px; background: ${d.color}; border: 1px solid #aaa; margin-right: 4px; border-radius: 2px;"></span>
@@ -1656,7 +1682,6 @@
                         `;
                     });
 
-                    // 画像（Base64）の生成
                     const pieChartUrl = generatePieChartBase64(chartData, 200);
 
                     statsHtml += `
