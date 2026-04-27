@@ -49,6 +49,10 @@
         
         .ver-badge { font-weight: bold; color: #555; background: #eee; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; display: inline-block; }
         .level-badge { font-weight: bold; color: #fff; background: #555; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; display: inline-block; }
+
+        /* ★ 難易度と指数の基本スタイル（PCは横並び） */
+        .diff-wrapper { display: inline-block; }
+        .diff-sub { margin-left: 3px; font-size: 0.9em; }
         
         /* コンパクト編集・メダル選択モーダル用のスタイル */
         .modal-overlay {
@@ -154,6 +158,22 @@
             /* モーダル画面の調整 */
             .modal-content { width: 95%; padding: 15px; box-sizing: border-box; }
             .medal-item { padding: 8px; }
+
+            /* ★ 7. 難易度と指数を2段に分ける（スマホのみ） */
+            .diff-wrapper { 
+                display: flex !important; 
+                flex-direction: column; 
+                align-items: center; 
+                justify-content: center; 
+                line-height: 1.1; 
+            }
+            .diff-main { font-size: 1.05em; }
+            .diff-sub { 
+                font-size: 0.75em; 
+                margin-left: 0 !important; 
+                margin-top: 2px; 
+                opacity: 0.85; /* 少し色を薄くして控えめにする */
+            }
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -168,7 +188,7 @@
     <div style="padding: 20px;">
         <h1>Pop’n Clear Rate app</h1>
 
-<details class="controls" style="cursor: pointer;">
+        <details class="controls" style="cursor: pointer;">
             <summary style="font-weight: bold; font-size: 1.1em; color: #333; user-select: none; outline: none; padding-bottom: 5px; border-bottom: 1px dashed #ccc;">
                 ⚙️ データ追加・管理・バックアップ (タップして開く)
             </summary>
@@ -233,12 +253,6 @@
                 </div>
             </div>
         </details>
-        
-        </details>
-            
-            <hr style="border: none; border-top: 1px solid #eee; margin: 15px 0;">
-            
-        </div>
 
         <div class="view-header">
             <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
@@ -657,7 +671,6 @@
             }
             if (needsClearSave) {
                 localStorage.setItem(STORAGE_KEY_CLEARS, JSON.stringify(clearRecords));
-                // もし初回起動時からパスワードを持っていない場合は保存をスキップ（不要なエラーを防ぐため）
                 if(currentPassword !== "") saveToCloud(); 
             }
 
@@ -672,7 +685,6 @@
             if (!GAS_URL || GAS_URL.trim() === '') return;
             showLoading(true, 'クラウドに保存中...');
             try {
-                // 送信データにパスワードを含める
                 const exportData = { songs: songs, clearRecords: clearRecords, password: currentPassword };
                 const response = await fetch(GAS_URL, {
                     method: 'POST',
@@ -916,7 +928,6 @@
         function clearSearch() { document.getElementById('search-input').value = ''; renderTable(); }
 
         async function exportAsImage() {
-            // 画像出力は閲覧専用機能なのでパスワードは不要
             const btn = document.querySelector('.btn-image');
             const originalText = btn.innerText;
             
@@ -1469,7 +1480,20 @@
                 if (medalInfo.isEasyClear) tr.classList.add('cleared-row');
 
                 const styleObj = getDifficultyColor(song.diffClass, song.diffIndex);
-                const diffHtml = `<span style="color: ${styleObj.color}; text-shadow: ${styleObj.shadow}; font-weight: bold;">${song.diffRaw}</span>`;
+                
+                // ★ 「難易度（別格など）」と「指数（+1.5など）」を分離する
+                let dClassStr = song.diffClass || '';
+                let dIndexStr = song.diffRaw.replace(dClassStr, '').trim();
+                if (!song.diffRaw.includes(dClassStr)) {
+                    dClassStr = song.diffRaw; dIndexStr = ''; // 置換できなかった時の保険
+                }
+                
+                // PC用とスマホ用でスタイルを変えられるように2つのspanに分ける
+                const diffHtml = `
+                    <div class="diff-wrapper" style="color: ${styleObj.color}; text-shadow: ${styleObj.shadow}; font-weight: bold;">
+                        <span class="diff-main">${dClassStr}</span><span class="diff-sub">${dIndexStr}</span>
+                    </div>
+                `;
                 
                 const safeId = song.id.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;");
 
@@ -1568,7 +1592,7 @@
                 const stat = diffStats[dKey];
                 if (stat.total === 0) return; 
                 
-                const ePerc = ((stat.easy / stat.total) * 100).toFixed(1);
+                const ePerc = ((stat.easy / total) * 100).toFixed(1);
                 const nPerc = ((stat.normal / stat.total) * 100).toFixed(1);
                 
                 let baseClass = dKey.startsWith('中') ? '中' : dKey;
