@@ -454,6 +454,8 @@
 
         const MEDAL_TYPES = {
             '':         { imgUrl: 'URLをペースト', label: '未プレイ', rank: 0, isEasyClear: false, isNormalClear: false },
+            // ★ 新規追加：「未解禁」メダル（excludeFromRateで分母から除外）
+            '未解禁':   { imgUrl: '', label: '🔒未解禁', rank: -1, isEasyClear: false, isNormalClear: false, excludeFromRate: true },
             '黒丸':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/groove_02.png', label: '黒丸', rank: 1, isEasyClear: false, isNormalClear: false },
             '黒菱':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/groove_01.png', label: '黒菱', rank: 2, isEasyClear: false, isNormalClear: false },
             '黒星':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/groove_00.png', label: '黒星', rank: 3, isEasyClear: false, isNormalClear: false },
@@ -635,7 +637,6 @@
         let clearRecords = JSON.parse(localStorage.getItem(STORAGE_KEY_CLEARS)) || {};
         let needsClearSave = false;
         
-        // ★ スマホ版（画面幅768px以下）は初期ソートを「難易度」、PCは「Ver順」に設定
         let currentSort = window.innerWidth <= 768 ? 'diff' : 'version';
         let sortDesc = window.innerWidth <= 768 ? true : false;
         let currentViewLevel = '48';
@@ -964,7 +965,6 @@
             exportContainer.style.fontFamily = 'sans-serif';
             document.body.appendChild(exportContainer);
 
-            // stats-display（クリア率等の表示領域）をそのままコピーして画像化
             const statsClone = document.getElementById('stats-display').cloneNode(true);
             statsClone.style.marginBottom = '20px';
             statsClone.style.fontSize = '1.3em';
@@ -1013,7 +1013,6 @@
             activeIndices.forEach(idx => totalPct += colWidths[idx]);
             const totalWidth = totalPct * 10; 
 
-            // ★ 画像出力時のヘッダー文字列の指定
             const colProps = [
                 { id: 0, html: `<th style="width: ${colWidths[0]}%; text-align: center; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">メダル</th>` },
                 { id: 1, html: `<th style="width: ${colWidths[1]}%; text-align: center; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">Lv</th>` },
@@ -1432,6 +1431,7 @@
 
             let easyClearCount = 0; 
             let normalClearCount = 0; 
+            let rateTotal = 0; // ★ レート計算の分母となる曲数
             
             let medalCounts = {};
             Object.keys(MEDAL_TYPES).forEach(k => {
@@ -1463,15 +1463,22 @@
                 }
                 
                 if (!diffStats[dClass]) dClass = '未分類';
-                diffStats[dClass].total++;
                 
-                if (medalInfo.isEasyClear) {
-                    easyClearCount++;
-                    diffStats[dClass].easy++;
-                }
-                if (medalInfo.isNormalClear) {
-                    normalClearCount++;
-                    diffStats[dClass].normal++;
+                // ★ 「未解禁」をレート計算から除外する処理
+                if (medalInfo.excludeFromRate) {
+                    // 何もしない（レートの分母に足さない）
+                } else {
+                    rateTotal++;
+                    diffStats[dClass].total++;
+                    
+                    if (medalInfo.isEasyClear) {
+                        easyClearCount++;
+                        diffStats[dClass].easy++;
+                    }
+                    if (medalInfo.isNormalClear) {
+                        normalClearCount++;
+                        diffStats[dClass].normal++;
+                    }
                 }
 
                 const tr = document.createElement('tr');
@@ -1521,11 +1528,13 @@
 
             updateSortHeaders();
 
-            const total = displaySongs.length;
-            const easyPerc = total === 0 ? 0 : ((easyClearCount / total) * 100).toFixed(1);
-            const normalPerc = total === 0 ? 0 : ((normalClearCount / total) * 100).toFixed(1);
-            const easyRemain = total - easyClearCount;
-            const normalRemain = total - normalClearCount;
+            // ★ 変数を整理
+            const displayTotal = displaySongs.length; // 画面に見えている全曲数（未解禁含む）
+            
+            const easyPerc = rateTotal === 0 ? 0 : ((easyClearCount / rateTotal) * 100).toFixed(1);
+            const normalPerc = rateTotal === 0 ? 0 : ((normalClearCount / rateTotal) * 100).toFixed(1);
+            const easyRemain = rateTotal - easyClearCount;
+            const normalRemain = rateTotal - normalClearCount;
 
             let levelLabel = currentViewLevel === 'ALL' ? '全体' : `Lv${currentViewLevel}`;
             if (searchQuery) levelLabel = `検索結果 ("${searchQuery}")`;
@@ -1545,7 +1554,7 @@
                 statsHtml += `
                     <div class="stats-group">
                         <span class="stats-title">イージークリア以上:</span>
-                        <span class="stats-fraction">${easyClearCount} / ${total} <span class="stats-remain">(未クリア: ${easyRemain})</span></span>
+                        <span class="stats-fraction">${easyClearCount} / ${rateTotal} <span class="stats-remain">(未クリア: ${easyRemain})</span></span>
                         <span class="stats-easypercentage">${easyPerc}%</span>
                     </div>`;
             }
@@ -1553,7 +1562,7 @@
                 statsHtml += `
                     <div class="stats-group">
                         <span class="stats-title">ノーマルクリア以上:</span>
-                        <span class="stats-fraction">${normalClearCount} / ${total} <span class="stats-remain">(未クリア: ${normalRemain})</span></span>
+                        <span class="stats-fraction">${normalClearCount} / ${rateTotal} <span class="stats-remain">(未クリア: ${normalRemain})</span></span>
                         <span class="stats-percentage">${normalPerc}%</span>
                     </div>`;
             }
@@ -1609,7 +1618,7 @@
                             <div style="background: #fff; padding: 8px; border-radius: 4px; border: 1px solid #ddd; border-left: 4px solid ${borderColor}; box-shadow: 0 1px 2px rgba(0,0,0,0.05); font-size: 0.85em;">
                                 <div style="display: flex; justify-content: space-between; border-bottom: 1px dotted #eee; padding-bottom: 4px; margin-bottom: 4px;">
                                     <span style="font-weight: bold; color: ${dKey === '危険' ? '#FFD700' : '#333'}; text-shadow: ${dKey === '危険' ? styleObj.shadow : 'none'};">${dKey}</span>
-                                    <span style="color: #666;">全${stat.total}曲</span>
+                                    <span style="color: #666;">対象${stat.total}曲</span>
                                 </div>
                                 <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
                                     <span style="color: #2cbc21; font-weight: bold;">イージー以上 <span style="color: #333;">${stat.easy}/${stat.total}</span></span>
