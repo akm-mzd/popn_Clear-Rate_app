@@ -123,6 +123,9 @@
             body { padding: 4px !important; box-sizing: border-box; }
             #capture-area { padding: 0 !important; } 
             
+            /* スマホで管理メニューを非表示にする */
+            #admin-controls { display: none !important; }
+
             .flex-row { flex-direction: column; align-items: stretch; gap: 6px; }
             
             button, select, input.search-box { 
@@ -220,7 +223,7 @@
     <div style="padding: 20px;">
         <h1>Pop’n Clear Rate app</h1>
 
-        <details class="controls" style="cursor: pointer;">
+        <details id="admin-controls" class="controls" style="cursor: pointer;">
             <summary style="font-weight: bold; font-size: 1.1em; color: #333; user-select: none; outline: none; padding-bottom: 5px; border-bottom: 1px dashed #ccc;">
                 ⚙️ データ追加・管理・バックアップ (タップして開く)
             </summary>
@@ -306,7 +309,7 @@
                         <div style="position: absolute; top: 100%; right: 0; background: #fff; border: 1px solid #ccc; border-radius: 6px; padding: 12px; z-index: 2000; box-shadow: 0 4px 10px rgba(0,0,0,0.2); width: max-content; display: grid; gap: 8px; margin-top: 5px; text-align: left;">
                             <div style="font-size: 0.85em; color: #666; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 4px; margin-bottom: 4px;">📷 画像に出力する列</div>
                             <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="0" checked> メダル</label>
-                            <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="1"> スコア</label>
+                            <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="1" checked> スコア</label>
                             <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="2"> 比較</label>
                             <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="3"> Lv</label>
                             <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="4"> Ver</label>
@@ -378,7 +381,7 @@
             
             <div class="stats-toggles" style="justify-content: flex-start; border-top: 1px solid #eee; padding-top: 10px; margin-top: 10px;">
                 <span style="font-size: 0.9em; font-weight: bold; color: #666; margin-right: auto;">🔢 スコア・比較機能:</span>
-                <label><input type="checkbox" id="show-score-col" onchange="renderTable()" style="margin:0;"> スコア表示</label>
+                <label><input type="checkbox" id="show-score-col" onchange="renderTable()" style="margin:0;" checked> スコア表示</label>
                 <label><input type="checkbox" id="enable-compare" onchange="renderTable()" style="margin:0;"> スコア比較</label>
                 <select id="compare-user-select" onchange="if(document.getElementById('enable-compare').checked) renderTable()" style="padding: 4px 8px; font-size: 0.9em; border-radius: 4px; border: 1px solid #ccc;">
                 </select>
