@@ -124,11 +124,15 @@
             }
             .stats-level { margin-bottom: 4px; }
             
-            /* 5. テーブル：Ver, BPM, ノーツを隠す */
+            /* 5. テーブル：指定された4項目以外を隠す（Lv，Ver，BPM，ノーツ，操作 を非表示） */
             .view-header { position: static; padding-top: 5px; }
-            th:nth-child(3), td:nth-child(3),
-            th:nth-child(6), td:nth-child(6),
-            th:nth-child(7), td:nth-child(7) { display: none; }
+            th:nth-child(2), td:nth-child(2), /* Lv */
+            th:nth-child(3), td:nth-child(3), /* Ver */
+            th:nth-child(6), td:nth-child(6), /* BPM */
+            th:nth-child(7), td:nth-child(7), /* ノーツ */
+            th:nth-child(9), td:nth-child(9)  /* 操作(編集ボタン) */ { 
+                display: none; 
+            }
             
             /* 6. テーブル：曲名や操作ボタンのバランス調整 */
             td { font-size: 0.9em; padding: 8px 4px; word-break: break-word; }
