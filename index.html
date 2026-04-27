@@ -207,13 +207,14 @@
 
             details > div[style*="position: absolute"] { right: 0; left: auto; max-width: 90vw; }
             
-            /* スマホ時のユーザー切り替えエリア調整 */
-            .user-selector-area { flex-direction: column; align-items: flex-start; gap: 10px; }
-            .user-selector-area > div { width: 100%; display: flex; justify-content: space-between; align-items: center; }
-            .user-selector-area .user-label { white-space: nowrap; flex-shrink: 0; margin-right: 5px; }
-            .user-selector-area select { flex-grow: 1; margin: 0 5px; min-width: 0; }
-            .user-selector-area button { white-space: nowrap; flex-shrink: 0; margin-left: 5px !important; padding: 6px 10px !important; }
+            /* スマホ時のユーザー切り替えエリア調整（2段に分ける） */
+            .user-selector-area { padding: 10px; }
+            .user-selector-area > div { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; align-items: center; }
+            .user-selector-area .user-label { white-space: nowrap; margin: 0; }
+            .user-selector-area select { flex-grow: 1; margin: 0; min-width: 150px; font-size: 16px; }
+            .user-selector-area button { width: 100%; margin: 5px 0 0 0 !important; padding: 10px !important; font-size: 1em !important; box-sizing: border-box; }
         }
+    </style>
     </style>
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
