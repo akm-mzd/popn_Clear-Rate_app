@@ -155,14 +155,16 @@
             
             table { table-layout: fixed !important; width: 100% !important; max-width: 100% !important; } 
             
-            th:nth-child(1), td:nth-child(1) { width: 15% !important; padding: 4px 2px !important; } 
-            th:nth-child(4), td:nth-child(4) { width: 22% !important; padding: 4px 2px !important; } 
-            th:nth-child(5), td:nth-child(5) { width: 45% !important; padding: 4px !important; }     
-            th:nth-child(8), td:nth-child(8) { width: 18% !important; padding: 4px 2px !important; text-align: center !important; } 
+            th:nth-child(1), td:nth-child(1) { width: 14% !important; padding: 4px 1px !important; } /* メダル */
+            th:nth-child(4), td:nth-child(4) { width: 20% !important; padding: 4px 1px !important; } /* バナー */
+            th:nth-child(5), td:nth-child(5) { width: 43% !important; padding: 4px !important; }     /* 曲名 */
+            th:nth-child(8), td:nth-child(8) { width: 23% !important; padding: 4px 0 !important; text-align: center !important; } /* 難易度 */
             
+            /* 文字サイズと折り返し（文字が長くて枠を突き破るのを防ぐ） */
             td { font-size: 0.8em; word-break: break-all !important; overflow-wrap: break-word !important; }
             th { font-size: 0.8em; padding: 8px 2px; }
             
+            /* バナー画像が指定した枠にピタッと収まるように調整 */
             td:nth-child(4) img { width: 100% !important; height: auto !important; max-height: 35px !important; object-fit: contain !important; }
             
             .modal-content { width: 95%; padding: 15px; box-sizing: border-box; }
@@ -176,15 +178,17 @@
                 line-height: 1.1; 
             }
             .diff-main { 
-                font-size: 0.95em; /* メインも少しだけ縮小 */
-                white-space: nowrap; /* 強制的に改行を禁止 */
+                font-size: 0.85em; /* 少し縮小 */
+                letter-spacing: -0.5px; /* ★文字と文字の隙間を詰める */
+                white-space: nowrap; 
             }
             .diff-sub { 
-                font-size: 0.30em; /* 文字をさらに小さく */
+                font-size: 0.65em; 
                 margin-left: 0 !important; 
-                margin-top: 2px; 
+                margin-top: 1px; 
                 opacity: 0.85; 
-                white-space: nowrap; /* 強制的に改行を禁止 */
+                letter-spacing: -0.5px; /* ★文字と文字の隙間を詰める */
+                white-space: nowrap; 
             }
 
             details > div[style*="position: absolute"] { right: 0; left: auto; max-width: 90vw; }
