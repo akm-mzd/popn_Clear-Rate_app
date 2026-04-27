@@ -29,7 +29,7 @@
             position: sticky; top: 0; z-index: 1000; background-color: #f9f9f9; 
         }
         
-        /* ★ 統計表示のトグルボタンスタイル ★ */
+        /* 統計表示のトグルボタンスタイル */
         .stats-toggles {
             width: 100%; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; align-items: center; margin-bottom: 5px; margin-top: 10px;
         }
@@ -66,6 +66,10 @@
         /* 難易度と指数の基本スタイル（PCは横並び） */
         .diff-wrapper { display: inline-block; }
         .diff-sub { margin-left: 3px; font-size: 0.9em; }
+
+        /* ヘッダー用スマホ改行スタイル（PCでは非表示） */
+        .sp-br { display: none; }
+        .diff-header-sub { font-weight: normal; font-size: 0.9em; }
         
         /* コンパクト編集・メダル選択モーダル用のスタイル */
         .modal-overlay {
@@ -155,16 +159,14 @@
             
             table { table-layout: fixed !important; width: 100% !important; max-width: 100% !important; } 
             
-            th:nth-child(1), td:nth-child(1) { width: 14% !important; padding: 4px 1px !important; } /* メダル */
-            th:nth-child(4), td:nth-child(4) { width: 20% !important; padding: 4px 1px !important; } /* バナー */
-            th:nth-child(5), td:nth-child(5) { width: 43% !important; padding: 4px !important; }     /* 曲名 */
-            th:nth-child(8), td:nth-child(8) { width: 23% !important; padding: 4px 0 !important; text-align: center !important; } /* 難易度 */
+            th:nth-child(1), td:nth-child(1) { width: 14% !important; padding: 4px 1px !important; } 
+            th:nth-child(4), td:nth-child(4) { width: 20% !important; padding: 4px 1px !important; } 
+            th:nth-child(5), td:nth-child(5) { width: 43% !important; padding: 4px !important; }     
+            th:nth-child(8), td:nth-child(8) { width: 23% !important; padding: 4px 0 !important; text-align: center !important; } 
             
-            /* 文字サイズと折り返し（文字が長くて枠を突き破るのを防ぐ） */
             td { font-size: 0.8em; word-break: break-all !important; overflow-wrap: break-word !important; }
             th { font-size: 0.8em; padding: 8px 2px; }
             
-            /* バナー画像が指定した枠にピタッと収まるように調整 */
             td:nth-child(4) img { width: 100% !important; height: auto !important; max-height: 35px !important; object-fit: contain !important; }
             
             .modal-content { width: 95%; padding: 15px; box-sizing: border-box; }
@@ -190,6 +192,9 @@
                 letter-spacing: -0.5px; 
                 white-space: nowrap; 
             }
+
+            .sp-br { display: block; margin-top: 2px; }
+            .diff-header-sub { font-size: 0.8em; opacity: 0.9; }
 
             details > div[style*="position: absolute"] { right: 0; left: auto; max-width: 90vw; }
         }
@@ -375,7 +380,7 @@
                         <th style="width: 24%;" onclick="sortBy('title')" id="th-title" title="クリックでソート">ジャンル / 曲名</th>
                         <th style="width: 7%; text-align: right;" onclick="sortBy('bpm')" id="th-bpm" title="クリックでソート">BPM</th>
                         <th style="width: 7%; text-align: right;" onclick="sortBy('notes')" id="th-notes" title="クリックでソート">ノーツ</th>
-                        <th style="width: 22%; text-align: center;" onclick="sortBy('diff')" id="th-diff" title="クリックでソート">難易度 (指数)</th>
+                        <th style="width: 22%; text-align: center;" onclick="sortBy('diff')" id="th-diff" title="クリックでソート">難易度<span class="sp-br"></span><span class="diff-header-sub">(指数)</span></th>
                         <th style="width: 10%; text-align: center;" class="no-export">操作</th>
                     </tr>
                 </thead>
@@ -499,9 +504,7 @@
             updateDynamicFilters();
         }
 
-        // ★ レベル・バージョンのドロップダウンを動的に更新する関数
         function updateDynamicFilters() {
-            // --- バージョンの更新 ---
             const versionSelect = document.getElementById('filter-version');
             if (versionSelect) {
                 const currentVer = versionSelect.value;
@@ -518,12 +521,10 @@
                 }
             }
 
-            // --- ★ 表示レベルの更新 ---
             const viewLevelSelect = document.getElementById('view-level');
             if (viewLevelSelect) {
                 viewLevelSelect.innerHTML = '<option value="ALL">すべて表示</option>';
                 
-                // 登録されている曲から一意なレベルを抽出し、降順(50, 49...)にソート
                 const levels = [...new Set(songs.map(s => s.level))].filter(l => l);
                 levels.sort((a, b) => {
                     const numA = parseInt(a, 10);
@@ -541,7 +542,6 @@
                     viewLevelSelect.appendChild(option);
                 });
                 
-                // 状態の復元（ALL、または直前まで選択していたレベル）
                 if (currentViewLevel === 'ALL') {
                     viewLevelSelect.value = 'ALL';
                 } else if (levels.includes(currentViewLevel)) {
@@ -635,8 +635,9 @@
         let clearRecords = JSON.parse(localStorage.getItem(STORAGE_KEY_CLEARS)) || {};
         let needsClearSave = false;
         
-        let currentSort = 'version';
-        let sortDesc = false;
+        // ★ スマホ版（画面幅768px以下）は初期ソートを「難易度」、PCは「Ver順」に設定
+        let currentSort = window.innerWidth <= 768 ? 'diff' : 'version';
+        let sortDesc = window.innerWidth <= 768 ? true : false;
         let currentViewLevel = '48';
 
         window.onload = async () => {
@@ -963,6 +964,7 @@
             exportContainer.style.fontFamily = 'sans-serif';
             document.body.appendChild(exportContainer);
 
+            // stats-display（クリア率等の表示領域）をそのままコピーして画像化
             const statsClone = document.getElementById('stats-display').cloneNode(true);
             statsClone.style.marginBottom = '20px';
             statsClone.style.fontSize = '1.3em';
@@ -1011,6 +1013,7 @@
             activeIndices.forEach(idx => totalPct += colWidths[idx]);
             const totalWidth = totalPct * 10; 
 
+            // ★ 画像出力時のヘッダー文字列の指定
             const colProps = [
                 { id: 0, html: `<th style="width: ${colWidths[0]}%; text-align: center; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">メダル</th>` },
                 { id: 1, html: `<th style="width: ${colWidths[1]}%; text-align: center; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">Lv</th>` },
@@ -1019,7 +1022,7 @@
                 { id: 4, html: `<th style="width: ${colWidths[4]}%; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2; text-align: left;">ジャンル / 曲名</th>` },
                 { id: 5, html: `<th style="width: ${colWidths[5]}%; text-align: right; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">BPM</th>` },
                 { id: 6, html: `<th style="width: ${colWidths[6]}%; text-align: right; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">ノーツ</th>` },
-                { id: 7, html: `<th style="width: ${colWidths[7]}%; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2; text-align: center;">難易度</th>` }
+                { id: 7, html: `<th style="width: ${colWidths[7]}%; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2; text-align: center;">難易度 (指数)</th>` }
             ];
 
             for (let i = 0; i < originalRows.length; i += chunkSize) {
@@ -1263,7 +1266,7 @@
                 'title': 'ジャンル / 曲名',
                 'bpm': 'BPM',
                 'notes': 'ノーツ',
-                'diff': '難易度 (指数)'
+                'diff': '難易度<span class="sp-br"></span><span class="diff-header-sub">(指数)</span>'
             };
             for (const [key, label] of Object.entries(headers)) {
                 const th = document.getElementById(`th-${key}`);
