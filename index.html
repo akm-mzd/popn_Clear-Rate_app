@@ -24,7 +24,7 @@
             display: flex; justify-content: space-between; align-items: flex-end; 
             margin-bottom: 10px; padding-bottom: 10px; padding-top: 15px; 
             border-bottom: 2px solid #ddd; flex-wrap: wrap; gap: 15px; 
-            position: sticky; top: 0; z-index: 1000; background-color: #f9f9f9; 
+            /* 追従機能を削除しました */
         }
         
         .stats-toggles {
@@ -35,7 +35,13 @@
         }
         .stats-toggles label:hover { background: #f0f8ff; border-color: #2196F3; }
 
-        .stats-container { display: flex; flex-wrap: wrap; gap: 15px; align-items: baseline; justify-content: flex-end; margin-left: auto; background: #fff; padding: 10px 15px; border-radius: 8px; border: 1px solid #eee; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .stats-container { 
+            display: flex; flex-wrap: wrap; gap: 15px; align-items: baseline; justify-content: flex-end; 
+            margin-left: auto; background: #fff; padding: 10px 15px; border-radius: 8px; border: 1px solid #eee; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05); 
+            /* クリアレートを追従させる設定を追加 */
+            position: sticky; top: 0; z-index: 1000; 
+        }
         .stats-group { display: flex; align-items: baseline; gap: 8px; }
         .stats-title { font-size: 14px; color: #666; font-weight: bold; }
         .stats-fraction { font-size: 18px; font-weight: bold; color: #333; }
@@ -149,7 +155,7 @@
             }
             .stats-level { margin-bottom: 4px; }
             
-            .view-header { position: static; padding-top: 5px; }
+            .view-header { padding-top: 5px; }
             
             /* スマホで非表示にする列 */
             .col-level, .col-version, .col-bpm, .col-notes, .col-action { display: none !important; }
@@ -386,9 +392,7 @@
                 <select id="compare-user-select" onchange="if(document.getElementById('enable-compare').checked) renderTable()" style="padding: 4px 8px; font-size: 0.9em; border-radius: 4px; border: 1px solid #ccc;">
                 </select>
             </div>
-
-            <div class="stats-container" id="stats-display"></div>
-        </div>
+        </div> <div class="stats-container" id="stats-display"></div>
 
         <div id="capture-area" style="background-color: #f9f9f9; padding: 10px;">
             <div id="capture-stats-placeholder"></div>
