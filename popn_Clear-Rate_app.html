@@ -100,18 +100,42 @@
            📱 スマホ向け最適化（レスポンシブデザイン）
            ========================================= */
         @media screen and (max-width: 768px) {
-            body { padding: 10px; }
-            .flex-row { flex-direction: column; align-items: stretch; gap: 5px; }
+            /* 1. 画面の余白をギリギリまで削って広く使う */
+            body { padding: 6px; }
+            
+            /* 2. 要素を縦積みにするが、隙間は詰める */
+            .flex-row { flex-direction: column; align-items: stretch; gap: 6px; }
+            
+            /* 3. ボタン類を押しやすく。ただし検索クリアボタンなどは例外 */
             button, select, input.search-box { 
-                width: 100%; padding: 12px; font-size: 16px; box-sizing: border-box; margin-bottom: 5px;
+                width: 100%; padding: 12px; font-size: 16px; box-sizing: border-box; margin-bottom: 0;
             }
-            details > div > div { width: 48%; flex: 1 1 48%; }
+            button[onclick="clearSearch()"] { width: auto; padding: 12px 16px; flex-shrink: 0; }
+            #search-input { flex-grow: 1; }
+            
+            /* 4. クリア率（ヘッダー上部）のレイアウト崩れを防ぐ */
+            .stats-container { 
+                flex-direction: column; align-items: flex-start !important; 
+                gap: 8px !important; padding: 12px !important;
+            }
+            .stats-group { 
+                width: 100%; justify-content: space-between; 
+                border-bottom: 1px solid #eee; padding-bottom: 4px; 
+            }
+            .stats-level { margin-bottom: 4px; }
+            
+            /* 5. テーブル：Ver, BPM, ノーツを隠す */
             .view-header { position: static; padding-top: 5px; }
             th:nth-child(3), td:nth-child(3),
             th:nth-child(6), td:nth-child(6),
             th:nth-child(7), td:nth-child(7) { display: none; }
-            td { font-size: 0.85em; padding: 6px 4px; }
-            th { font-size: 0.9em; padding: 6px 4px; }
+            
+            /* 6. テーブル：曲名や操作ボタンのバランス調整 */
+            td { font-size: 0.9em; padding: 8px 4px; word-break: break-word; }
+            th { font-size: 0.85em; padding: 8px 4px; }
+            td:nth-child(4) img { min-width: 60px; max-height: 40px; } /* バナーが潰れないように */
+            .edit-btn { padding: 8px 4px; font-size: 0.8em; } /* 編集ボタンを押しやすく */
+            
             .modal-content { width: 95%; padding: 15px; }
             .medal-item { padding: 8px; }
         }
