@@ -210,8 +210,11 @@
             /* スマホ時のユーザー切り替えエリア調整 */
             .user-selector-area { flex-direction: column; align-items: flex-start; gap: 10px; }
             .user-selector-area > div { width: 100%; display: flex; justify-content: space-between; align-items: center; }
-            .user-selector-area select { flex-grow: 1; margin: 0 10px; }
+            .user-selector-area .user-label { white-space: nowrap; flex-shrink: 0; margin-right: 5px; }
+            .user-selector-area select { flex-grow: 1; margin: 0 5px; min-width: 0; }
+            .user-selector-area button { white-space: nowrap; flex-shrink: 0; margin-left: 5px !important; padding: 6px 10px !important; }
         }
+    </style>
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
