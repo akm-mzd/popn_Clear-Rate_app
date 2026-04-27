@@ -478,9 +478,12 @@
 
     <script>
         // ==========================================
-        // ★クラウド同期設定（GAS）
+        // ★クラウド同期設定（GAS）と管理者パスワード
         // ==========================================
         const GAS_URL = 'https://script.google.com/macros/s/AKfycbzEx9tpbcxbNWzL54wOn7EmYzoS2RzOaM3fJxXReN46CX9bJOrGjxpOe4tdVz7nPRs2bA/exec';
+        
+        // ★ 楽曲リストの編集用パスワード
+        const ADMIN_PASSWORD = "1005"; 
         // ==========================================
 
         const STORAGE_KEY_SONGS = 'popn_songs_data_v2';
@@ -493,6 +496,21 @@
         let clearRecords = {}; 
         let scoreRecords = {}; 
         
+        let isAdminAuthenticated = false;
+
+        // ★ マスターデータ編集時のパスワード確認関数
+        function checkAdminAuth() {
+            if (isAdminAuthenticated) return true;
+            const pwd = prompt("この操作には管理者用パスワードが必要です．パスワードを入力してください:");
+            if (pwd === ADMIN_PASSWORD) {
+                isAdminAuthenticated = true;
+                return true;
+            } else {
+                alert("パスワードが違います．操作はキャンセルされました．");
+                return false;
+            }
+        }
+
         const MEDAL_TYPES = {
             '':         { imgUrl: 'URLをペースト', label: '未プレイ', rank: 0, isEasyClear: false, isNormalClear: false },
             '未解禁':   { imgUrl: '', label: '未解禁', rank: -1, isEasyClear: false, isNormalClear: false, excludeFromRate: true },
