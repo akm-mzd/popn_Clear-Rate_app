@@ -20,7 +20,6 @@
         
         .search-box { padding: 6px 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 4px; width: 260px; box-sizing: border-box; }
 
-        /* ▼ 変更: 追従(sticky)を解除しました */
         .view-header { 
             display: flex; justify-content: space-between; align-items: flex-end; 
             margin-bottom: 10px; padding-bottom: 10px; padding-top: 15px; 
@@ -35,7 +34,6 @@
         }
         .stats-toggles label:hover { background: #f0f8ff; border-color: #2196F3; }
 
-        /* ▼ 変更: 統計表示を追従(sticky)にし、影を少し強調しました */
         .stats-container { 
             display: flex; flex-wrap: wrap; gap: 15px; align-items: baseline; justify-content: flex-end; 
             margin-left: auto; background: #fff; padding: 10px 15px; border-radius: 8px; 
@@ -753,20 +751,27 @@
                 return; 
             }
 
+            let success1 = true;
+            let success2 = true;
+
             if (mode === "1" || mode === "3") {
-                await saveToCloud(false);
+                success1 = await saveToCloud(false);
             }
             if (mode === "2" || mode === "3") {
                 if (!checkAdminAuth()) return;
-                await saveToCloud(true);
+                success2 = await saveToCloud(true);
             }
-            alert("クラウドへの保存が完了しました！");
+            
+            if (success1 && success2) {
+                alert("クラウドへの保存が完了しました！");
+            }
         }
 
         async function saveToCloud(isSongUpdate = false) {
-            if (!GAS_URL || GAS_URL.trim() === '') return;
+            if (!GAS_URL || GAS_URL.trim() === '') return false;
 
             showLoading(true, 'クラウドに保存中...');
+            let isSuccess = false;
             try {
                 const payload = {
                     type: isSongUpdate ? "updateSongs" : "updateClears",
@@ -795,12 +800,14 @@
                         allUsersData[currentUser].clearRecords = clearRecords;
                         allUsersData[currentUser].scoreRecords = scoreRecords;
                     }
+                    isSuccess = true;
                 }
             } catch (e) {
                 console.error("クラウド保存エラー:", e);
-                alert("通信エラーが発生しました。");
+                alert("通信エラーが発生しました。サイトを 更新しない で、保存が完了するまで試してください。");
             }
             showLoading(false);
+            return isSuccess;
         }
 
         async function syncLocalToCloud() {
