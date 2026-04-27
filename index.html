@@ -440,8 +440,14 @@
             </div>
 
             <div class="input-item" style="margin-bottom: 8px;">
-                <label>バナー画像URL (任意)</label>
-                <input type="text" id="edit-banner-url" placeholder="https://...">
+                <label>バナー画像 (URLまたはファイル選択)</label>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="text" id="edit-banner-url" placeholder="https://..." style="flex: 1;">
+                    <label style="background: #e0e0e0; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; white-space: nowrap; border: 1px solid #ccc; font-weight: bold;">
+                        📁 画像を選択
+                        <input type="file" id="edit-banner-file" accept="image/png, image/jpeg, image/gif" style="display: none;" onchange="handleBannerFileUpload(event)">
+                    </label>
+                </div>
             </div>
             
             <div class="modal-actions">
@@ -1515,6 +1521,45 @@
             renderTable();
             closeEditModal();
             await saveToCloud(true);
+        }
+
+        // ==========================================
+        // ★ バナー画像アップロード＆自動リサイズ処理
+        // ==========================================
+        function handleBannerFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    // データ容量を抑えるため、横幅を最大250pxに自動リサイズします
+                    const MAX_WIDTH = 250;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > MAX_WIDTH) {
+                        height = Math.round(height * (MAX_WIDTH / width));
+                        width = MAX_WIDTH;
+                    }
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // 画像を文字列(Base64)に変換して、URL入力欄に自動セットする
+                    const dataUrl = canvas.toDataURL(file.type === 'image/jpeg' ? 'image/jpeg' : 'image/png');
+                    document.getElementById('edit-banner-url').value = dataUrl;
+                    
+                    // 次回も同じファイルを選べるように入力をリセット
+                    event.target.value = '';
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
         }
 
         async function clearRecordsOnly() {
