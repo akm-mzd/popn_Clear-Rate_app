@@ -178,8 +178,8 @@
                 line-height: 1.1; 
             }
             .diff-main { 
-                font-size: 0.85em; /* 少し縮小 */
-                letter-spacing: -0.5px; /* ★文字と文字の隙間を詰める */
+                font-size: 0.85em; 
+                letter-spacing: -0.5px; 
                 white-space: nowrap; 
             }
             .diff-sub { 
@@ -187,7 +187,7 @@
                 margin-left: 0 !important; 
                 margin-top: 1px; 
                 opacity: 0.85; 
-                letter-spacing: -0.5px; /* ★文字と文字の隙間を詰める */
+                letter-spacing: -0.5px; 
                 white-space: nowrap; 
             }
 
@@ -277,18 +277,6 @@
                 <label style="font-weight: bold; font-size: 1.1em;">表示レベル: 
                     <select id="view-level" onchange="changeViewLevel()">
                         <option value="ALL">すべて表示</option>
-                        <option value="50">Lv 50</option>
-                        <option value="49">Lv 49</option>
-                        <option value="48" selected>Lv 48</option>
-                        <option value="47">Lv 47</option>
-                        <option value="46">Lv 46</option>
-                        <option value="45">Lv 45</option>
-                        <option value="44">Lv 44</option>
-                        <option value="43">Lv 43</option>
-                        <option value="42">Lv 42</option>
-                        <option value="41">Lv 41</option>
-                        <option value="40">Lv 40</option>
-                        <option value="その他">その他</option>
                     </select>
                 </label>
                 
@@ -507,23 +495,61 @@
             optionUnplayed.value = 'unplayed';
             optionUnplayed.text = '未プレイ';
             medalSelect.appendChild(optionUnplayed);
-            updateVersionFilter();
+            
+            updateDynamicFilters();
         }
 
-        function updateVersionFilter() {
+        // ★ レベル・バージョンのドロップダウンを動的に更新する関数
+        function updateDynamicFilters() {
+            // --- バージョンの更新 ---
             const versionSelect = document.getElementById('filter-version');
-            if (!versionSelect) return;
-            const currentVal = versionSelect.value;
-            versionSelect.innerHTML = '<option value="ALL">すべて</option>';
-            const versions = [...new Set(songs.map(s => s.version))].filter(v => v).sort((a, b) => getVersionSortValue(a) - getVersionSortValue(b));
-            versions.forEach(v => {
-                const option = document.createElement('option');
-                option.value = v;
-                option.text = v;
-                versionSelect.appendChild(option);
-            });
-            if (versions.includes(currentVal)) {
-                versionSelect.value = currentVal;
+            if (versionSelect) {
+                const currentVer = versionSelect.value;
+                versionSelect.innerHTML = '<option value="ALL">すべて</option>';
+                const versions = [...new Set(songs.map(s => s.version))].filter(v => v).sort((a, b) => getVersionSortValue(a) - getVersionSortValue(b));
+                versions.forEach(v => {
+                    const option = document.createElement('option');
+                    option.value = v;
+                    option.text = v;
+                    versionSelect.appendChild(option);
+                });
+                if (versions.includes(currentVer)) {
+                    versionSelect.value = currentVer;
+                }
+            }
+
+            // --- ★ 表示レベルの更新 ---
+            const viewLevelSelect = document.getElementById('view-level');
+            if (viewLevelSelect) {
+                viewLevelSelect.innerHTML = '<option value="ALL">すべて表示</option>';
+                
+                // 登録されている曲から一意なレベルを抽出し、降順(50, 49...)にソート
+                const levels = [...new Set(songs.map(s => s.level))].filter(l => l);
+                levels.sort((a, b) => {
+                    const numA = parseInt(a, 10);
+                    const numB = parseInt(b, 10);
+                    if (!isNaN(numA) && !isNaN(numB)) return numB - numA;
+                    if (isNaN(numA)) return 1;
+                    if (isNaN(numB)) return -1;
+                    return 0;
+                });
+                
+                levels.forEach(l => {
+                    const option = document.createElement('option');
+                    option.value = l;
+                    option.text = isNaN(parseInt(l, 10)) ? l : `Lv ${l}`;
+                    viewLevelSelect.appendChild(option);
+                });
+                
+                // 状態の復元（ALL、または直前まで選択していたレベル）
+                if (currentViewLevel === 'ALL') {
+                    viewLevelSelect.value = 'ALL';
+                } else if (levels.includes(currentViewLevel)) {
+                    viewLevelSelect.value = currentViewLevel;
+                } else if (levels.length > 0) {
+                    viewLevelSelect.value = 'ALL';
+                    currentViewLevel = 'ALL';
+                }
             }
         }
 
@@ -682,7 +708,6 @@
 
             initFilters();
             initMedalGrid();
-            document.getElementById('view-level').value = currentViewLevel;
             renderTable();
         };
 
@@ -872,10 +897,9 @@
             localStorage.setItem(STORAGE_KEY_SONGS, JSON.stringify(songs));
             localStorage.setItem(STORAGE_KEY_CLEARS, JSON.stringify(clearRecords));
             
-            updateVersionFilter();
-            document.getElementById('search-input').value = '';
             currentViewLevel = targetLevel;
-            document.getElementById('view-level').value = targetLevel;
+            updateDynamicFilters();
+            document.getElementById('search-input').value = '';
             renderTable();
             
             await saveToCloud();
@@ -939,7 +963,6 @@
             exportContainer.style.fontFamily = 'sans-serif';
             document.body.appendChild(exportContainer);
 
-            // stats-display（クリア率等の表示領域）をそのままコピーして画像化
             const statsClone = document.getElementById('stats-display').cloneNode(true);
             statsClone.style.marginBottom = '20px';
             statsClone.style.fontSize = '1.3em';
@@ -1109,7 +1132,7 @@
                 localStorage.setItem(STORAGE_KEY_SONGS, JSON.stringify(songs));
                 localStorage.setItem(STORAGE_KEY_CLEARS, JSON.stringify(clearRecords));
                 
-                updateVersionFilter();
+                updateDynamicFilters();
                 renderTable();
                 await saveToCloud();
                 alert(`レベル${targetLevel}の楽曲データとクリア記録を削除しました。`);
@@ -1144,7 +1167,7 @@
                 localStorage.setItem(STORAGE_KEY_SONGS, JSON.stringify(songs));
                 localStorage.setItem(STORAGE_KEY_CLEARS, JSON.stringify(clearRecords));
                 
-                updateVersionFilter();
+                updateDynamicFilters();
                 renderTable();
                 closeEditModal();
                 await saveToCloud();
@@ -1186,7 +1209,7 @@
             songs[songIndex].diffIndex = parsed.diffIndex;
 
             localStorage.setItem(STORAGE_KEY_SONGS, JSON.stringify(songs));
-            updateVersionFilter();
+            updateDynamicFilters();
             renderTable();
             closeEditModal();
             await saveToCloud();
@@ -1209,7 +1232,7 @@
                 clearRecords = {};
                 localStorage.removeItem(STORAGE_KEY_SONGS);
                 localStorage.removeItem(STORAGE_KEY_CLEARS);
-                updateVersionFilter();
+                updateDynamicFilters();
                 renderTable();
                 await saveToCloud();
                 alert("アプリを初期化しました。");
