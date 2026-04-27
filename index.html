@@ -40,9 +40,13 @@
 
         table { width: 100%; border-collapse: collapse; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: middle; }
-        th { background-color: #f2f2f2; cursor: pointer; }
+        th { background-color: #f2f2f2; }
         .spicy-gauge { background-color: #ffe6e6; }
         .cleared-row { opacity: 0.8; }
+        
+        /* ★ テーブルのソート用ヘッダーのスタイル ★ */
+        th[onclick] { cursor: pointer; user-select: none; transition: background-color 0.2s; }
+        th[onclick]:hover { background-color: #e0e0e0; }
         
         .edit-btn { cursor: pointer; font-size: 0.85em; padding: 4px 8px; background: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; display: inline-block; font-weight: bold; white-space: nowrap; }
         .edit-btn:hover { background: #e0e0e0; }
@@ -50,7 +54,7 @@
         .ver-badge { font-weight: bold; color: #555; background: #eee; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; display: inline-block; }
         .level-badge { font-weight: bold; color: #fff; background: #555; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; display: inline-block; }
 
-        /* ★ 難易度と指数の基本スタイル（PCは横並び） */
+        /* 難易度と指数の基本スタイル（PCは横並び） */
         .diff-wrapper { display: inline-block; }
         .diff-sub { margin-left: 3px; font-size: 0.9em; }
         
@@ -104,62 +108,52 @@
            📱 スマホ向け最適化（レスポンシブデザイン）
            ========================================= */
         @media screen and (max-width: 768px) {
-            /* 1. 画面の余白を極限まで削り、横スクロール（横ブレ）を完全に防ぐ */
             html, body { overflow-x: hidden; width: 100%; margin: 0; padding: 0; }
             body { padding: 4px !important; box-sizing: border-box; }
-            #capture-area { padding: 0 !important; } /* 右側の不要な余白を消去 */
+            #capture-area { padding: 0 !important; } 
             
-            /* 2. 要素を縦積み */
             .flex-row { flex-direction: column; align-items: stretch; gap: 6px; }
             
-            /* 3. ボタン類 */
             button, select, input.search-box { 
                 width: 100%; padding: 12px; font-size: 16px; box-sizing: border-box; margin-bottom: 0;
             }
             button[onclick="clearSearch()"] { width: auto; padding: 12px 16px; flex-shrink: 0; }
             #search-input { flex-grow: 1; }
             
-            /* 4. クリア率レイアウト */
             .stats-container { 
                 flex-direction: column; align-items: flex-start !important; 
                 gap: 8px !important; padding: 12px !important; width: 100%; box-sizing: border-box;
             }
             .stats-group { 
                 width: 100%; justify-content: space-between; 
-                border-bottom: 1px solid #eee; padding-bottom: 4px; 
+                border-bottom: 1px solid #eee; padding-bottom: 4px; margin-left: 0 !important;
             }
             .stats-level { margin-bottom: 4px; }
             
-            /* 5. テーブル：確実に非表示にするために !important を追加 */
             .view-header { position: static; padding-top: 5px; }
-            th:nth-child(2), td:nth-child(2), /* Lv */
-            th:nth-child(3), td:nth-child(3), /* Ver */
-            th:nth-child(6), td:nth-child(6), /* BPM */
-            th:nth-child(7), td:nth-child(7), /* ノーツ */
-            th:nth-child(9), td:nth-child(9)  /* 操作 */ { 
+            th:nth-child(2), td:nth-child(2), 
+            th:nth-child(3), td:nth-child(3), 
+            th:nth-child(6), td:nth-child(6), 
+            th:nth-child(7), td:nth-child(7), 
+            th:nth-child(9), td:nth-child(9) { 
                 display: none !important; 
             }
             
-            /* 6. テーブル：右の余白を消し、4項目の比率で画面幅を100%使い切る */
             table { table-layout: fixed !important; width: 100% !important; max-width: 100% !important; } 
             
-            th:nth-child(1), td:nth-child(1) { width: 15% !important; padding: 4px 2px !important; } /* メダル */
-            th:nth-child(4), td:nth-child(4) { width: 22% !important; padding: 4px 2px !important; } /* バナー */
-            th:nth-child(5), td:nth-child(5) { width: 45% !important; padding: 4px !important; }     /* 曲名 */
-            th:nth-child(8), td:nth-child(8) { width: 18% !important; padding: 4px 2px !important; text-align: center !important; } /* 難易度 */
+            th:nth-child(1), td:nth-child(1) { width: 15% !important; padding: 4px 2px !important; } 
+            th:nth-child(4), td:nth-child(4) { width: 22% !important; padding: 4px 2px !important; } 
+            th:nth-child(5), td:nth-child(5) { width: 45% !important; padding: 4px !important; }     
+            th:nth-child(8), td:nth-child(8) { width: 18% !important; padding: 4px 2px !important; text-align: center !important; } 
             
-            /* 文字サイズと折り返し（文字が長くて枠を突き破るのを防ぐ） */
             td { font-size: 0.8em; word-break: break-all !important; overflow-wrap: break-word !important; }
             th { font-size: 0.8em; }
             
-            /* バナー画像が指定した22%の枠にピタッと収まるように調整 */
             td:nth-child(4) img { width: 100% !important; height: auto !important; max-height: 35px !important; object-fit: contain !important; }
             
-            /* モーダル画面の調整 */
             .modal-content { width: 95%; padding: 15px; box-sizing: border-box; }
             .medal-item { padding: 8px; }
 
-            /* ★ 7. 難易度と指数を2段に分ける（スマホのみ） */
             .diff-wrapper { 
                 display: flex !important; 
                 flex-direction: column; 
@@ -172,8 +166,11 @@
                 font-size: 0.75em; 
                 margin-left: 0 !important; 
                 margin-top: 2px; 
-                opacity: 0.85; /* 少し色を薄くして控えめにする */
+                opacity: 0.85; 
             }
+
+            /* スマホで表示設定メニューを開いたときにはみ出さないように調整 */
+            details > div[style*="position: absolute"] { right: 0; left: auto; max-width: 90vw; }
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -279,18 +276,20 @@
                     <button onclick="clearSearch()" style="padding: 6px 12px; border: 1px solid #ccc; background: #eee; cursor: pointer;">クリア</button>
                 </div>
 
-                <div class="controls" style="margin: 0; padding: 0; box-shadow: none; background: transparent; display: flex; align-items: center; gap: 5px;">
-                    <button onclick="sortBy('clear')">クリア順</button>
-                    <button onclick="sortBy('level')">Lv順</button>
-                    <button onclick="sortBy('version')">Ver順</button>
-                    <button onclick="sortBy('bpm')">BPM順</button>
-                    <button onclick="sortBy('notes')">ノーツ順</button>
-                    <button onclick="sortBy('diff')">指数順</button>
+                <div class="controls" style="margin: 0; padding: 0; box-shadow: none; background: transparent; display: flex; align-items: center; justify-content: flex-end; flex-grow: 1;">
+                    <button onclick="exportAsImage()" class="btn-image" style="padding: 8px 16px; margin-right: 10px;">画像として保存</button>
 
-                    <details style="position: relative; margin-left: 10px;">
-                        <summary style="padding: 6px 12px; border: 1px solid #ccc; background-color: #fff; border-radius: 4px; cursor: pointer; font-size: 0.9em; font-weight: bold; color: #555;">⚙️ 出力設定</summary>
+                    <details style="position: relative;">
+                        <summary style="padding: 6px 12px; border: 1px solid #ccc; background-color: #fff; border-radius: 4px; cursor: pointer; font-size: 0.9em; font-weight: bold; color: #555;">⚙️ 表示・出力設定</summary>
                         <div style="position: absolute; top: 100%; right: 0; background: #fff; border: 1px solid #ccc; border-radius: 6px; padding: 12px; z-index: 2000; box-shadow: 0 4px 10px rgba(0,0,0,0.2); width: max-content; display: grid; gap: 8px; margin-top: 5px; text-align: left;">
-                            <div style="font-size: 0.85em; color: #666; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 4px; margin-bottom: 4px;">画像に含める項目</div>
+                            
+                            <div style="font-size: 0.85em; color: #666; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 4px; margin-bottom: 4px;">📊 統計の表示</div>
+                            <label style="cursor: pointer;"><input type="checkbox" id="show-easy-rate" checked onchange="renderTable()"> イージークリア以上</label>
+                            <label style="cursor: pointer;"><input type="checkbox" id="show-normal-rate" checked onchange="renderTable()"> ノーマルクリア以上</label>
+                            <label style="cursor: pointer;"><input type="checkbox" id="show-medal-stats" checked onchange="renderTable()"> メダル別内訳</label>
+                            <label style="cursor: pointer;"><input type="checkbox" id="show-diff-stats" checked onchange="renderTable()"> 難易度別クリア率</label>
+
+                            <div style="font-size: 0.85em; color: #666; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 4px; margin-bottom: 4px; margin-top: 8px;">📷 画像に出力する列</div>
                             <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="0" checked> メダル</label>
                             <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="1" checked> Lv</label>
                             <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="2" checked> Ver</label>
@@ -301,8 +300,6 @@
                             <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="7" checked> 難易度</label>
                         </div>
                     </details>
-                    
-                    <button onclick="exportAsImage()" class="btn-image" style="padding: 8px 16px;">画像として保存</button>
                 </div>
             </div>
             
@@ -361,14 +358,14 @@
             <table id="song-table">
                 <thead>
                     <tr>
-                        <th style="width: 8%; text-align: center;">メダル</th>
-                        <th style="width: 5%; text-align: center;">Lv</th>
-                        <th style="width: 5%; text-align: center;">Ver</th>
+                        <th style="width: 8%; text-align: center;" onclick="sortBy('clear')" id="th-clear" title="クリックでソート">メダル</th>
+                        <th style="width: 5%; text-align: center;" onclick="sortBy('level')" id="th-level" title="クリックでソート">Lv</th>
+                        <th style="width: 5%; text-align: center;" onclick="sortBy('version')" id="th-version" title="クリックでソート">Ver</th>
                         <th style="width: 12%; text-align: center;">バナー</th>
-                        <th style="width: 24%;">ジャンル / 曲名</th>
-                        <th style="width: 7%; text-align: right;">BPM</th>
-                        <th style="width: 7%; text-align: right;">ノーツ</th>
-                        <th style="width: 22%;">難易度 (指数)</th>
+                        <th style="width: 24%;" onclick="sortBy('title')" id="th-title" title="クリックでソート">ジャンル / 曲名</th>
+                        <th style="width: 7%; text-align: right;" onclick="sortBy('bpm')" id="th-bpm" title="クリックでソート">BPM</th>
+                        <th style="width: 7%; text-align: right;" onclick="sortBy('notes')" id="th-notes" title="クリックでソート">ノーツ</th>
+                        <th style="width: 22%; text-align: center;" onclick="sortBy('diff')" id="th-diff" title="クリックでソート">難易度 (指数)</th>
                         <th style="width: 10%; text-align: center;" class="no-export">操作</th>
                     </tr>
                 </thead>
@@ -464,7 +461,6 @@
             document.getElementById('loading').style.display = show ? 'flex' : 'none';
         }
 
-        // ★ パスワード認証をチェックする関数
         function checkAuth() {
             if (currentPassword !== "") return true;
             const pwd = prompt("データの編集・追加を行うにはパスワードを入力してください:");
@@ -490,7 +486,6 @@
             optionUnplayed.value = 'unplayed';
             optionUnplayed.text = '未プレイ';
             medalSelect.appendChild(optionUnplayed);
-
             updateVersionFilter();
         }
 
@@ -498,9 +493,7 @@
             const versionSelect = document.getElementById('filter-version');
             if (!versionSelect) return;
             const currentVal = versionSelect.value;
-            
             versionSelect.innerHTML = '<option value="ALL">すべて</option>';
-            
             const versions = [...new Set(songs.map(s => s.version))].filter(v => v).sort((a, b) => getVersionSortValue(a) - getVersionSortValue(b));
             versions.forEach(v => {
                 const option = document.createElement('option');
@@ -508,7 +501,6 @@
                 option.text = v;
                 versionSelect.appendChild(option);
             });
-            
             if (versions.includes(currentVal)) {
                 versionSelect.value = currentVal;
             }
@@ -553,7 +545,7 @@
         }
 
         async function selectMedal(medalKey) {
-            if (!checkAuth()) return; // ★ 編集ブロック
+            if (!checkAuth()) return;
             if (currentMedalEditId) {
                 if (medalKey === '') {
                     delete clearRecords[currentMedalEditId];
@@ -563,28 +555,23 @@
                 localStorage.setItem(STORAGE_KEY_CLEARS, JSON.stringify(clearRecords));
                 renderTable();
                 closeMedalModal();
-                
                 await saveToCloud();
             }
         }
 
         function parseDifficulty(rawStr) {
             if (!rawStr) return { diffClass: '未分類', diffIndex: null };
-            
             let diffClass = '未分類';
             let diffIndex = null;
-
             let normalizedStr = rawStr
                 .replace(/[＋]/g, '+')
                 .replace(/[－]/g, '-')
                 .replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
                 .replace(/．/g, '.');
-
             const match = normalizedStr.match(/([-+]?\d*\.?\d+)/);
             if (match) {
                 diffIndex = parseFloat(match[1]);
             }
-
             if (rawStr.includes('危険')) diffClass = '危険';
             else if (rawStr.includes('別格')) diffClass = '別格';
             else if (rawStr.includes('逆詐称')) diffClass = '逆詐称';
@@ -593,7 +580,6 @@
             else if (rawStr.includes('強')) diffClass = '強';
             else if (rawStr.includes('中')) diffClass = '中';
             else if (rawStr.includes('弱')) diffClass = '弱';
-
             return { diffClass, diffIndex };
         }
 
@@ -645,7 +631,6 @@
                 }
             }
 
-            // マイグレーション
             songs.forEach(s => {
                 if (!s.level) { s.level = '48'; }
                 const reporsed = parseDifficulty(s.diffRaw);
@@ -680,7 +665,6 @@
             renderTable();
         };
 
-        // ★ クラウド（GAS）にデータを送信する関数
         async function saveToCloud() {
             if (!GAS_URL || GAS_URL.trim() === '') return;
             showLoading(true, 'クラウドに保存中...');
@@ -694,9 +678,9 @@
                 const result = await response.json();
                 if (result.status === 'error') {
                     alert(result.message + "\nページを再読み込みします。");
-                    sessionStorage.removeItem('admin_pwd'); // パスワードリセット
+                    sessionStorage.removeItem('admin_pwd');
                     currentPassword = "";
-                    location.reload(); // 不正なローカル編集を元に戻す
+                    location.reload();
                 }
             } catch (e) {
                 console.error("クラウド保存エラー:", e);
@@ -706,38 +690,24 @@
         }
 
         async function syncLocalToCloud() {
-            if (!checkAuth()) return; // ★ 編集ブロック
-
+            if (!checkAuth()) return;
             if (!GAS_URL || GAS_URL.trim() === '') {
                 alert("GAS_URLが設定されていません。先にGASのデプロイとURLの貼り付けを行ってください。");
                 return;
             }
-
             const localSongs = JSON.parse(localStorage.getItem(STORAGE_KEY_SONGS)) || [];
             const localClears = JSON.parse(localStorage.getItem(STORAGE_KEY_CLEARS)) || {};
-
             if (localSongs.length === 0 && Object.keys(localClears).length === 0) {
                 alert("ブラウザ（ローカル）にデータが見つかりません。すでに移行済みか、別のブラウザで開いている可能性があります。");
                 return;
             }
-
             if (!confirm("ブラウザに保存されている「" + localSongs.length + "件の楽曲」と「クリア記録」をクラウドにアップロードしますか？\n（クラウド側の既存データは上書きされます）")) {
                 return;
             }
-
             showLoading(true, 'クラウドへ移行中...');
             try {
-                const exportData = {
-                    songs: localSongs,
-                    clearRecords: localClears,
-                    password: currentPassword // ★ パスワードを含める
-                };
-
-                const res = await fetch(GAS_URL, {
-                    method: 'POST',
-                    body: JSON.stringify(exportData)
-                });
-
+                const exportData = { songs: localSongs, clearRecords: localClears, password: currentPassword };
+                const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(exportData) });
                 const result = await res.json();
                 if (result.status === 'error') {
                     alert(result.message);
@@ -754,16 +724,15 @@
             showLoading(false);
         }
 
-        // ---------- JSONダウンロード用の処理 ----------
         function downloadSongsAndClearsJson() {
-            if (!checkAuth()) return; // ★ 編集ブロック
+            if (!checkAuth()) return;
             const exportData = { songs: songs, clearRecords: clearRecords };
             const dataStr = JSON.stringify(exportData, null, 2);
             triggerDownload(dataStr, 'songs.json', 'クリア記録を含めて');
         }
 
         function downloadSongsJsonOnly() {
-            if (!checkAuth()) return; // ★ 編集ブロック
+            if (!checkAuth()) return;
             const dataStr = JSON.stringify(songs, null, 2);
             triggerDownload(dataStr, 'songs.json', '楽曲データのみで');
         }
@@ -776,13 +745,11 @@
             a.download = filename;
             a.click();
             URL.revokeObjectURL(url);
-            
             alert(`「${filename}」として${typeMessage}保存しました。`);
         }
-        // --------------------------------------------------
 
         async function importFromClipboard() {
-            if (!checkAuth()) return; // ★ 編集ブロック
+            if (!checkAuth()) return;
             try {
                 const text = await navigator.clipboard.readText();
                 if (!text || text.trim() === '') {
@@ -798,7 +765,7 @@
         }
 
         async function importDataManual() {
-            if (!checkAuth()) return; // ★ 編集ブロック
+            if (!checkAuth()) return;
             const text = document.getElementById('import-text').value;
             if (!text.trim()) {
                 alert("テキストエリアが空です。");
@@ -895,7 +862,7 @@
         }
 
         async function updateBannerFromClipboard(id) {
-            if (!checkAuth()) return; // ★ 編集ブロック
+            if (!checkAuth()) return;
             try {
                 const text = await navigator.clipboard.readText();
                 if (!text || text.trim() === '') {
@@ -951,6 +918,7 @@
             exportContainer.style.fontFamily = 'sans-serif';
             document.body.appendChild(exportContainer);
 
+            // stats-display（クリア率等の表示領域）をそのままコピーして画像化
             const statsClone = document.getElementById('stats-display').cloneNode(true);
             statsClone.style.marginBottom = '20px';
             statsClone.style.fontSize = '1.3em';
@@ -958,37 +926,21 @@
 
             const statGroups = statsClone.querySelectorAll('.stats-group');
             statGroups.forEach(group => { group.style.gap = '15px'; });
-
             const statTitles = statsClone.querySelectorAll('.stats-title');
             statTitles.forEach(title => { title.style.fontSize = '1.1em'; });
-
             const statFractions = statsClone.querySelectorAll('.stats-fraction');
             statFractions.forEach(frac => { frac.style.fontSize = '1.3em'; });
-
             const statRemains = statsClone.querySelectorAll('.stats-remain');
             statRemains.forEach(rem => { rem.style.fontSize = '0.9em'; });
-
             const easyPercs = statsClone.querySelectorAll('.stats-easypercentage');
             easyPercs.forEach(perc => { perc.style.fontSize = '2.3em'; });
-
             const percs = statsClone.querySelectorAll('.stats-percentage');
             percs.forEach(perc => { perc.style.fontSize = '2.3em'; });
-
             const levelBadges = statsClone.querySelectorAll('.stats-level');
             levelBadges.forEach(badge => {
                 badge.style.fontSize = '1.9em';
                 badge.style.padding = '10px 25px'; 
             });
-
-            const detailsElement = statsClone.querySelector('details');
-            if (detailsElement) {
-                const contentDiv = detailsElement.querySelector('.details-content');
-                if (detailsElement.hasAttribute('open')) {
-                    if (contentDiv) contentDiv.style.display = 'block'; 
-                } else {
-                    if (contentDiv) contentDiv.style.display = 'none'; 
-                }
-            }
             
             const statsImages = Array.from(statsClone.querySelectorAll('img'));
             statsImages.forEach(img => {
@@ -1049,18 +1001,12 @@
                 const tbody = document.createElement('tbody');
                 chunk.forEach(row => {
                     const clonedRow = row.cloneNode(true);
-                    
-                    if (clonedRow.lastElementChild) {
-                        clonedRow.removeChild(clonedRow.lastElementChild);
-                    }
-
+                    if (clonedRow.lastElementChild) { clonedRow.removeChild(clonedRow.lastElementChild); }
                     const cells = Array.from(clonedRow.children);
-                    
                     cells.forEach((cell, index) => {
                         cell.style.border = '1px solid #ddd';
                         cell.style.padding = '8px';
                         cell.style.verticalAlign = 'middle';
-
                         if (index === 0 || index === 3) {
                             const img = cell.querySelector('img');
                             if (img) {
@@ -1078,7 +1024,6 @@
                             clonedRow.removeChild(cells[c]);
                         }
                     }
-
                     tbody.appendChild(clonedRow);
                 });
                 
@@ -1125,7 +1070,7 @@
         }
 
         async function deleteLevelData() {
-            if (!checkAuth()) return; // ★ 編集ブロック
+            if (!checkAuth()) return; 
             const targetLevel = document.getElementById('delete-level').value;
             const songsToDelete = songs.filter(s => s.level === targetLevel);
             
@@ -1136,20 +1081,16 @@
 
             if(confirm(`【警告】レベル${targetLevel}の楽曲データ（${songsToDelete.length}件）をすべて削除しますか？\n（クリア記録も削除されます。この操作は元に戻せません）`)) {
                 const deleteIds = songsToDelete.map(s => s.id);
-                
                 songs = songs.filter(s => s.level !== targetLevel);
-                
                 deleteIds.forEach(id => {
                     delete clearRecords[id];
                 });
-
                 localStorage.setItem(STORAGE_KEY_SONGS, JSON.stringify(songs));
                 localStorage.setItem(STORAGE_KEY_CLEARS, JSON.stringify(clearRecords));
                 
                 updateVersionFilter();
                 renderTable();
                 await saveToCloud();
-                
                 alert(`レベル${targetLevel}の楽曲データとクリア記録を削除しました。`);
             }
         }
@@ -1157,7 +1098,6 @@
         function openEditModal(id) {
             const song = songs.find(s => s.id === id);
             if (!song) return;
-            
             document.getElementById('edit-original-id').value = song.id;
             document.getElementById('edit-genre').value = song.genre;
             document.getElementById('edit-title').value = song.title;
@@ -1167,7 +1107,6 @@
             document.getElementById('edit-notes').value = song.notes || 0;
             document.getElementById('edit-diff').value = song.diffRaw || "";
             document.getElementById('edit-banner-url').value = song.bannerUrl || "";
-            
             document.getElementById('edit-modal').style.display = 'flex';
         }
 
@@ -1176,12 +1115,11 @@
         }
 
         async function deleteSong() {
-            if (!checkAuth()) return; // ★ 編集ブロック
+            if (!checkAuth()) return;
             if(confirm("この楽曲をリストから削除しますか？\n（クリア記録も同時に削除されます）")) {
                 const originalId = document.getElementById('edit-original-id').value;
                 songs = songs.filter(s => s.id !== originalId);
                 delete clearRecords[originalId];
-                
                 localStorage.setItem(STORAGE_KEY_SONGS, JSON.stringify(songs));
                 localStorage.setItem(STORAGE_KEY_CLEARS, JSON.stringify(clearRecords));
                 
@@ -1193,7 +1131,7 @@
         }
 
         async function saveEditModal() {
-            if (!checkAuth()) return; // ★ 編集ブロック
+            if (!checkAuth()) return; 
             const originalId = document.getElementById('edit-original-id').value;
             const songIndex = songs.findIndex(s => s.id === originalId);
             if (songIndex === -1) return;
@@ -1201,7 +1139,6 @@
             const newGenre = document.getElementById('edit-genre').value.trim();
             const newTitle = document.getElementById('edit-title').value.trim();
             const newNotes = parseInt(document.getElementById('edit-notes').value, 10) || 0;
-            
             const newId = newGenre + "_" + newTitle + "_" + newNotes;
 
             if (newId !== originalId) {
@@ -1235,7 +1172,7 @@
         }
 
         async function clearRecordsOnly() {
-            if (!checkAuth()) return; // ★ 編集ブロック
+            if (!checkAuth()) return; 
             if(confirm("すべてのクリア記録のみをリセットしますか？\n（楽曲リストや編集した情報は保持されます）")) {
                 clearRecords = {};
                 localStorage.setItem(STORAGE_KEY_CLEARS, JSON.stringify(clearRecords));
@@ -1245,7 +1182,7 @@
         }
 
         async function initializeData() {
-            if (!checkAuth()) return; // ★ 編集ブロック
+            if (!checkAuth()) return; 
             if(confirm("【警告】楽曲データ・クリア記録のすべてを削除し、完全に初期化しますか？\n（この操作は元に戻せません）")) {
                 songs = [];
                 clearRecords = {};
@@ -1264,6 +1201,7 @@
             renderTable();
         }
 
+        // ★ ソート機能の更新
         function sortBy(key) {
             if (currentSort === key) {
                 sortDesc = !sortDesc;
@@ -1272,6 +1210,29 @@
                 sortDesc = (key === 'notes' || key === 'diff' || key === 'bpm' || key === 'level' || key === 'clear') ? true : false;
             }
             renderTable();
+        }
+
+        // ★ ソート状態をヘッダーの「▲/▼」で表示する関数
+        function updateSortHeaders() {
+            const headers = {
+                'clear': 'メダル',
+                'level': 'Lv',
+                'version': 'Ver',
+                'title': 'ジャンル / 曲名',
+                'bpm': 'BPM',
+                'notes': 'ノーツ',
+                'diff': '難易度 (指数)'
+            };
+            for (const [key, label] of Object.entries(headers)) {
+                const th = document.getElementById(`th-${key}`);
+                if (th) {
+                    if (currentSort === key) {
+                        th.innerHTML = `${label} <span style="font-size:0.8em; color:#2196F3; margin-left:4px;">${sortDesc ? '▼' : '▲'}</span>`;
+                    } else {
+                        th.innerHTML = label;
+                    }
+                }
+            }
         }
 
         function getDifficultyColor(diffClass, index) {
@@ -1294,18 +1255,10 @@
                     shadow: '1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000' 
                 };
             }
-            if (diffClass === '入門') {
-                return { color: `rgba(0, 128, 0, ${alpha})`, shadow: 'none' }; 
-            }
-            if (diffClass === '別格') {
-                return { color: `rgba(128, 0, 128, ${alpha})`, shadow: 'none' };
-            }
-            if (diffClass === '強' || diffClass === '詐称') {
-                return { color: `rgba(255, 0, 0, ${alpha})`, shadow: 'none' };
-            }
-            if (diffClass === '弱' || diffClass === '逆詐称') {
-                return { color: `rgba(0, 0, 255, ${alpha})`, shadow: 'none' };
-            }
+            if (diffClass === '入門') { return { color: `rgba(0, 128, 0, ${alpha})`, shadow: 'none' }; }
+            if (diffClass === '別格') { return { color: `rgba(128, 0, 128, ${alpha})`, shadow: 'none' }; }
+            if (diffClass === '強' || diffClass === '詐称') { return { color: `rgba(255, 0, 0, ${alpha})`, shadow: 'none' }; }
+            if (diffClass === '弱' || diffClass === '逆詐称') { return { color: `rgba(0, 0, 255, ${alpha})`, shadow: 'none' }; }
             
             return { color: `rgba(0, 0, 0, 1.0)`, shadow: 'none' };
         }
@@ -1326,9 +1279,7 @@
         function getBpmSortValue(bpmStr) {
             if (!bpmStr || bpmStr === '-') return 0;
             const matches = bpmStr.match(/\d+/g);
-            if (matches) {
-                return Math.max(...matches.map(Number));
-            }
+            if (matches) { return Math.max(...matches.map(Number)); }
             return 0;
         }
 
@@ -1356,7 +1307,6 @@
                     if (filterMedal === 'unplayed' && medalKey !== '') return false;
                     if (filterMedal !== 'unplayed' && medalKey !== filterMedal) return false;
                 }
-
                 if (filterVersion !== 'ALL' && s.version !== filterVersion) return false;
 
                 if (filterDiff !== 'ALL') {
@@ -1370,16 +1320,25 @@
                         if (dClass !== filterDiff) return false;
                     }
                 }
-
                 return true;
             });
 
+            // ★ ソート処理に「曲名」を追加
             if (currentSort === 'clear') {
                 displaySongs.sort((a, b) => {
                     let valA = MEDAL_TYPES[clearRecords[a.id] || ''].rank;
                     let valB = MEDAL_TYPES[clearRecords[b.id] || ''].rank;
                     if (valA === valB) return a.originalOrder - b.originalOrder;
                     return sortDesc ? valB - valA : valA - valB;
+                });
+            } else if (currentSort === 'title') {
+                displaySongs.sort((a, b) => {
+                    let valA = (a.title || "").toLowerCase();
+                    let valB = (b.title || "").toLowerCase();
+                    if (valA === valB) return a.originalOrder - b.originalOrder;
+                    if (valA < valB) return sortDesc ? 1 : -1;
+                    if (valA > valB) return sortDesc ? -1 : 1;
+                    return 0;
                 });
             } else if (currentSort === 'notes') {
                 displaySongs.sort((a, b) => sortDesc ? b.notes - a.notes : a.notes - b.notes);
@@ -1456,11 +1415,7 @@
                 
                 let dClass = song.diffClass || '未分類';
                 if (dClass === '中') {
-                    if (song.diffIndex !== null && song.diffIndex < 0) {
-                        dClass = '中(-)';
-                    } else {
-                        dClass = '中(+)';
-                    }
+                    if (song.diffIndex !== null && song.diffIndex < 0) { dClass = '中(-)'; } else { dClass = '中(+)'; }
                 }
                 
                 if (!diffStats[dClass]) dClass = '未分類';
@@ -1480,15 +1435,10 @@
                 if (medalInfo.isEasyClear) tr.classList.add('cleared-row');
 
                 const styleObj = getDifficultyColor(song.diffClass, song.diffIndex);
-                
-                // ★ 「難易度（別格など）」と「指数（+1.5など）」を分離する
                 let dClassStr = song.diffClass || '';
                 let dIndexStr = song.diffRaw.replace(dClassStr, '').trim();
-                if (!song.diffRaw.includes(dClassStr)) {
-                    dClassStr = song.diffRaw; dIndexStr = ''; // 置換できなかった時の保険
-                }
+                if (!song.diffRaw.includes(dClassStr)) { dClassStr = song.diffRaw; dIndexStr = ''; }
                 
-                // PC用とスマホ用でスタイルを変えられるように2つのspanに分ける
                 const diffHtml = `
                     <div class="diff-wrapper" style="color: ${styleObj.color}; text-shadow: ${styleObj.shadow}; font-weight: bold;">
                         <span class="diff-main">${dClassStr}</span><span class="diff-sub">${dIndexStr}</span>
@@ -1507,31 +1457,17 @@
                     : `<span style="color: #aaa; font-size: 0.85em; font-weight: bold; text-decoration: underline; cursor: pointer;" onclick="updateBannerFromClipboard('${safeId}')" title="クリックしてコピーしたURLを自動ペースト">No Image</span>`;
 
                 tr.innerHTML = `
-                    <td style="text-align: center; vertical-align: middle;">
-                        ${medalDisplayHtml}
-                    </td>
-                    <td style="text-align: center;">
-                        <span class="level-badge">${song.level || '-'}</span>
-                    </td>
-                    <td style="text-align: center;">
-                        <span class="ver-badge">${song.version || '-'}</span>
-                    </td>
-                    <td style="text-align: center;">
-                        ${bannerHtml}
-                    </td>
+                    <td style="text-align: center; vertical-align: middle;">${medalDisplayHtml}</td>
+                    <td style="text-align: center;"><span class="level-badge">${song.level || '-'}</span></td>
+                    <td style="text-align: center;"><span class="ver-badge">${song.version || '-'}</span></td>
+                    <td style="text-align: center;">${bannerHtml}</td>
                     <td>
                         <div style="font-size: 0.85em; color: #666;">${song.genre}</div>
                         <div style="font-weight: bold;">${song.title}</div>
                     </td>
-                    <td style="text-align: right;">
-                        <span>${song.bpm || '-'}</span>
-                    </td>
-                    <td style="text-align: right;">
-                        <span>${song.notes}</span>
-                    </td>
-                    <td>
-                        ${diffHtml}
-                    </td>
+                    <td style="text-align: right;"><span>${song.bpm || '-'}</span></td>
+                    <td style="text-align: right;"><span>${song.notes}</span></td>
+                    <td style="text-align: center;">${diffHtml}</td>
                     <td style="text-align: center;" class="no-export">
                         <button class="edit-btn" onclick="openEditModal('${safeId}')">✏️編集</button>
                     </td>
@@ -1539,104 +1475,118 @@
                 tbody.appendChild(tr);
             });
 
+            // ★ ヘッダーのソート矢印を更新
+            updateSortHeaders();
+
+            // ★ チェックボックスの状態を取得して表示を切り替える
             const total = displaySongs.length;
             const easyPerc = total === 0 ? 0 : ((easyClearCount / total) * 100).toFixed(1);
             const normalPerc = total === 0 ? 0 : ((normalClearCount / total) * 100).toFixed(1);
-            
             const easyRemain = total - easyClearCount;
             const normalRemain = total - normalClearCount;
 
             let levelLabel = currentViewLevel === 'ALL' ? '全体' : `Lv${currentViewLevel}`;
-            if (searchQuery) {
-                levelLabel = `検索結果 ("${searchQuery}")`;
-            }
+            if (searchQuery) levelLabel = `検索結果 ("${searchQuery}")`;
             if (filterClear !== 'ALL' || filterMedal !== 'ALL' || filterVersion !== 'ALL' || filterDiff !== 'ALL') {
                 levelLabel += ' (絞り込み中)';
             }
             
-            let detailsHtml = `
-                <details style="width: 100%; margin-top: 10px;">
-                    <summary style="cursor: pointer; font-size: 0.9em; font-weight: bold; color: #555; padding: 6px; border-top: 1px dashed #ddd; outline: none; user-select: none;">
-                        📊 メダル・難易度別クリア内訳を表示
-                    </summary>
-                    <div class="details-content" style="padding: 12px; background: #f1f8ff; border-radius: 6px; border: 1px solid #e3f2fd; margin-top: 8px;">
-                        
-                    <div style="font-weight: bold; color: #555; margin-bottom: 6px; font-size: 0.9em;">🏅 メダル別内訳</div>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(55px, 1fr)); gap: 6px; margin-bottom: 15px;">
-                    `;
-            Object.keys(MEDAL_TYPES).forEach(k => {
-           const m = MEDAL_TYPES[k];
-           const count = medalCounts[k];
-    
-             const isValidMedalUrl = m.imgUrl.startsWith('http') || m.imgUrl.startsWith('data:');
-           /* 画像を少し大きく（26px）し、右側の余白設定を消しました */
-             const iconHtml = isValidMedalUrl 
-             ? `<img src="${m.imgUrl}" style="width: 26px; height: 26px; object-fit: contain; margin-bottom: 2px;">` 
-             : `<div style="font-weight: bold; color: #555; font-size: 0.7em;">${m.label}</div>`;
+            const showEasy = document.getElementById('show-easy-rate') ? document.getElementById('show-easy-rate').checked : true;
+            const showNormal = document.getElementById('show-normal-rate') ? document.getElementById('show-normal-rate').checked : true;
+            const showMedal = document.getElementById('show-medal-stats') ? document.getElementById('show-medal-stats').checked : true;
+            const showDiff = document.getElementById('show-diff-stats') ? document.getElementById('show-diff-stats').checked : true;
 
-            /* 文字を消し、画像の下に数字（count）が来る「縦並び（flex-direction: column）」にしました */
-            detailsHtml += `
-                <div style="background: #fff; padding: 6px 2px; border-radius: 4px; border: 1px solid #ddd; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-                   ${iconHtml}
-                   <span style="color: #333; font-weight: bold; font-size: 1.1em; line-height: 1;">${count}</span>
-                </div>
-               `;
-            });
-            detailsHtml += `</div>`;
+            let statsHtml = `<div style="display: flex; flex-wrap: wrap; gap: 15px; width: 100%; justify-content: flex-end; align-items: baseline;">
+                <div class="stats-level">【${levelLabel}】</div>`;
 
-            detailsHtml += `<div style="font-weight: bold; color: #555; margin-bottom: 6px; font-size: 0.9em; border-top: 1px dashed #ccc; padding-top: 10px;">🎯 難易度（指数）別クリア率</div>`;
-            detailsHtml += `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px;">`;
-            
-            const diffOrder = ['危険', '別格', '詐称', '強', '中(+)', '中(-)', '弱', '逆詐称', '入門', '未分類'];
-            diffOrder.forEach(dKey => {
-                const stat = diffStats[dKey];
-                if (stat.total === 0) return; 
-                
-                const ePerc = ((stat.easy / total) * 100).toFixed(1);
-                const nPerc = ((stat.normal / stat.total) * 100).toFixed(1);
-                
-                let baseClass = dKey.startsWith('中') ? '中' : dKey;
-                let baseIndex = dKey === '中(+)' ? 0.5 : (dKey === '中(-)' ? -0.5 : 0);
-                
-                const styleObj = getDifficultyColor(baseClass, baseIndex);
-                let borderColor = styleObj.color.replace('0.3', '0.8').replace('1.0', '0.8');
-                if (dKey === '危険') borderColor = '#333';
-                
-                detailsHtml += `
-                    <div style="background: #fff; padding: 8px; border-radius: 4px; border: 1px solid #ddd; border-left: 4px solid ${borderColor}; box-shadow: 0 1px 2px rgba(0,0,0,0.05); font-size: 0.85em;">
-                        <div style="display: flex; justify-content: space-between; border-bottom: 1px dotted #eee; padding-bottom: 4px; margin-bottom: 4px;">
-                            <span style="font-weight: bold; color: ${dKey === '危険' ? '#FFD700' : '#333'}; text-shadow: ${dKey === '危険' ? styleObj.shadow : 'none'};">${dKey}</span>
-                            <span style="color: #666;">全${stat.total}曲</span>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
-                            <span style="color: #2cbc21; font-weight: bold;">イージー以上 <span style="color: #333;">${stat.easy}/${stat.total}</span></span>
-                            <span style="color: #666;">${ePerc}%</span>
-                        </div>
-                        <div style="display: flex; justify-content: space-between;">
-                            <span style="color: #d32f2f; font-weight: bold;">ノーマル以上 <span style="color: #333;">${stat.normal}/${stat.total}</span></span>
-                            <span style="color: #666;">${nPerc}%</span>
-                        </div>
-                    </div>
-                `;
-            });
-            detailsHtml += `</div></div></details>`;
-            
-            document.getElementById('stats-display').innerHTML = `
-                <div style="display: flex; flex-wrap: wrap; gap: 15px; width: 100%; justify-content: flex-end; align-items: baseline;">
-                    <div class="stats-level">【${levelLabel}】</div>
+            if (showEasy) {
+                statsHtml += `
                     <div class="stats-group">
                         <span class="stats-title">イージークリア以上:</span>
                         <span class="stats-fraction">${easyClearCount} / ${total} <span class="stats-remain">(未クリア: ${easyRemain})</span></span>
                         <span class="stats-easypercentage">${easyPerc}%</span>
-                    </div>
+                    </div>`;
+            }
+            if (showNormal) {
+                statsHtml += `
                     <div class="stats-group" style="margin-left: 10px;">
                         <span class="stats-title">ノーマルクリア以上:</span>
                         <span class="stats-fraction">${normalClearCount} / ${total} <span class="stats-remain">(未クリア: ${normalRemain})</span></span>
                         <span class="stats-percentage">${normalPerc}%</span>
-                    </div>
-                </div>
-                ${detailsHtml}
-            `;
+                    </div>`;
+            }
+            statsHtml += `</div>`;
+
+            // メダル内訳・難易度別クリア率（<details>タグを外し、チェックされていれば常にブロックとして表示・出力されるように変更）
+            if (showMedal || showDiff) {
+                statsHtml += `<div style="width: 100%; margin-top: 10px; padding: 12px; background: #f1f8ff; border-radius: 6px; border: 1px solid #e3f2fd; box-sizing: border-box;">`;
+                
+                if (showMedal) {
+                    statsHtml += `
+                        <div style="font-weight: bold; color: #555; margin-bottom: 6px; font-size: 0.9em;">🏅 メダル別内訳</div>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(55px, 1fr)); gap: 6px; margin-bottom: ${showDiff ? '15px' : '0'};">
+                    `;
+                    Object.keys(MEDAL_TYPES).forEach(k => {
+                        const m = MEDAL_TYPES[k];
+                        const count = medalCounts[k];
+                        const isValidMedalUrl = m.imgUrl.startsWith('http') || m.imgUrl.startsWith('data:');
+                        const iconHtml = isValidMedalUrl 
+                            ? `<img src="${m.imgUrl}" style="width: 26px; height: 26px; object-fit: contain; margin-bottom: 2px;">` 
+                            : `<div style="font-weight: bold; color: #555; font-size: 0.7em;">${m.label}</div>`;
+
+                        statsHtml += `
+                            <div style="background: #fff; padding: 6px 2px; border-radius: 4px; border: 1px solid #ddd; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                            ${iconHtml}
+                            <span style="color: #333; font-weight: bold; font-size: 1.1em; line-height: 1;">${count}</span>
+                            </div>
+                        `;
+                    });
+                    statsHtml += `</div>`;
+                }
+
+                if (showDiff) {
+                    statsHtml += `
+                        <div style="font-weight: bold; color: #555; margin-bottom: 6px; font-size: 0.9em; ${showMedal ? 'border-top: 1px dashed #ccc; padding-top: 10px;' : ''}">🎯 難易度（指数）別クリア率</div>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px;">
+                    `;
+                    const diffOrder = ['危険', '別格', '詐称', '強', '中(+)', '中(-)', '弱', '逆詐称', '入門', '未分類'];
+                    diffOrder.forEach(dKey => {
+                        const stat = diffStats[dKey];
+                        if (stat.total === 0) return; 
+                        
+                        const ePerc = ((stat.easy / stat.total) * 100).toFixed(1);
+                        const nPerc = ((stat.normal / stat.total) * 100).toFixed(1);
+                        
+                        let baseClass = dKey.startsWith('中') ? '中' : dKey;
+                        let baseIndex = dKey === '中(+)' ? 0.5 : (dKey === '中(-)' ? -0.5 : 0);
+                        
+                        const styleObj = getDifficultyColor(baseClass, baseIndex);
+                        let borderColor = styleObj.color.replace('0.3', '0.8').replace('1.0', '0.8');
+                        if (dKey === '危険') borderColor = '#333';
+                        
+                        statsHtml += `
+                            <div style="background: #fff; padding: 8px; border-radius: 4px; border: 1px solid #ddd; border-left: 4px solid ${borderColor}; box-shadow: 0 1px 2px rgba(0,0,0,0.05); font-size: 0.85em;">
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px dotted #eee; padding-bottom: 4px; margin-bottom: 4px;">
+                                    <span style="font-weight: bold; color: ${dKey === '危険' ? '#FFD700' : '#333'}; text-shadow: ${dKey === '危険' ? styleObj.shadow : 'none'};">${dKey}</span>
+                                    <span style="color: #666;">全${stat.total}曲</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                                    <span style="color: #2cbc21; font-weight: bold;">イージー以上 <span style="color: #333;">${stat.easy}/${stat.total}</span></span>
+                                    <span style="color: #666;">${ePerc}%</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: #d32f2f; font-weight: bold;">ノーマル以上 <span style="color: #333;">${stat.normal}/${stat.total}</span></span>
+                                    <span style="color: #666;">${nPerc}%</span>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    statsHtml += `</div>`;
+                }
+                statsHtml += `</div>`;
+            }
+            
+            document.getElementById('stats-display').innerHTML = statsHtml;
         }
     </script>
 </body>
