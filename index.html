@@ -115,6 +115,9 @@
         .user-selector-area select { padding: 5px; border-radius: 4px; }
         .user-label { font-weight: bold; margin-right: 10px; }
 
+        /* =========================================
+           📱 スマホ向け最適化（レスポンシブデザイン）
+           ========================================= */
         @media screen and (max-width: 768px) {
             html, body { overflow-x: hidden; width: 100%; margin: 0; padding: 0; }
             body { padding: 4px !important; box-sizing: border-box; }
@@ -131,6 +134,7 @@
             .stats-toggles { justify-content: flex-start; gap: 6px; }
             .stats-toggles > span { width: 100%; margin-bottom: 2px; }
             .stats-toggles label { flex: 1 1 28%; justify-content: center; padding: 8px 4px; font-size: 0.85em; margin: 0; }
+            .stats-toggles select { flex: 1 1 100%; margin-top: 4px; }
 
             .stats-container { 
                 flex-direction: column; align-items: flex-start !important; 
@@ -144,17 +148,32 @@
             
             .view-header { position: static; padding-top: 5px; }
             
-            /* 列のスマホ表示制御 */
+            /* スマホで非表示にする列 */
             .col-level, .col-version, .col-bpm, .col-notes, .col-action { display: none !important; }
             
             table { table-layout: fixed !important; width: 100% !important; max-width: 100% !important; } 
             
-            .col-medal { width: 15% !important; padding: 4px 1px !important; } 
-            .col-score { width: 10% !important; padding: 4px 0 !important; font-size: 0.8em !important; }
-            .col-compare { width: 10% !important; padding: 4px 0 !important; font-size: 0.8em !important; }
+            /* デフォルト（スコア・比較オフ）の幅設定 */
+            .col-medal { width: 14% !important; padding: 4px 1px !important; } 
             .col-banner { width: 20% !important; padding: 4px 1px !important; } 
-            .col-title { width: 33% !important; padding: 4px !important; }     
-            .col-diff { width: 12% !important; padding: 4px 0 !important; text-align: center !important; } 
+            .col-title { width: 44% !important; padding: 4px !important; }     
+            .col-diff { width: 22% !important; padding: 4px 0 !important; text-align: center !important; } 
+            
+            /* スマホ時にスコアまたは比較がオンの場合は「難易度」を非表示にする */
+            #song-table.mobile-hide-diff .col-diff { display: none !important; }
+
+            /* スコアのみオンの場合 */
+            #song-table.has-score:not(.has-compare) .col-title { width: 34% !important; }
+            #song-table.has-score:not(.has-compare) .col-score { width: 18% !important; padding: 4px 0 !important; font-size: 0.8em !important; }
+
+            /* 比較のみオンの場合 */
+            #song-table.has-compare:not(.has-score) .col-title { width: 34% !important; }
+            #song-table.has-compare:not(.has-score) .col-compare { width: 18% !important; padding: 4px 0 !important; font-size: 0.8em !important; }
+
+            /* スコア＋比較 両方オンの場合 */
+            #song-table.has-score.has-compare .col-title { width: 24% !important; }
+            #song-table.has-score.has-compare .col-score { width: 16% !important; padding: 4px 0 !important; font-size: 0.8em !important; }
+            #song-table.has-score.has-compare .col-compare { width: 16% !important; padding: 4px 0 !important; font-size: 0.8em !important; }
             
             td { font-size: 0.8em; word-break: break-all !important; overflow-wrap: break-word !important; }
             th { font-size: 0.8em; padding: 8px 2px; }
@@ -164,26 +183,9 @@
             .modal-content { width: 95%; padding: 15px; box-sizing: border-box; }
             .medal-item { padding: 8px; }
 
-            .diff-wrapper { 
-                display: flex !important; 
-                flex-direction: column; 
-                align-items: center; 
-                justify-content: center; 
-                line-height: 1.1; 
-            }
-            .diff-main { 
-                font-size: 0.85em; 
-                letter-spacing: -0.5px; 
-                white-space: nowrap; 
-            }
-            .diff-sub { 
-                font-size: 0.65em; 
-                margin-left: 0 !important; 
-                margin-top: 1px; 
-                opacity: 0.85; 
-                letter-spacing: -0.5px; 
-                white-space: nowrap; 
-            }
+            .diff-wrapper { display: flex !important; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1; }
+            .diff-main { font-size: 0.85em; letter-spacing: -0.5px; white-space: nowrap; }
+            .diff-sub { font-size: 0.65em; margin-left: 0 !important; margin-top: 1px; opacity: 0.85; letter-spacing: -0.5px; white-space: nowrap; }
 
             .sp-br { display: block; margin-top: 2px; }
             .diff-header-sub { font-size: 0.8em; opacity: 0.9; }
@@ -1354,6 +1356,8 @@
                     for (let c = cells.length - 1; c >= 0; c--) {
                         if (!activeIndices.includes(c)) {
                             clonedRow.removeChild(cells[c]);
+                        } else {
+                            cells[c].style.display = ''; 
                         }
                     }
                     tbody.appendChild(clonedRow);
@@ -1656,6 +1660,16 @@
             document.getElementById('th-score').style.display = showScore ? '' : 'none';
             document.getElementById('th-compare').style.display = showCompare ? '' : 'none';
 
+            // スマホ用表示切り替えのクラス操作
+            const table = document.getElementById('song-table');
+            if (showScore || showCompare) {
+                table.classList.add('mobile-hide-diff');
+            } else {
+                table.classList.remove('mobile-hide-diff');
+            }
+            if (showScore) table.classList.add('has-score'); else table.classList.remove('has-score');
+            if (showCompare) table.classList.add('has-compare'); else table.classList.remove('has-compare');
+
             let displaySongs = songs.filter(s => {
                 if (currentViewLevel !== 'ALL' && s.level !== currentViewLevel) return false;
                 if (searchQuery && !(s.genre.toLowerCase().includes(searchQuery) || s.title.toLowerCase().includes(searchQuery))) return false;
@@ -1877,13 +1891,13 @@
                     }
                 }
 
-                const scoreTd = showScore ? `<td class="col-score" style="text-align: center; cursor: pointer; background-color: #fafafa;" onclick="openScoreModal('${safeId}')" title="クリックしてスコア入力">${scoreDisplayHtml}</td>` : '';
-                const compareTd = showCompare ? `<td class="col-compare" style="text-align: center; background-color: #f0f8ff;">${compareHtml}</td>` : '';
+                const scoreDisplay = showScore ? '' : 'display: none;';
+                const compareDisplay = showCompare ? '' : 'display: none;';
 
                 tr.innerHTML = `
                     <td class="col-medal" style="text-align: center; vertical-align: middle;">${medalDisplayHtml}</td>
-                    ${scoreTd}
-                    ${compareTd}
+                    <td class="col-score" style="text-align: center; cursor: pointer; background-color: #fafafa; ${scoreDisplay}" onclick="openScoreModal('${safeId}')" title="クリックしてスコア入力">${scoreDisplayHtml}</td>
+                    <td class="col-compare" style="text-align: center; background-color: #f0f8ff; ${compareDisplay}">${compareHtml}</td>
                     <td class="col-level" style="text-align: center;"><span class="level-badge">${song.level || '-'}</span></td>
                     <td class="col-version" style="text-align: center;"><span class="ver-badge">${song.version || '-'}</span></td>
                     <td class="col-banner" style="text-align: center;">${bannerHtml}</td>
