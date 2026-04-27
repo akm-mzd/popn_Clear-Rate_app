@@ -133,10 +133,10 @@
             button[onclick="clearSearch()"] { width: auto; padding: 12px 16px; flex-shrink: 0; }
             #search-input { flex-grow: 1; }
             
-            /* 表示トグルのスマホ最適化 */
+            /* 表示トグルのスマホ最適化（5項目になるため少し調整） */
             .stats-toggles { justify-content: flex-start; gap: 6px; }
             .stats-toggles > span { width: 100%; margin-bottom: 2px; }
-            .stats-toggles label { flex: 1 1 45%; justify-content: center; padding: 8px 4px; font-size: 0.9em; margin: 0; }
+            .stats-toggles label { flex: 1 1 28%; justify-content: center; padding: 8px 4px; font-size: 0.85em; margin: 0; }
 
             .stats-container { 
                 flex-direction: column; align-items: flex-start !important; 
@@ -159,10 +159,10 @@
             
             table { table-layout: fixed !important; width: 100% !important; max-width: 100% !important; } 
             
-            th:nth-child(1), td:nth-child(1) { width: 14% !important; padding: 4px 1px !important; } 
+            th:nth-child(1), td:nth-child(1) { width: 16% !important; padding: 4px 1px !important; } 
             th:nth-child(4), td:nth-child(4) { width: 20% !important; padding: 4px 1px !important; } 
-            th:nth-child(5), td:nth-child(5) { width: 43% !important; padding: 4px !important; }     
-            th:nth-child(8), td:nth-child(8) { width: 23% !important; padding: 4px 0 !important; text-align: center !important; } 
+            th:nth-child(5), td:nth-child(5) { width: 42% !important; padding: 4px !important; }     
+            th:nth-child(8), td:nth-child(8) { width: 22% !important; padding: 4px 0 !important; text-align: center !important; } 
             
             td { font-size: 0.8em; word-break: break-all !important; overflow-wrap: break-word !important; }
             th { font-size: 0.8em; padding: 8px 2px; }
@@ -361,6 +361,7 @@
                 <span style="font-size: 0.9em; font-weight: bold; color: #666; margin-right: auto;">📊 統計表示:</span>
                 <label><input type="checkbox" id="show-easy-rate" onchange="renderTable()" style="margin:0;"> イージー</label>
                 <label><input type="checkbox" id="show-normal-rate" checked onchange="renderTable()" style="margin:0;"> ノーマル</label>
+                <label><input type="checkbox" id="show-unreleased" onchange="renderTable()" style="margin:0;"> 未解禁を含む</label>
                 <label><input type="checkbox" id="show-medal-stats" onchange="renderTable()" style="margin:0;"> メダル内訳</label>
                 <label><input type="checkbox" id="show-diff-stats" onchange="renderTable()" style="margin:0;"> 難易度別</label>
             </div>
@@ -965,6 +966,7 @@
             exportContainer.style.fontFamily = 'sans-serif';
             document.body.appendChild(exportContainer);
 
+            // stats-display（クリア率等の表示領域）をそのままコピーして画像化
             const statsClone = document.getElementById('stats-display').cloneNode(true);
             statsClone.style.marginBottom = '20px';
             statsClone.style.fontSize = '1.3em';
@@ -1013,6 +1015,7 @@
             activeIndices.forEach(idx => totalPct += colWidths[idx]);
             const totalWidth = totalPct * 10; 
 
+            // ★ 画像出力時のヘッダー文字列の指定
             const colProps = [
                 { id: 0, html: `<th style="width: ${colWidths[0]}%; text-align: center; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">メダル</th>` },
                 { id: 1, html: `<th style="width: ${colWidths[1]}%; text-align: center; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">Lv</th>` },
@@ -1336,6 +1339,9 @@
             const filterVersion = document.getElementById('filter-version') ? document.getElementById('filter-version').value : 'ALL';
             const filterDiff = document.getElementById('filter-diff') ? document.getElementById('filter-diff').value : 'ALL';
 
+            // ★ ここで「未解禁を含む」のチェック状態を取得
+            const showUnreleased = document.getElementById('show-unreleased') ? document.getElementById('show-unreleased').checked : false;
+
             let displaySongs = songs.filter(s => {
                 if (currentViewLevel !== 'ALL' && s.level !== currentViewLevel) return false;
                 if (searchQuery && !(s.genre.toLowerCase().includes(searchQuery) || s.title.toLowerCase().includes(searchQuery))) return false;
@@ -1431,7 +1437,7 @@
 
             let easyClearCount = 0; 
             let normalClearCount = 0; 
-            let rateTotal = 0; // ★ レート計算の分母となる曲数
+            let rateTotal = 0; // レート計算の分母
             
             let medalCounts = {};
             Object.keys(MEDAL_TYPES).forEach(k => {
@@ -1464,9 +1470,9 @@
                 
                 if (!diffStats[dClass]) dClass = '未分類';
                 
-                // ★ 「未解禁」をレート計算から除外する処理
-                if (medalInfo.excludeFromRate) {
-                    // 何もしない（レートの分母に足さない）
+                // ★ 「未解禁を含む」がオフで、かつ除外指定のあるメダル（未解禁）の場合は分母に足さない
+                if (medalInfo.excludeFromRate && !showUnreleased) {
+                    // 何もしない
                 } else {
                     rateTotal++;
                     diffStats[dClass].total++;
@@ -1528,9 +1534,6 @@
 
             updateSortHeaders();
 
-            // ★ 変数を整理
-            const displayTotal = displaySongs.length; // 画面に見えている全曲数（未解禁含む）
-            
             const easyPerc = rateTotal === 0 ? 0 : ((easyClearCount / rateTotal) * 100).toFixed(1);
             const normalPerc = rateTotal === 0 ? 0 : ((normalClearCount / rateTotal) * 100).toFixed(1);
             const easyRemain = rateTotal - easyClearCount;
