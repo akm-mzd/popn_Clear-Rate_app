@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pop’n Multi-User App</title>
+    <title>Pop’n Clear Rate app</title>
     <style>
         body { font-family: sans-serif; padding: 20px; background-color: #f9f9f9; margin: 0; }
         h1 { font-size: 24px; margin-bottom: 15px; }
@@ -259,6 +259,7 @@
                         </select>
                     </label>
                     <button onclick="importFromClipboard()" style="background-color: #2196F3; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">📋 コピーしたデータを追加</button>
+                    <button onclick="syncLocalToCloud()" style="background-color: #4caf50; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">⬆️ 今のデバイスのデータを移行</button>
                     <button onclick="downloadSongsAndClearsJson()" style="background-color: #ff9800; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">💾 バックアップ (データ＋クリア)</button>
                     <button onclick="downloadSongsJsonOnly()" style="background-color: #795548; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">💾 バックアップ (楽曲のみ)</button>
                 </div>
@@ -294,7 +295,7 @@
                     
                     <div style="margin-left: auto; display: flex; flex-wrap: wrap; gap: 10px;">
                         <button onclick="clearRecordsOnly()" style="padding: 8px 12px;">現在のユーザーのクリア記録リセット</button>
-                        </div>
+                    </div>
                 </div>
             </div>
         </details>
@@ -464,11 +465,15 @@
     </div>
 
     <script>
+        // ==========================================
+        // ★クラウド同期設定（GAS）
+        // ==========================================
         const GAS_URL = 'https://script.google.com/macros/s/AKfycbw_kPkSkFy-vBqh_7CP01svNYPqkhirh6T9s4ocF4yUktkDqzWYT3oH_3Or9sBb-kRv6A/exec';
+        // ==========================================
 
-        // ローカルストレージのキーは一旦そのまま（※あとでマルチユーザー版に完全移行する場合は変更を検討）
         const STORAGE_KEY_SONGS = 'popn_songs_data_v2';
-        
+        const STORAGE_KEY_CLEARS = 'popn_clear_data_v2';
+
         let songs = [];
         let allUsersData = {}; 
         let currentUser = localStorage.getItem('popn_current_user') || "Guest";
@@ -479,7 +484,7 @@
 
         const MEDAL_TYPES = {
             '':         { imgUrl: 'URLをペースト', label: '未プレイ', rank: 0, isEasyClear: false, isNormalClear: false },
-            '未解禁':   { imgUrl: '', label: '🔒未解禁', rank: -1, isEasyClear: false, isNormalClear: false, excludeFromRate: true },
+            '未解禁':   { imgUrl: '', label: '未解禁', rank: -1, isEasyClear: false, isNormalClear: false, excludeFromRate: true },
             '黒丸':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/groove_02.png', label: '黒丸', rank: 1, isEasyClear: false, isNormalClear: false },
             '黒菱':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/groove_01.png', label: '黒菱', rank: 2, isEasyClear: false, isNormalClear: false },
             '黒星':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/groove_00.png', label: '黒星', rank: 3, isEasyClear: false, isNormalClear: false },
@@ -650,7 +655,6 @@
                 if (u === currentUser) opt.selected = true;
                 select.appendChild(opt);
             });
-            // document.getElementById('user-display-name').innerText = currentUser; // 表示を消した場合は不要
         }
 
         // ★ ユーザー切り替え処理
@@ -658,7 +662,6 @@
             currentUser = document.getElementById('current-user-select').value;
             localStorage.setItem('popn_current_user', currentUser);
             clearRecords = allUsersData[currentUser]?.clearRecords || {};
-            // document.getElementById('user-display-name').innerText = currentUser;
             renderTable();
         }
 
@@ -725,6 +728,103 @@
                 alert("通信エラーが発生しました。");
             }
             showLoading(false);
+        }
+
+        // ★ 今のデバイスのデータをユーザーに上書き移行（同期）する処理
+        async function syncLocalToCloud() {
+            if (!GAS_URL || GAS_URL.trim() === '') {
+                alert("GAS_URLが設定されていません。先にGASのデプロイとURLの貼り付けを行ってください。");
+                return;
+            }
+            
+            if (currentUser === "Guest") {
+                alert("「Guest」ユーザーにはデータを上書きできません。\n右上の「+ 新規追加」からユーザーを作成し、選択してから実行してください。");
+                return;
+            }
+
+            const localSongs = JSON.parse(localStorage.getItem(STORAGE_KEY_SONGS)) || [];
+            const localClears = JSON.parse(localStorage.getItem(STORAGE_KEY_CLEARS)) || {};
+            
+            if (localSongs.length === 0 && Object.keys(localClears).length === 0) {
+                alert("このデバイス（ブラウザ）にデータが見つかりません。");
+                return;
+            }
+
+            const mode = prompt(`何をクラウドに同期（上書き）しますか？\n\n1 : 現在のユーザー [${currentUser}] のクリア記録だけを移行\n2 : 楽曲リスト全体を移行（※マスターパスワード必須）\n3 : 両方移行\n\n半角数字の 1, 2, 3 のいずれかを入力してください。`, "1");
+
+            if (mode !== "1" && mode !== "2" && mode !== "3") {
+                return; // キャンセル扱い
+            }
+
+            // 1. クリア記録の移行
+            if (mode === "1" || mode === "3") {
+                if (!confirm(`このデバイスに保存されているクリア記録（${Object.keys(localClears).length}件）を、ユーザー [${currentUser}] のデータとしてクラウドに上書きしますか？`)) return;
+                
+                if (!checkUserAuth()) return; // ユーザーパスワード確認
+                
+                showLoading(true, `ユーザー [${currentUser}] の記録を移行中...`);
+                try {
+                    const payload = {
+                        type: "updateClears",
+                        targetUser: currentUser,
+                        password: userPasswords[currentUser],
+                        clearRecords: localClears
+                    };
+                    const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
+                    const result = await res.json();
+                    
+                    if (result.status === 'error') {
+                        alert("クリア記録の移行エラー: " + result.message);
+                        delete userPasswords[currentUser];
+                        sessionStorage.setItem('popn_pwds', JSON.stringify(userPasswords));
+                        showLoading(false);
+                        return; // エラーなら中断
+                    } else {
+                        clearRecords = localClears;
+                        if (!allUsersData[currentUser]) allUsersData[currentUser] = {};
+                        allUsersData[currentUser].clearRecords = clearRecords;
+                        alert(`ユーザー [${currentUser}] へのクリア記録の移行が完了しました！`);
+                    }
+                } catch (e) {
+                    alert("通信エラーが発生しました。");
+                    showLoading(false);
+                    return;
+                }
+            }
+
+            // 2. 楽曲リストの移行
+            if (mode === "2" || mode === "3") {
+                const masterPwd = prompt("楽曲リスト全体を上書きするための「マスターパスワード」を入力してください:");
+                if (!masterPwd) {
+                    showLoading(false);
+                    renderTable();
+                    return;
+                }
+                
+                showLoading(true, '楽曲リスト全体を移行中...');
+                try {
+                    const payload = {
+                        type: "updateSongs",
+                        targetUser: currentUser, 
+                        password: masterPwd,
+                        songs: localSongs
+                    };
+                    const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
+                    const result = await res.json();
+                    
+                    if (result.status === 'error') {
+                        alert("楽曲リストの移行エラー: " + result.message);
+                    } else {
+                        songs = localSongs;
+                        alert("楽曲リスト全体の移行が完了しました！");
+                    }
+                } catch (e) {
+                    alert("通信エラーが発生しました。");
+                }
+            }
+
+            showLoading(false);
+            renderTable();
         }
 
         function initFilters() {
