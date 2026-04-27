@@ -175,12 +175,16 @@
                 justify-content: center; 
                 line-height: 1.1; 
             }
-            .diff-main { font-size: 1.05em; }
+            .diff-main { 
+                font-size: 0.95em; /* メインも少しだけ縮小 */
+                white-space: nowrap; /* 強制的に改行を禁止 */
+            }
             .diff-sub { 
-                font-size: 0.75em; 
+                font-size: 0.65em; /* 文字をさらに小さく */
                 margin-left: 0 !important; 
                 margin-top: 2px; 
                 opacity: 0.85; 
+                white-space: nowrap; /* 強制的に改行を禁止 */
             }
 
             details > div[style*="position: absolute"] { right: 0; left: auto; max-width: 90vw; }
