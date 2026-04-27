@@ -475,10 +475,9 @@
 
     <script>
         // ==========================================
-        // ★クラウド同期設定（GAS）と管理者パスワード
+        // ★クラウド同期設定（GAS）
         // ==========================================
-        const GAS_URL = 'https://script.google.com/macros/s/AKfycbw1XqS3lm48s7u8gyMExDr63PQcp5Z_m6Irb6SNIX4DYv5abrFfiQpWc3gg1Fs5Mjdxfg/exec';
-        const ADMIN_PASSWORD = "admin"; 
+        const GAS_URL = 'https://script.google.com/macros/s/AKfycbwmLo1UcBXJxc_oVz9yaZ9zZkluLCtbFdnGrFOETyDdKsv-uFdxOtt9KwAMYRLCXjcFRQ/exec';
         // ==========================================
 
         const STORAGE_KEY_SONGS = 'popn_songs_data_v2';
@@ -491,21 +490,6 @@
         let clearRecords = {}; 
         let scoreRecords = {}; 
         
-        let userPasswords = JSON.parse(sessionStorage.getItem('popn_pwds')) || {};
-        let isAdminAuthenticated = false;
-
-        function checkAdminAuth() {
-            if (isAdminAuthenticated) return true;
-            const pwd = prompt("この操作には管理者用パスワードが必要です．パスワードを入力してください:");
-            if (pwd === ADMIN_PASSWORD) {
-                isAdminAuthenticated = true;
-                return true;
-            } else {
-                alert("パスワードが違います．操作はキャンセルされました．");
-                return false;
-            }
-        }
-
         const MEDAL_TYPES = {
             '':         { imgUrl: 'URLをペースト', label: '未プレイ', rank: 0, isEasyClear: false, isNormalClear: false },
             '未解禁':   { imgUrl: '', label: '未解禁', rank: -1, isEasyClear: false, isNormalClear: false, excludeFromRate: true },
@@ -583,18 +567,6 @@
         function showLoading(show, text = '通信中...') {
             document.getElementById('loading-text').innerText = text;
             document.getElementById('loading').style.display = show ? 'flex' : 'none';
-        }
-
-        function checkUserAuth() {
-            if (userPasswords[currentUser]) return true;
-            
-            const pwd = prompt(`ユーザー [${currentUser}] のパスワードを入力してください:\n（新規ユーザーの場合は、今入力したパスワードが登録されます）`);
-            if (pwd) {
-                userPasswords[currentUser] = pwd;
-                sessionStorage.setItem('popn_pwds', JSON.stringify(userPasswords));
-                return true;
-            }
-            return false;
         }
 
         window.onload = async () => {
@@ -732,26 +704,16 @@
             initUserSelector();
             updateCompareUserSelect();
             switchUser();
-            alert(`ユーザー [${name}] を作成しました！\n最初にメダルを変更する際に、専用のパスワードを設定してください。`);
         }
 
         async function saveToCloud(isSongUpdate = false) {
             if (!GAS_URL || GAS_URL.trim() === '') return;
-            
-            let pwd;
-            if (isSongUpdate) {
-                pwd = ADMIN_PASSWORD; 
-            } else {
-                if (!checkUserAuth()) return;
-                pwd = userPasswords[currentUser];
-            }
 
             showLoading(true, 'クラウドに保存中...');
             try {
                 const payload = {
                     type: isSongUpdate ? "updateSongs" : "updateClears",
                     targetUser: currentUser,
-                    password: pwd,
                     songs: songs,
                     clearRecords: clearRecords,
                     scoreRecords: scoreRecords
@@ -765,10 +727,6 @@
                 const result = await response.json();
                 if (result.status === 'error') {
                     alert(result.message);
-                    if (!isSongUpdate) {
-                        delete userPasswords[currentUser];
-                        sessionStorage.setItem('popn_pwds', JSON.stringify(userPasswords));
-                    }
                 } else {
                     if (!isSongUpdate) {
                         if (!allUsersData[currentUser]) allUsersData[currentUser] = { clearRecords: {}, scoreRecords: {} };
@@ -803,7 +761,7 @@
                 return;
             }
 
-            const mode = prompt(`何をクラウドに同期（上書き）しますか？\n\n1 : 現在のユーザー [${currentUser}] の記録だけを移行\n2 : 楽曲リスト全体を移行（※管理者パスワード必須）\n3 : 両方移行\n\n半角数字の 1, 2, 3 のいずれかを入力してください。`, "1");
+            const mode = prompt(`何をクラウドに同期（上書き）しますか？\n\n1 : 現在のユーザー [${currentUser}] の記録だけを移行\n2 : 楽曲リスト全体を移行\n3 : 両方移行\n\n半角数字の 1, 2, 3 のいずれかを入力してください。`, "1");
 
             if (mode !== "1" && mode !== "2" && mode !== "3") {
                 return; 
@@ -812,14 +770,11 @@
             if (mode === "1" || mode === "3") {
                 if (!confirm(`このデバイスに保存されている記録を、ユーザー [${currentUser}] のデータとしてクラウドに上書きしますか？`)) return;
                 
-                if (!checkUserAuth()) return;
-                
                 showLoading(true, `ユーザー [${currentUser}] の記録を移行中...`);
                 try {
                     const payload = {
                         type: "updateClears",
                         targetUser: currentUser,
-                        password: userPasswords[currentUser],
                         clearRecords: localClears,
                         scoreRecords: localScores
                     };
@@ -828,8 +783,6 @@
                     
                     if (result.status === 'error') {
                         alert("記録の移行エラー: " + result.message);
-                        delete userPasswords[currentUser];
-                        sessionStorage.setItem('popn_pwds', JSON.stringify(userPasswords));
                         showLoading(false);
                         return;
                     } else {
@@ -848,18 +801,11 @@
             }
 
             if (mode === "2" || mode === "3") {
-                if (!checkAdminAuth()) {
-                    showLoading(false);
-                    renderTable();
-                    return;
-                }
-                
                 showLoading(true, '楽曲リスト全体を移行中...');
                 try {
                     const payload = {
                         type: "updateSongs",
                         targetUser: currentUser, 
-                        password: ADMIN_PASSWORD,
                         songs: localSongs
                     };
                     const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
@@ -1079,8 +1025,6 @@
         }
 
         async function importFromClipboard() {
-            if (!checkAdminAuth()) return;
-
             try {
                 const text = await navigator.clipboard.readText();
                 if (!text || text.trim() === '') {
@@ -1096,8 +1040,6 @@
         }
 
         async function importDataManual() {
-            if (!checkAdminAuth()) return;
-
             const text = document.getElementById('import-text').value;
             if (!text.trim()) {
                 alert("テキストエリアが空です。");
@@ -1190,8 +1132,6 @@
         }
 
         async function updateBannerFromClipboard(id) {
-            if (!checkAdminAuth()) return;
-
             try {
                 const text = await navigator.clipboard.readText();
                 if (!text || text.trim() === '') {
@@ -1406,8 +1346,6 @@
         }
 
         async function deleteLevelData() {
-            if (!checkAdminAuth()) return;
-
             const targetLevel = document.getElementById('delete-level').value;
             const songsToDelete = songs.filter(s => s.level === targetLevel);
             
@@ -1437,8 +1375,6 @@
         }
 
         function openEditModal(id) {
-            if (!checkAdminAuth()) return;
-
             const song = songs.find(s => s.id === id);
             if (!song) return;
             document.getElementById('edit-original-id').value = song.id;
@@ -1458,8 +1394,6 @@
         }
 
         async function deleteSong() {
-            if (!checkAdminAuth()) return;
-
             if(confirm("この楽曲をリストから削除しますか？\n（全ユーザーのクリア記録も同時に削除されます）")) {
                 const originalId = document.getElementById('edit-original-id').value;
                 songs = songs.filter(s => s.id !== originalId);
@@ -1479,8 +1413,6 @@
         }
 
         async function saveEditModal() {
-            if (!checkAdminAuth()) return;
-
             const originalId = document.getElementById('edit-original-id').value;
             const songIndex = songs.findIndex(s => s.id === originalId);
             if (songIndex === -1) return;
@@ -1624,23 +1556,48 @@
             return 0;
         }
 
-        function getScoreRankInfo(score, isCleared) {
-            if (score === undefined || score === null || score === '') return { rank: '', color: '#999' };
-            const s = parseInt(score, 10);
-            if (isNaN(s)) return { rank: '', color: '#999' };
+        // ==========================================
+        // ★ ランク画像のURL定義
+        // （用意できたら以下のURLを書き換えてください）
+        // ==========================================
+        const RANK_IMAGES = {
+            'S+':  'https://placehold.co/80x40/e91e63/fff?text=S%2B',
+            'S':   'https://placehold.co/80x40/e91e63/fff?text=S',
+            'AAA': 'https://placehold.co/80x40/d32f2f/fff?text=AAA',
+            'AA+': 'https://placehold.co/80x40/d32f2f/fff?text=AA%2B',
+            'AA':  'https://placehold.co/80x40/d32f2f/fff?text=AA',
+            'A+':  'https://placehold.co/80x40/d32f2f/fff?text=A%2B',
+            'A':   'https://placehold.co/80x40/f44336/fff?text=A',
+            'B+':  'https://placehold.co/80x40/ff9800/fff?text=B%2B',
+            'B':   'https://placehold.co/80x40/ff9800/fff?text=B',
+            'C':   'https://placehold.co/80x40/4caf50/fff?text=C',
+            'D':   'https://placehold.co/80x40/2196f3/fff?text=D',
+            'E':   'https://placehold.co/80x40/9c27b0/fff?text=E'
+        };
 
-            if (s >= 99000 && isCleared) return { rank: 'S+', color: '#e91e63' }; 
-            if (s >= 98000 && isCleared) return { rank: 'S',  color: '#e91e63' };
-            if (s >= 95000 && isCleared) return { rank: 'AAA', color: '#d32f2f' }; 
-            if (s >= 93000 && isCleared) return { rank: 'AA+', color: '#d32f2f' };
-            if (s >= 90000 && isCleared) return { rank: 'AA', color: '#d32f2f' };
-            if (s >= 86000 && isCleared) return { rank: 'A+', color: '#d32f2f' };
-            if (s >= 82000) return { rank: 'A', color: '#f44336' }; 
-            if (s >= 77000) return { rank: 'B+', color: '#ff9800' }; 
-            if (s >= 72000) return { rank: 'B', color: '#ff9800' };
-            if (s >= 62000) return { rank: 'C', color: '#4caf50' }; 
-            if (s >= 50000) return { rank: 'D', color: '#2196f3' }; 
-            return { rank: 'E', color: '#9c27b0' }; 
+        function getScoreRankInfo(score, isCleared) {
+            if (score === undefined || score === null || score === '') return { rank: '', isImage: false, color: '#999' };
+            const s = parseInt(score, 10);
+            if (isNaN(s)) return { rank: '', isImage: false, color: '#999' };
+
+            let rankKey = 'E';
+            if (s >= 99000 && isCleared) rankKey = 'S+';
+            else if (s >= 98000 && isCleared) rankKey = 'S';
+            else if (s >= 95000 && isCleared) rankKey = 'AAA';
+            else if (s >= 93000 && isCleared) rankKey = 'AA+';
+            else if (s >= 90000 && isCleared) rankKey = 'AA';
+            else if (s >= 86000 && isCleared) rankKey = 'A+';
+            else if (s >= 82000) rankKey = 'A';
+            else if (s >= 77000) rankKey = 'B+';
+            else if (s >= 72000) rankKey = 'B';
+            else if (s >= 62000) rankKey = 'C';
+            else if (s >= 50000) rankKey = 'D';
+
+            return { 
+                rank: rankKey, 
+                isImage: true, 
+                imgUrl: RANK_IMAGES[rankKey] 
+            };
         }
 
         function renderTable() {
@@ -1853,9 +1810,13 @@
 
                 let scoreDisplayHtml = `<div style="color: #ccc; font-size: 0.8em; font-weight: normal;">未登録</div>`;
                 if (myScore !== undefined && myScore !== '') {
+                    const rankMark = rankInfo.isImage 
+                        ? `<img src="${rankInfo.imgUrl}" alt="${rankInfo.rank}" style="height: 18px; width: auto; vertical-align: middle; margin-top: 2px;">` 
+                        : `<div style="font-weight: bold; font-size: 0.9em; color: ${rankInfo.color};">${rankInfo.rank}</div>`;
+                    
                     scoreDisplayHtml = `
                         <div style="font-weight: bold; font-size: 1.1em; color: #333;">${myScore}</div>
-                        <div style="font-weight: bold; font-size: 0.9em; color: ${rankInfo.color};">${rankInfo.rank}</div>
+                        ${rankMark}
                     `;
                 }
 
@@ -1875,6 +1836,11 @@
                         const tMedal = allUsersData[targetUser].clearRecords[song.id];
                         const tIsCleared = tMedal ? MEDAL_TYPES[tMedal].isEasyClear : false;
                         const tRankInfo = getScoreRankInfo(targetScore, tIsCleared);
+                        
+                        const tRankMark = tRankInfo.isImage 
+                            ? `<img src="${tRankInfo.imgUrl}" alt="${tRankInfo.rank}" style="height: 14px; width: auto; vertical-align: middle; margin-top: 1px;">` 
+                            : `<div style="font-size: 0.8em; color: ${tRankInfo.color}; font-weight: bold;">${tRankInfo.rank}</div>`;
+
                         let diff = '';
                         if (myScore !== undefined && myScore !== '') {
                             const d = parseInt(myScore, 10) - parseInt(targetScore, 10);
@@ -1885,7 +1851,7 @@
                         
                         compareHtml = `
                             <div style="font-size: 0.95em; color: #555; font-weight: bold;">${targetScore}</div>
-                            <div style="font-size: 0.8em; color: ${tRankInfo.color}; font-weight: bold;">${tRankInfo.rank}</div>
+                            ${tRankMark}
                             <div style="margin-top: 2px;">${diff}</div>
                         `;
                     }
