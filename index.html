@@ -446,6 +446,10 @@
             </div>
 
             <div class="input-item" style="margin-bottom: 8px;">
+                <label>個別Wiki URL（空欄の場合は自動生成）</label>
+                <input type="text" id="edit-wiki-url" placeholder="https://popn.wiki/...">
+            </div>
+            <div class="input-item" style="margin-bottom: 8px;">
                 <label>バナー画像 (URLまたはファイル選択)</label>
                 <div style="display: flex; gap: 8px; align-items: center;">
                     <input type="text" id="edit-banner-url" placeholder="https://..." style="flex: 1;">
@@ -1481,6 +1485,10 @@
             document.getElementById('edit-notes').value = song.notes || 0;
             document.getElementById('edit-diff').value = song.diffRaw || "";
             document.getElementById('edit-banner-url').value = song.bannerUrl || "";
+            
+            // ▼▼ ここを追加 ▼▼
+            document.getElementById('edit-wiki-url').value = song.wikiUrl || "";
+
             document.getElementById('edit-modal').style.display = 'flex';
         }
 
@@ -1545,6 +1553,9 @@
             songs[songIndex].bpm = document.getElementById('edit-bpm').value.trim();
             songs[songIndex].notes = newNotes;
             songs[songIndex].bannerUrl = document.getElementById('edit-banner-url').value.trim();
+            
+            // ▼▼ ここを追加 ▼▼
+            songs[songIndex].wikiUrl = document.getElementById('edit-wiki-url').value.trim();
             
             const newDiffRaw = document.getElementById('edit-diff').value.trim();
             const parsed = parseDifficulty(newDiffRaw);
@@ -2015,12 +2026,14 @@
                 const scoreDisplay = showScore ? '' : 'display: none;';
                 const compareDisplay = showCompare ? '' : 'display: none;';
 
-                // --- ここから追加 ---
-                // ジャンル名があればジャンル名、なければ曲名をURLに使う
+                // --- ここから変更 ---
+                // ジャンル名があればジャンル名、なければ曲名を自動生成のキーに使う
                 const searchKey = (song.genre && song.genre.trim() !== '') ? song.genre : song.title;
-                // Pop'n WikiのURL形式に合わせて結合
-                const wikiUrl = `https://popn.wiki/難易度表/${encodeURIComponent(searchKey)}`;
-                // --- ここまで追加 ---
+                const autoWikiUrl = `https://popn.wiki/難易度表/${encodeURIComponent(searchKey)}`;
+                
+                // ★ 手動で登録されたURL（song.wikiUrl）があればそれを優先、空欄なら自動生成URL（autoWikiUrl）を使う
+                const finalWikiUrl = (song.wikiUrl && song.wikiUrl !== '') ? song.wikiUrl : autoWikiUrl;
+                // --- ここまで変更 ---
 
                 tr.innerHTML = `
                     <td class="col-medal" style="text-align: center; vertical-align: middle;">${medalDisplayHtml}</td>
@@ -2032,7 +2045,7 @@
                     <td class="col-title">
                         <div style="font-size: 0.85em; color: #666;">${song.genre}</div>
                         <div style="font-weight: bold;">
-                            <a href="${wikiUrl}" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none;">
+                            <a href="${finalWikiUrl}" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none;">
                                 ${song.title} <span style="font-size: 0.8em; color: #2196F3;">🔗</span>
                             </a>
                         </div>
