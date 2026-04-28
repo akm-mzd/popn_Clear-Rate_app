@@ -2015,6 +2015,13 @@
                 const scoreDisplay = showScore ? '' : 'display: none;';
                 const compareDisplay = showCompare ? '' : 'display: none;';
 
+                // --- ここから追加 ---
+                // ジャンル名があればジャンル名、なければ曲名をURLに使う
+                const searchKey = (song.genre && song.genre.trim() !== '') ? song.genre : song.title;
+                // Pop'n WikiのURL形式に合わせて結合
+                const wikiUrl = `https://popn.wiki/難易度表/${encodeURIComponent(searchKey)}`;
+                // --- ここまで追加 ---
+
                 tr.innerHTML = `
                     <td class="col-medal" style="text-align: center; vertical-align: middle;">${medalDisplayHtml}</td>
                     <td class="col-score" style="text-align: center; cursor: pointer; background-color: #fafafa; ${scoreDisplay}" onclick="openScoreModal('${safeId}')" title="クリックしてスコア入力">${scoreDisplayHtml}</td>
@@ -2024,7 +2031,11 @@
                     <td class="col-banner" style="text-align: center;">${bannerHtml}</td>
                     <td class="col-title">
                         <div style="font-size: 0.85em; color: #666;">${song.genre}</div>
-                        <div style="font-weight: bold;">${song.title}</div>
+                        <div style="font-weight: bold;">
+                            <a href="${wikiUrl}" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none;">
+                                ${song.title} <span style="font-size: 0.8em; color: #2196F3;">🔗</span>
+                            </a>
+                        </div>
                     </td>
                     <td class="col-bpm" style="text-align: right;"><span>${song.bpm || '-'}</span></td>
                     <td class="col-notes" style="text-align: right;"><span>${song.notes}</span></td>
