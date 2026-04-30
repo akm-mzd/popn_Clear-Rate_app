@@ -1977,7 +1977,7 @@
                 let scoreDisplayHtml = `<div style="color: #ccc; font-size: 0.8em; font-weight: normal;">未登録</div>`;
                 if (myScore !== undefined && myScore !== '') {
                     const rankMark = rankInfo.isImage 
-                        ? `<img src="${rankInfo.imgUrl}" alt="${rankInfo.rank}" style="height: 18px; width: auto; vertical-align: middle; margin-top: 2px;">` 
+                        ? `<img src="${rankInfo.imgUrl}" alt="${rankInfo.rank}" style="height: 40px; width: auto; vertical-align: middle; margin-top: 2px;">` 
                         : `<div style="font-weight: bold; font-size: 0.9em; color: ${rankInfo.color};">${rankInfo.rank}</div>`;
                     
                     scoreDisplayHtml = `
@@ -2004,7 +2004,7 @@
                         const tRankInfo = getScoreRankInfo(targetScore, tIsCleared);
                         
                         const tRankMark = tRankInfo.isImage 
-                            ? `<img src="${tRankInfo.imgUrl}" alt="${tRankInfo.rank}" style="height: 14px; width: auto; vertical-align: middle; margin-top: 1px;">` 
+                            ? `<img src="${tRankInfo.imgUrl}" alt="${tRankInfo.rank}" style="height: 40px; width: auto; vertical-align: middle; margin-top: 1px;">` 
                             : `<div style="font-size: 0.8em; color: ${tRankInfo.color}; font-weight: bold;">${tRankInfo.rank}</div>`;
 
                         let diff = '';
