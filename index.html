@@ -85,7 +85,7 @@
         .input-group { display: flex; gap: 8px; margin-bottom: 8px; }
         .input-item { flex: 1; display: flex; flex-direction: column; }
         .input-item label { font-size: 12px; margin-bottom: 2px; color: #555; font-weight: bold; }
-        .input-item input { 
+        .input-item input, .input-item select, .input-item textarea { 
             width: 100%; padding: 4px 8px; font-size: 13px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;
         }
         .modal-actions { margin-top: 15px; display: flex; justify-content: space-between; gap: 8px; }
@@ -129,6 +129,12 @@
         }
         .check-label:hover { background: #f0f8ff; border-color: #2196F3; }
         .check-label input { margin: 0; }
+
+        /* メモアイコン用装飾 */
+        .memo-badge-得意 { color: #2196F3; font-weight: bold; }
+        .memo-badge-苦手 { color: #FF9800; font-weight: bold; }
+        .memo-badge-噛み合い { color: #9C27B0; font-weight: bold; }
+        .memo-badge-敵 { color: #F44336; font-weight: bold; }
 
         /* =========================================
             📱 スマホ向け最適化（レスポンシブデザイン）
@@ -263,7 +269,7 @@
                     </label>
                     <button onclick="importFromClipboard()" style="background-color: #2196F3; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">📋 コピーしたデータを追加</button>
                     <button onclick="syncLocalToCloud()" style="background-color: #4caf50; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">⬆️ 今のデバイスのデータを移行</button>
-                    <button onclick="downloadSongsAndClearsJson()" style="background-color: #ff9800; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">💾 バックアップ (データ＋クリア)</button>
+                    <button onclick="downloadSongsAndClearsJson()" style="background-color: #ff9800; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">💾 バックアップ (データ＋記録)</button>
                     <button onclick="downloadSongsJsonOnly()" style="background-color: #795548; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">💾 バックアップ (楽曲のみ)</button>
                 </div>
                 
@@ -304,7 +310,7 @@
                     <button onclick="deleteLevelData()" style="color: #d32f2f; border-color: #d32f2f; background-color: #fff;">削除実行</button>
                     
                     <div style="margin-left: auto; display: flex; flex-wrap: wrap; gap: 10px;">
-                        <button onclick="clearRecordsOnly()" style="padding: 8px 12px;">現在のユーザーのクリア記録・スコア リセット</button>
+                        <button onclick="clearRecordsOnly()" style="padding: 8px 12px;">現在のユーザーの記録(クリア・スコア・メモ)リセット</button>
                     </div>
                 </div>
             </div>
@@ -337,7 +343,7 @@
                             <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="3"> Lv</label>
                             <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="4"> Ver</label>
                             <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="5" checked> バナー</label>
-                            <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="6" checked> ジャンル / 曲名</label>
+                            <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="6" checked> ジャンル / 曲名 (+メモ)</label>
                             <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="7"> BPM</label>
                             <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="8"> ノーツ</label>
                             <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="9" checked> 難易度</label>
@@ -387,6 +393,17 @@
                             <option value="未分類">未分類</option>
                         </select>
                     </div>
+                    <div style="display: flex; flex-direction: column;">
+                        <label style="font-size: 0.8em; font-weight: bold; color: #666; margin-bottom: 2px;">相性 (メモ)</label>
+                        <select id="filter-affinity" onchange="renderTable()" style="padding: 4px;">
+                            <option value="ALL">すべて</option>
+                            <option value="得意">得意</option>
+                            <option value="苦手">苦手</option>
+                            <option value="噛み合い">噛み合い</option>
+                            <option value="敵">敵</option>
+                            <option value="未設定">未設定(メモ無含む)</option>
+                        </select>
+                    </div>
                     <div style="display: flex; align-items: flex-end;">
                         <button onclick="resetFilters()" style="padding: 4px 12px; height: 28px; background: #eee; border: 1px solid #ccc;">リセット</button>
                     </div>
@@ -424,7 +441,7 @@
                         <th class="col-level" style="width: 5%; text-align: center;" onclick="sortBy('level')" id="th-level" title="クリックでソート">Lv</th>
                         <th class="col-version" style="width: 5%; text-align: center;" onclick="sortBy('version')" id="th-version" title="クリックでソート">Ver</th>
                         <th class="col-banner" style="width: 12%; text-align: center;">バナー</th>
-                        <th class="col-title" style="width: 20%;" onclick="sortBy('title')" id="th-title" title="クリックでソート">ジャンル / 曲名</th>
+                        <th class="col-title" style="width: 20%;" onclick="sortBy('title')" id="th-title" title="クリックでソート">ジャンル / 曲名 <span style="font-size: 0.8em; font-weight: normal; color: #555;">(メモ)</span></th>
                         <th class="col-bpm" style="width: 6%; text-align: right;" onclick="sortBy('bpm')" id="th-bpm" title="クリックでソート">BPM</th>
                         <th class="col-notes" style="width: 6%; text-align: right;" onclick="sortBy('notes')" id="th-notes" title="クリックでソート">ノーツ</th>
                         <th class="col-diff" style="width: 13%; text-align: center;" onclick="sortBy('diff')" id="th-diff" title="クリックでソート">難易度<span class="sp-br"></span><span class="diff-header-sub">(指数)</span></th>
@@ -467,6 +484,44 @@
         </div>
     </div>
 
+    <!-- メモ入力モーダル -->
+    <div id="memo-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 400px;">
+            <h3 id="memo-modal-title">メモ</h3>
+            <input type="hidden" id="memo-modal-id">
+            
+            <div class="input-item" style="margin-bottom: 15px;">
+                <label>相性</label>
+                <select id="memo-input-affinity">
+                    <option value="">未設定</option>
+                    <option value="得意">得意</option>
+                    <option value="苦手">苦手</option>
+                    <option value="噛み合い">噛み合い</option>
+                    <option value="敵">敵</option>
+                </select>
+            </div>
+
+            <div class="input-item" style="margin-bottom: 15px;">
+                <label>SUDDEN+ (サドプラ) の値など</label>
+                <input type="text" id="memo-input-sudden" placeholder="例: -150, 300 など">
+            </div>
+
+            <div class="input-item" style="margin-bottom: 20px;">
+                <label>コメント</label>
+                <textarea id="memo-input-comment" placeholder="譜面の傾向や注意点など..."></textarea>
+            </div>
+
+            <div class="modal-actions" style="justify-content: space-between; gap: 20px;">
+                <button onclick="clearMemo()" style="background-color: #f44336; color: white;">クリア</button>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="closeMemoModal()" style="border: 1px solid #ccc; background: #eee;">キャンセル</button>
+                    <button onclick="saveMemoModal()" style="background-color: #4caf50; color: white; font-weight: bold;">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 楽曲編集モーダル -->
     <div id="edit-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content">
             <h3 id="edit-modal-title">楽曲データの編集</h3>
@@ -518,6 +573,7 @@
         </div>
     </div>
 
+    <!-- メダル・スコアモーダル等 -->
     <div id="medal-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content" style="max-width: 400px;">
             <h3 style="text-align: center; color: #555; border-bottom: 1px solid #eee; padding-bottom: 10px;">メダルを選択</h3>
@@ -553,12 +609,14 @@
         const STORAGE_KEY_SONGS = 'popn_songs_data_v2';
         const STORAGE_KEY_CLEARS = 'popn_clear_data_v2';
         const STORAGE_KEY_SCORES = 'popn_score_data_v2';
+        const STORAGE_KEY_MEMOS = 'popn_memo_data_v2'; // 追加: メモ用キー
 
         let songs = [];
         let allUsersData = {}; 
         let currentUser = localStorage.getItem('popn_current_user') || "Guest";
         let clearRecords = {}; 
         let scoreRecords = {}; 
+        let memoRecords = {}; // 追加: メモ用変数
         
         let isAdminAuthenticated = false;
 
@@ -667,45 +725,52 @@
                         allUsersData = fetchedData.users || {};
                         
                         if (Object.keys(allUsersData).length === 0) {
-                            allUsersData["Guest"] = { clearRecords: {}, scoreRecords: {} };
+                            allUsersData["Guest"] = { clearRecords: {}, scoreRecords: {}, memoRecords: {} };
                         }
                         
                         for (let u in allUsersData) {
                             if (!allUsersData[u].scoreRecords) allUsersData[u].scoreRecords = {};
+                            if (!allUsersData[u].memoRecords) allUsersData[u].memoRecords = {};
                         }
                         
                         if (allUsersData[currentUser]) {
                             clearRecords = allUsersData[currentUser].clearRecords || {};
                             scoreRecords = allUsersData[currentUser].scoreRecords || {};
+                            memoRecords = allUsersData[currentUser].memoRecords || {};
                         } else {
                             currentUser = "Guest";
                             localStorage.setItem('popn_current_user', currentUser);
-                            if(!allUsersData["Guest"]) allUsersData["Guest"] = { clearRecords: {}, scoreRecords: {} };
+                            if(!allUsersData["Guest"]) allUsersData["Guest"] = { clearRecords: {}, scoreRecords: {}, memoRecords: {} };
                             clearRecords = allUsersData[currentUser].clearRecords;
                             scoreRecords = allUsersData[currentUser].scoreRecords;
+                            memoRecords = allUsersData[currentUser].memoRecords || {};
                         }
                     }
                 } catch (error) {
                     console.warn('クラウドからの読み込みに失敗しました。ローカルデータを使用します。', error);
                     songs = JSON.parse(localStorage.getItem(STORAGE_KEY_SONGS)) || [];
                     allUsersData = { "Guest": { 
-                        clearRecords: JSON.parse(localStorage.getItem('popn_clear_data_v2')) || {},
-                        scoreRecords: JSON.parse(localStorage.getItem(STORAGE_KEY_SCORES)) || {}
+                        clearRecords: JSON.parse(localStorage.getItem(STORAGE_KEY_CLEARS)) || {},
+                        scoreRecords: JSON.parse(localStorage.getItem(STORAGE_KEY_SCORES)) || {},
+                        memoRecords: JSON.parse(localStorage.getItem(STORAGE_KEY_MEMOS)) || {}
                     } };
                     currentUser = "Guest";
                     clearRecords = allUsersData["Guest"].clearRecords;
                     scoreRecords = allUsersData["Guest"].scoreRecords;
+                    memoRecords = allUsersData["Guest"].memoRecords;
                 }
                 showLoading(false);
             } else {
                 songs = JSON.parse(localStorage.getItem(STORAGE_KEY_SONGS)) || [];
                 allUsersData = { "Guest": { 
-                    clearRecords: JSON.parse(localStorage.getItem('popn_clear_data_v2')) || {},
-                    scoreRecords: JSON.parse(localStorage.getItem(STORAGE_KEY_SCORES)) || {}
+                    clearRecords: JSON.parse(localStorage.getItem(STORAGE_KEY_CLEARS)) || {},
+                    scoreRecords: JSON.parse(localStorage.getItem(STORAGE_KEY_SCORES)) || {},
+                    memoRecords: JSON.parse(localStorage.getItem(STORAGE_KEY_MEMOS)) || {}
                 } };
                 currentUser = "Guest";
                 clearRecords = allUsersData["Guest"].clearRecords;
                 scoreRecords = allUsersData["Guest"].scoreRecords;
+                memoRecords = allUsersData["Guest"].memoRecords;
             }
 
             songs.forEach(s => {
@@ -724,6 +789,10 @@
                     if (scoreRecords[s.id] !== undefined) {
                         scoreRecords[expectedId] = scoreRecords[s.id];
                         delete scoreRecords[s.id];
+                    }
+                    if (memoRecords[s.id] !== undefined) {
+                        memoRecords[expectedId] = memoRecords[s.id];
+                        delete memoRecords[s.id];
                     }
                     s.id = expectedId;
                 }
@@ -772,6 +841,7 @@
             localStorage.setItem('popn_current_user', currentUser);
             clearRecords = allUsersData[currentUser]?.clearRecords || {};
             scoreRecords = allUsersData[currentUser]?.scoreRecords || {};
+            memoRecords = allUsersData[currentUser]?.memoRecords || {};
             updateCompareUserSelect();
             renderTable();
         }
@@ -784,7 +854,7 @@
                 return;
             }
             currentUser = name;
-            allUsersData[name] = { clearRecords: {}, scoreRecords: {} };
+            allUsersData[name] = { clearRecords: {}, scoreRecords: {}, memoRecords: {} };
             localStorage.setItem('popn_current_user', name);
             initUserSelector();
             updateCompareUserSelect();
@@ -797,7 +867,7 @@
                 alert("クラウド保存先のURLが設定されていません。");
                 return;
             }
-            const mode = prompt(`何をクラウドに保存（同期）しますか？\n\n1 : 現在のユーザー [${currentUser}] のクリア記録・スコア\n2 : 楽曲リスト全体（※管理者パスワード必須）\n3 : 両方\n\n半角数字の 1, 2, 3 のいずれかを入力してください。`, "1");
+            const mode = prompt(`何をクラウドに保存（同期）しますか？\n\n1 : 現在のユーザー [${currentUser}] の記録（クリア・スコア・メモ）\n2 : 楽曲リスト全体（※管理者パスワード必須）\n3 : 両方\n\n半角数字の 1, 2, 3 のいずれかを入力してください。`, "1");
 
             if (mode !== "1" && mode !== "2" && mode !== "3") {
                 return; 
@@ -830,7 +900,8 @@
                     targetUser: currentUser,
                     songs: songs,
                     clearRecords: clearRecords,
-                    scoreRecords: scoreRecords
+                    scoreRecords: scoreRecords,
+                    memoRecords: memoRecords
                 };
 
                 // ★ マスターデータ編集時はパスワードを付与
@@ -848,9 +919,10 @@
                     alert(result.message);
                 } else {
                     if (!isSongUpdate) {
-                        if (!allUsersData[currentUser]) allUsersData[currentUser] = { clearRecords: {}, scoreRecords: {} };
+                        if (!allUsersData[currentUser]) allUsersData[currentUser] = { clearRecords: {}, scoreRecords: {}, memoRecords: {} };
                         allUsersData[currentUser].clearRecords = clearRecords;
                         allUsersData[currentUser].scoreRecords = scoreRecords;
+                        allUsersData[currentUser].memoRecords = memoRecords;
                     }
                     isSuccess = true;
                 }
@@ -876,6 +948,7 @@
             const localSongs = JSON.parse(localStorage.getItem(STORAGE_KEY_SONGS)) || [];
             const localClears = JSON.parse(localStorage.getItem(STORAGE_KEY_CLEARS)) || {};
             const localScores = JSON.parse(localStorage.getItem(STORAGE_KEY_SCORES)) || {};
+            const localMemos = JSON.parse(localStorage.getItem(STORAGE_KEY_MEMOS)) || {};
             
             if (localSongs.length === 0 && Object.keys(localClears).length === 0) {
                 alert("このデバイス（ブラウザ）にデータが見つかりません。");
@@ -898,7 +971,8 @@
                         type: "updateClears",
                         targetUser: currentUser,
                         clearRecords: localClears,
-                        scoreRecords: localScores
+                        scoreRecords: localScores,
+                        memoRecords: localMemos
                     };
                     const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
                     const result = await res.json();
@@ -910,9 +984,11 @@
                     } else {
                         clearRecords = localClears;
                         scoreRecords = localScores;
-                        if (!allUsersData[currentUser]) allUsersData[currentUser] = { clearRecords: {}, scoreRecords: {} };
+                        memoRecords = localMemos;
+                        if (!allUsersData[currentUser]) allUsersData[currentUser] = { clearRecords: {}, scoreRecords: {}, memoRecords: {} };
                         allUsersData[currentUser].clearRecords = clearRecords;
                         allUsersData[currentUser].scoreRecords = scoreRecords;
+                        allUsersData[currentUser].memoRecords = memoRecords;
                         alert(`ユーザー [${currentUser}] への記録の移行が完了しました！`);
                     }
                 } catch (e) {
@@ -1028,6 +1104,7 @@
             document.getElementById('filter-medal').value = 'ALL';
             document.getElementById('filter-version').value = 'ALL';
             document.getElementById('filter-diff').value = 'ALL';
+            document.getElementById('filter-affinity').value = 'ALL';
             renderTable();
         }
 
@@ -1068,7 +1145,7 @@
                 } else {
                     clearRecords[currentMedalEditId] = medalKey;
                 }
-                if (!allUsersData[currentUser]) allUsersData[currentUser] = { clearRecords: {}, scoreRecords: {} };
+                if (!allUsersData[currentUser]) allUsersData[currentUser] = { clearRecords: {}, scoreRecords: {}, memoRecords: {} };
                 allUsersData[currentUser].clearRecords = clearRecords;
                 renderTable();
                 closeMedalModal();
@@ -1104,10 +1181,64 @@
                 scoreRecords[id] = num;
             }
             
-            if (!allUsersData[currentUser]) allUsersData[currentUser] = { clearRecords: {}, scoreRecords: {} };
+            if (!allUsersData[currentUser]) allUsersData[currentUser] = { clearRecords: {}, scoreRecords: {}, memoRecords: {} };
             allUsersData[currentUser].scoreRecords = scoreRecords;
 
             closeScoreModal();
+            renderTable();
+        }
+
+        // --- メモ機能関連 ---
+        function openMemoModal(id) {
+            const song = songs.find(s => s.id === id);
+            if (!song) return;
+            
+            const memo = memoRecords[id] || {};
+            
+            document.getElementById('memo-modal-id').value = id;
+            document.getElementById('memo-modal-title').innerText = `メモ: ${song.title}`;
+            document.getElementById('memo-input-affinity').value = memo.affinity || '';
+            document.getElementById('memo-input-sudden').value = memo.sudden || '';
+            document.getElementById('memo-input-comment').value = memo.comment || '';
+            
+            document.getElementById('memo-modal').style.display = 'flex';
+        }
+
+        function closeMemoModal() {
+            document.getElementById('memo-modal').style.display = 'none';
+        }
+
+        function clearMemo() {
+            if(confirm('この楽曲のメモをすべてクリアしますか？')) {
+                const id = document.getElementById('memo-modal-id').value;
+                delete memoRecords[id];
+                
+                if (!allUsersData[currentUser]) allUsersData[currentUser] = { clearRecords: {}, scoreRecords: {}, memoRecords: {} };
+                allUsersData[currentUser].memoRecords = memoRecords;
+                localStorage.setItem(STORAGE_KEY_MEMOS, JSON.stringify(memoRecords));
+
+                closeMemoModal();
+                renderTable();
+            }
+        }
+
+        function saveMemoModal() {
+            const id = document.getElementById('memo-modal-id').value;
+            const affinity = document.getElementById('memo-input-affinity').value;
+            const sudden = document.getElementById('memo-input-sudden').value.trim();
+            const comment = document.getElementById('memo-input-comment').value.trim();
+
+            if (affinity === '' && sudden === '' && comment === '') {
+                delete memoRecords[id];
+            } else {
+                memoRecords[id] = { affinity, sudden, comment };
+            }
+
+            if (!allUsersData[currentUser]) allUsersData[currentUser] = { clearRecords: {}, scoreRecords: {}, memoRecords: {} };
+            allUsersData[currentUser].memoRecords = memoRecords;
+            localStorage.setItem(STORAGE_KEY_MEMOS, JSON.stringify(memoRecords));
+
+            closeMemoModal();
             renderTable();
         }
 
@@ -1234,9 +1365,9 @@
         }
 
         function downloadSongsAndClearsJson() {
-            const exportData = { songs: songs, clearRecords: clearRecords, scoreRecords: scoreRecords };
+            const exportData = { songs: songs, clearRecords: clearRecords, scoreRecords: scoreRecords, memoRecords: memoRecords };
             const dataStr = JSON.stringify(exportData, null, 2);
-            triggerDownload(dataStr, `popn_data_${currentUser}.json`, 'クリア記録・スコアを含めて');
+            triggerDownload(dataStr, `popn_data_${currentUser}.json`, 'クリア・スコア・メモを含めて');
         }
 
         function downloadSongsJsonOnly() {
@@ -1486,7 +1617,7 @@
                 { id: 3, html: `<th style="width: ${colWidths[3]}%; text-align: center; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">Lv</th>` },
                 { id: 4, html: `<th style="width: ${colWidths[4]}%; text-align: center; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">Ver</th>` },
                 { id: 5, html: `<th style="width: ${colWidths[5]}%; text-align: center; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">バナー</th>` },
-                { id: 6, html: `<th style="width: ${colWidths[6]}%; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2; text-align: left;">ジャンル / 曲名</th>` },
+                { id: 6, html: `<th style="width: ${colWidths[6]}%; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2; text-align: left;">ジャンル / 曲名 (+メモ)</th>` },
                 { id: 7, html: `<th style="width: ${colWidths[7]}%; text-align: right; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">BPM</th>` },
                 { id: 8, html: `<th style="width: ${colWidths[8]}%; text-align: right; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">ノーツ</th>` },
                 { id: 9, html: `<th style="width: ${colWidths[9]}%; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2; text-align: center;">難易度 (指数)</th>` }
@@ -1605,10 +1736,12 @@
                     deleteIds.forEach(id => {
                         delete allUsersData[u].clearRecords[id];
                         if (allUsersData[u].scoreRecords) delete allUsersData[u].scoreRecords[id];
+                        if (allUsersData[u].memoRecords) delete allUsersData[u].memoRecords[id];
                     });
                 }
                 clearRecords = allUsersData[currentUser].clearRecords;
                 scoreRecords = allUsersData[currentUser].scoreRecords;
+                memoRecords = allUsersData[currentUser].memoRecords;
                 
                 updateDynamicFilters();
                 renderTable();
@@ -1671,16 +1804,18 @@
             // ★ 管理者認証
             if (!checkAdminAuth()) return;
 
-            if(confirm("この楽曲をリストから削除しますか？\n（全ユーザーのクリア記録も同時に削除されます）")) {
+            if(confirm("この楽曲をリストから削除しますか？\n（全ユーザーの記録も同時に削除されます）")) {
                 const originalId = document.getElementById('edit-original-id').value;
                 songs = songs.filter(s => s.id !== originalId);
                 
                 for(let u in allUsersData) {
                     delete allUsersData[u].clearRecords[originalId];
                     if (allUsersData[u].scoreRecords) delete allUsersData[u].scoreRecords[originalId];
+                    if (allUsersData[u].memoRecords) delete allUsersData[u].memoRecords[originalId];
                 }
                 clearRecords = allUsersData[currentUser].clearRecords;
                 scoreRecords = allUsersData[currentUser].scoreRecords;
+                memoRecords = allUsersData[currentUser].memoRecords;
                 
                 updateDynamicFilters();
                 renderTable();
@@ -1754,9 +1889,14 @@
                             allUsersData[u].scoreRecords[newId] = allUsersData[u].scoreRecords[originalId];
                             delete allUsersData[u].scoreRecords[originalId];
                         }
+                        if (allUsersData[u].memoRecords && allUsersData[u].memoRecords[originalId] !== undefined) {
+                            allUsersData[u].memoRecords[newId] = allUsersData[u].memoRecords[originalId];
+                            delete allUsersData[u].memoRecords[originalId];
+                        }
                     }
                     clearRecords = allUsersData[currentUser].clearRecords;
                     scoreRecords = allUsersData[currentUser].scoreRecords;
+                    memoRecords = allUsersData[currentUser].memoRecords;
                     songs[songIndex].id = newId;
                 }
 
@@ -1818,11 +1958,14 @@
         }
 
         async function clearRecordsOnly() {
-            if(confirm(`ユーザー [${currentUser}] のすべてのクリア記録およびスコアをリセットしますか？\n（楽曲リストは保持されます）`)) {
+            if(confirm(`ユーザー [${currentUser}] のすべての記録（クリア・スコア・メモ）をリセットしますか？\n（楽曲リストは保持されます）`)) {
                 allUsersData[currentUser].clearRecords = {};
                 allUsersData[currentUser].scoreRecords = {};
+                allUsersData[currentUser].memoRecords = {};
                 clearRecords = allUsersData[currentUser].clearRecords;
                 scoreRecords = allUsersData[currentUser].scoreRecords;
+                memoRecords = allUsersData[currentUser].memoRecords;
+                localStorage.setItem(STORAGE_KEY_MEMOS, JSON.stringify(memoRecords));
                 renderTable();
             }
         }
@@ -1849,7 +1992,7 @@
                 'score': 'スコア',
                 'level': 'Lv',
                 'version': 'Ver',
-                'title': 'ジャンル / 曲名',
+                'title': 'ジャンル / 曲名 <span style="font-size: 0.8em; font-weight: normal; color: #555;">(メモ)</span>',
                 'bpm': 'BPM',
                 'notes': 'ノーツ',
                 'diff': '難易度<span class="sp-br"></span><span class="diff-header-sub">(指数)</span>'
@@ -1975,6 +2118,7 @@
             const filterMedal = document.getElementById('filter-medal') ? document.getElementById('filter-medal').value : 'ALL';
             const filterVersion = document.getElementById('filter-version') ? document.getElementById('filter-version').value : 'ALL';
             const filterDiff = document.getElementById('filter-diff') ? document.getElementById('filter-diff').value : 'ALL';
+            const filterAffinity = document.getElementById('filter-affinity') ? document.getElementById('filter-affinity').value : 'ALL';
 
             const showUnreleased = document.getElementById('show-unreleased') ? document.getElementById('show-unreleased').checked : false;
             
@@ -2020,6 +2164,16 @@
                         if (!dClass.startsWith('中')) return false;
                     } else {
                         if (dClass !== filterDiff) return false;
+                    }
+                }
+
+                if (filterAffinity !== 'ALL') {
+                    const memo = memoRecords[s.id] || {};
+                    const aff = memo.affinity || '';
+                    if (filterAffinity === '未設定') {
+                        if (aff !== '') return false;
+                    } else {
+                        if (aff !== filterAffinity) return false;
                     }
                 }
                 return true;
@@ -2236,14 +2390,23 @@
                 const scoreDisplay = showScore ? '' : 'display: none;';
                 const compareDisplay = showCompare ? '' : 'display: none;';
 
-                // --- ここから変更 ---
-                // ジャンル名があればジャンル名、なければ曲名を自動生成のキーに使う
                 const searchKey = (song.genre && song.genre.trim() !== '') ? song.genre : song.title;
                 const autoWikiUrl = `https://popn.wiki/難易度表/${encodeURIComponent(searchKey)}`;
-                
-                // ★ 手動で登録されたURL（song.wikiUrl）があればそれを優先、空欄なら自動生成URL（autoWikiUrl）を使う
                 const finalWikiUrl = (song.wikiUrl && song.wikiUrl !== '') ? song.wikiUrl : autoWikiUrl;
-                // --- ここまで変更 ---
+
+                // メモ機能表示設定
+                const memo = memoRecords[song.id] || {};
+                const hasMemo = memo.comment || memo.sudden || memo.affinity;
+                let tooltipLines = [];
+                if (memo.affinity) tooltipLines.push(`相性: ${memo.affinity}`);
+                if (memo.sudden) tooltipLines.push(`SUDDEN+: ${memo.sudden}`);
+                if (memo.comment) tooltipLines.push(`コメント:\n${memo.comment}`);
+                const memoTooltip = tooltipLines.length > 0 ? tooltipLines.join('\n') : 'メモを追加・編集';
+
+                let affinityBadge = '';
+                if (memo.affinity) {
+                    affinityBadge = `<div class="memo-badge-${memo.affinity}" style="font-size: 0.7em;">${memo.affinity.substring(0, 2)}</div>`;
+                }
 
                 tr.innerHTML = `
                     <td class="col-medal" style="text-align: center; vertical-align: middle;">${medalDisplayHtml}</td>
@@ -2253,11 +2416,19 @@
                     <td class="col-version" style="text-align: center;"><span class="ver-badge">${song.version || '-'}</span></td>
                     <td class="col-banner" style="text-align: center;">${bannerHtml}</td>
                     <td class="col-title">
-                        <div style="font-size: 0.85em; color: #666;">${song.genre}</div>
-                        <div style="font-weight: bold;">
-                            <a href="${finalWikiUrl}" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none;">
-                                ${song.title} <span style="font-size: 0.8em; color: #2196F3;">🔗</span>
-                            </a>
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 5px;">
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-size: 0.85em; color: #666;">${song.genre}</div>
+                                <div style="font-weight: bold; word-break: break-all;">
+                                    <a href="${finalWikiUrl}" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none;">
+                                        ${song.title} <span style="font-size: 0.8em; color: #2196F3;">🔗</span>
+                                    </a>
+                                </div>
+                            </div>
+                            <div onclick="openMemoModal('${safeId}')" style="cursor: pointer; text-align: center; background: #f8f9fa; border-radius: 4px; padding: 4px; border: 1px solid #ddd; min-width: 36px; flex-shrink: 0;" title="${memoTooltip}">
+                                <div style="${hasMemo ? '' : 'opacity: 0.3;'} font-size: 1.2em; line-height: 1;">📝</div>
+                                ${affinityBadge}
+                            </div>
                         </div>
                     </td>
                     <td class="col-bpm" style="text-align: right;"><span>${song.bpm || '-'}</span></td>
@@ -2279,7 +2450,7 @@
 
             let levelLabel = currentViewLevel === 'ALL' ? '全体' : `Lv${currentViewLevel}`;
             if (searchQuery) levelLabel = `検索結果 ("${searchQuery}")`;
-            if (filterClear !== 'ALL' || filterMedal !== 'ALL' || filterVersion !== 'ALL' || filterDiff !== 'ALL') {
+            if (filterClear !== 'ALL' || filterMedal !== 'ALL' || filterVersion !== 'ALL' || filterDiff !== 'ALL' || filterAffinity !== 'ALL') {
                 levelLabel += ' (絞り込み中)';
             }
             
