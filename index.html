@@ -603,7 +603,7 @@
         // ==========================================
         // ★クラウド同期設定（GAS）と管理者パスワード
         // ==========================================
-        const GAS_URL = 'https://script.google.com/macros/s/AKfycbzEx9tpbcxbNWzL54wOn7EmYzoS2RzOaM3fJxXReN46CX9bJOrGjxpOe4tdVz7nPRs2bA/exec';
+        const GAS_URL = 'https://script.google.com/macros/s/AKfycbxHiAAGAO39wPDRMeavONe93xQDj9ULCCyi-VNqkV3a866gyahctinmXSjFO72hfEohCg/exec';
         
         // ★ 楽曲リストの編集用パスワード
         const ADMIN_PASSWORD = "1005"; 
@@ -901,7 +901,8 @@
                 const payload = {
                     type: isSongUpdate ? "updateSongs" : "updateClears",
                     targetUser: currentUser,
-                    songs: songs,
+                    // ★修正：楽曲更新モード(2番)の時だけ重い楽曲データを送り、記録保存(1番)の時は空にする
+                    songs: isSongUpdate ? songs : [], 
                     clearRecords: clearRecords,
                     scoreRecords: scoreRecords,
                     memoRecords: memoRecords
