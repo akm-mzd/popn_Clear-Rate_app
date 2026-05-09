@@ -45,6 +45,8 @@
         .stats-title { font-size: 14px; color: #666; font-weight: bold; }
         .stats-fraction { font-size: 18px; font-weight: bold; color: #333; }
         .stats-remain { font-size: 0.85em; font-weight: normal; color: #555; }
+        .stats-kurohishipercentage { font-size: 1.6em; font-weight: bold; color: #1a237e; }
+        .stats-kuroboshipercentage { font-size: 1.6em; font-weight: bold; color: #000051; }
         .stats-easypercentage { font-size: 1.6em; font-weight: bold; color: #2cbc21; }
         .stats-percentage { font-size: 1.6em; font-weight: bold; color: #d32f2f; }
         .stats-level { font-size: 1.2em; font-weight: bold; color: #0056b3; background: #e3f2fd; padding: 4px 10px; border-radius: 20px; }
@@ -361,6 +363,8 @@
                         <select id="filter-clear" onchange="renderTable()" style="padding: 4px;">
                             <option value="ALL">すべて</option>
                             <option value="uncleared">未クリアのみ</option>
+                            <option value="kurohishi_cleared">クリア済 (黒菱以上)</option>
+                            <option value="kuroboshi_cleared">クリア済 (黒星以上)</option>
                             <option value="cleared">クリア済 (イージー以上)</option>
                             <option value="normal_cleared">クリア済 (ノーマル以上)</option>
                         </select>
@@ -414,6 +418,8 @@
 
             <div class="stats-toggles">
                 <span style="font-size: 0.9em; font-weight: bold; color: #666; margin-right: auto;">📊 統計表示:</span>
+                <label><input type="checkbox" id="show-kurohishi-rate" onchange="renderTable()" style="margin:0;"> 黒菱</label>
+                <label><input type="checkbox" id="show-kuroboshi-rate" onchange="renderTable()" style="margin:0;"> 黒星</label>
                 <label><input type="checkbox" id="show-easy-rate" onchange="renderTable()" style="margin:0;"> イージー</label>
                 <label><input type="checkbox" id="show-normal-rate" checked onchange="renderTable()" style="margin:0;"> ノーマル</label>
                 <label><input type="checkbox" id="show-unreleased" onchange="renderTable()" style="margin:0;"> 未解禁を含む</label>
@@ -612,18 +618,17 @@
         const STORAGE_KEY_SONGS = 'popn_songs_data_v2';
         const STORAGE_KEY_CLEARS = 'popn_clear_data_v2';
         const STORAGE_KEY_SCORES = 'popn_score_data_v2';
-        const STORAGE_KEY_MEMOS = 'popn_memo_data_v2'; // 追加: メモ用キー
+        const STORAGE_KEY_MEMOS = 'popn_memo_data_v2';
 
         let songs = [];
         let allUsersData = {}; 
         let currentUser = localStorage.getItem('popn_current_user') || "Guest";
         let clearRecords = {}; 
         let scoreRecords = {}; 
-        let memoRecords = {}; // 追加: メモ用変数
+        let memoRecords = {}; 
         
         let isAdminAuthenticated = false;
 
-        // ★ マスターデータ編集時のパスワード確認関数
         function checkAdminAuth() {
             if (isAdminAuthenticated) return true;
             const pwd = prompt("この操作には管理者用パスワードが必要です．パスワードを入力してください:");
@@ -637,20 +642,20 @@
         }
 
         const MEDAL_TYPES = {
-            '':         { imgUrl: 'URLをペースト', label: '未プレイ', rank: 0, isEasyClear: false, isNormalClear: false },
-            '未解禁':   { imgUrl: '', label: '未解禁', rank: -1, isEasyClear: false, isNormalClear: false, excludeFromRate: true },
-            '黒丸':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/groove_02.png', label: '黒丸', rank: 1, isEasyClear: false, isNormalClear: false },
-            '黒菱':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/groove_01.png', label: '黒菱', rank: 2, isEasyClear: false, isNormalClear: false },
-            '黒星':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/groove_00.png', label: '黒星', rank: 3, isEasyClear: false, isNormalClear: false },
-            'イージー': { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/easy.png', label: 'イージー', rank: 4, isEasyClear: true, isNormalClear: false },
-            'ロングオフ': { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/long_off.png', label: 'ロングオフ', rank: 5, isEasyClear: true, isNormalClear: true },
-            '銅丸':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/bad_02.png', label: '銅丸', rank: 6, isEasyClear: true, isNormalClear: true },
-            '銅菱':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/bad_01.png', label: '銅菱', rank: 7, isEasyClear: true, isNormalClear: true },
-            '銅星':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/bad_00.png', label: '銅星', rank: 8, isEasyClear: true, isNormalClear: true },
-            '銀丸':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/full_combo_02.png', label: '銀丸', rank: 9, isEasyClear: true, isNormalClear: true },
-            '銀菱':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/full_combo_01.png', label: '銀菱', rank: 10, isEasyClear: true, isNormalClear: true },
-            '銀星':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/full_combo_00.png', label: '銀星', rank: 11, isEasyClear: true, isNormalClear: true },
-            '金星':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/perfect_00.png', label: '金星', rank: 12, isEasyClear: true, isNormalClear: true }
+            '':         { imgUrl: 'URLをペースト', label: '未プレイ', rank: 0, isKuroHishiClear: false, isKuroBoshiClear: false, isEasyClear: false, isNormalClear: false },
+            '未解禁':   { imgUrl: '', label: '未解禁', rank: -1, isKuroHishiClear: false, isKuroBoshiClear: false, isEasyClear: false, isNormalClear: false, excludeFromRate: true },
+            '黒丸':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/groove_02.png', label: '黒丸', rank: 1, isKuroHishiClear: false, isKuroBoshiClear: false, isEasyClear: false, isNormalClear: false },
+            '黒菱':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/groove_01.png', label: '黒菱', rank: 2, isKuroHishiClear: true, isKuroBoshiClear: false, isEasyClear: false, isNormalClear: false },
+            '黒星':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/groove_00.png', label: '黒星', rank: 3, isKuroHishiClear: true, isKuroBoshiClear: true, isEasyClear: false, isNormalClear: false },
+            'イージー': { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/easy.png', label: 'イージー', rank: 4, isKuroHishiClear: true, isKuroBoshiClear: true, isEasyClear: true, isNormalClear: false },
+            'ロングオフ': { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/long_off.png', label: 'ロングオフ', rank: 5, isKuroHishiClear: true, isKuroBoshiClear: true, isEasyClear: true, isNormalClear: true },
+            '銅丸':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/bad_02.png', label: '銅丸', rank: 6, isKuroHishiClear: true, isKuroBoshiClear: true, isEasyClear: true, isNormalClear: true },
+            '銅菱':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/bad_01.png', label: '銅菱', rank: 7, isKuroHishiClear: true, isKuroBoshiClear: true, isEasyClear: true, isNormalClear: true },
+            '銅星':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/bad_00.png', label: '銅星', rank: 8, isKuroHishiClear: true, isKuroBoshiClear: true, isEasyClear: true, isNormalClear: true },
+            '銀丸':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/full_combo_02.png', label: '銀丸', rank: 9, isKuroHishiClear: true, isKuroBoshiClear: true, isEasyClear: true, isNormalClear: true },
+            '銀菱':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/full_combo_01.png', label: '銀菱', rank: 10, isKuroHishiClear: true, isKuroBoshiClear: true, isEasyClear: true, isNormalClear: true },
+            '銀星':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/full_combo_00.png', label: '銀星', rank: 11, isKuroHishiClear: true, isKuroBoshiClear: true, isEasyClear: true, isNormalClear: true },
+            '金星':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/perfect_00.png', label: '金星', rank: 12, isKuroHishiClear: true, isKuroBoshiClear: true, isEasyClear: true, isNormalClear: true }
         };
 
         const MEDAL_COLORS = {
@@ -864,7 +869,6 @@
             switchUser();
         }
 
-        // ★ 新規追加：手動保存ボタンの処理
         async function manualSaveToCloud() {
             if (!GAS_URL || GAS_URL.trim() === '') {
                 alert("クラウド保存先のURLが設定されていません。");
@@ -901,14 +905,12 @@
                 const payload = {
                     type: isSongUpdate ? "updateSongs" : "updateClears",
                     targetUser: currentUser,
-                    // ★修正：楽曲更新モード(2番)の時だけ重い楽曲データを送り、記録保存(1番)の時は空にする
                     songs: isSongUpdate ? songs : [], 
                     clearRecords: clearRecords,
                     scoreRecords: scoreRecords,
                     memoRecords: memoRecords
                 };
 
-                // ★ マスターデータ編集時はパスワードを付与
                 if (isSongUpdate) {
                     payload.password = ADMIN_PASSWORD;
                 }
@@ -965,7 +967,6 @@
                 return; 
             }
 
-            // 個人の記録（パスワード不要）
             if (mode === "1" || mode === "3") {
                 if (!confirm(`このデバイスに保存されている記録を、ユーザー [${currentUser}] のデータとしてクラウドに上書きしますか？`)) return;
                 
@@ -1002,7 +1003,6 @@
                 }
             }
 
-            // 楽曲リスト（管理者パスワード必要）
             if (mode === "2" || mode === "3") {
                 if (!checkAdminAuth()) {
                     showLoading(false);
@@ -1248,7 +1248,6 @@
 
         // --- ランダム選曲機能関連 ---
         function openRandomModal() {
-            // レベルのチェックボックス
             const levels = [...new Set(songs.map(s => s.level))].filter(l => l).sort((a,b)=>b-a);
             let levelHtml = '';
             levels.forEach(l => {
@@ -1256,7 +1255,6 @@
             });
             document.getElementById('random-level-checkboxes').innerHTML = levelHtml;
 
-            // メダルのチェックボックス
             let medalHtml = `<label class="check-label"><input type="checkbox" class="rand-medal" value=""> (未プレイ)</label>`;
             Object.keys(MEDAL_TYPES).forEach(k => {
                 if (k === '' || k === '未解禁') return;
@@ -1264,7 +1262,6 @@
             });
             document.getElementById('random-medal-checkboxes').innerHTML = medalHtml;
 
-            // 難易度のチェックボックス
             const diffs = ['危険', '別格', '詐称', '強', '中(+)', '中(-)', '弱', '逆詐称', '入門', '未分類'];
             let diffHtml = '';
             diffs.forEach(d => {
@@ -1391,7 +1388,6 @@
         }
 
         async function importFromClipboard() {
-            // ★ 管理者認証
             if (!checkAdminAuth()) return;
 
             try {
@@ -1409,7 +1405,6 @@
         }
 
         async function importDataManual() {
-            // ★ 管理者認証
             if (!checkAdminAuth()) return;
 
             const text = document.getElementById('import-text').value;
@@ -1503,10 +1498,8 @@
         }
 
         async function updateBannerFromClipboard(id) {
-            // ★ スマホではバナー編集機能を無効化（早期リターン）
             if (window.innerWidth <= 768) return;
 
-            // ★ 管理者認証
             if (!checkAdminAuth()) return;
 
             try {
@@ -1579,10 +1572,16 @@
             statFractions.forEach(frac => { frac.style.fontSize = '1.3em'; });
             const statRemains = statsClone.querySelectorAll('.stats-remain');
             statRemains.forEach(rem => { rem.style.fontSize = '0.9em'; });
+            
+            const khPercs = statsClone.querySelectorAll('.stats-kurohishipercentage');
+            khPercs.forEach(perc => { perc.style.fontSize = '2.3em'; });
+            const kbPercs = statsClone.querySelectorAll('.stats-kuroboshipercentage');
+            kbPercs.forEach(perc => { perc.style.fontSize = '2.3em'; });
             const easyPercs = statsClone.querySelectorAll('.stats-easypercentage');
             easyPercs.forEach(perc => { perc.style.fontSize = '2.3em'; });
             const percs = statsClone.querySelectorAll('.stats-percentage');
             percs.forEach(perc => { perc.style.fontSize = '2.3em'; });
+            
             const levelBadges = statsClone.querySelectorAll('.stats-level');
             levelBadges.forEach(badge => {
                 badge.style.fontSize = '1.9em';
@@ -1721,7 +1720,6 @@
         }
 
         async function deleteLevelData() {
-            // ★ 管理者認証
             if (!checkAdminAuth()) return;
 
             const targetLevel = document.getElementById('delete-level').value;
@@ -1754,13 +1752,11 @@
         }
 
         function openAddModal() {
-            // ★ 管理者認証
             if (!checkAdminAuth()) return;
 
             document.getElementById('edit-modal-title').innerText = "楽曲データの新規追加";
-            document.getElementById('edit-delete-btn').style.display = 'none'; // 新規追加時は削除ボタンを隠す
+            document.getElementById('edit-delete-btn').style.display = 'none';
 
-            // フォームを空にする
             document.getElementById('edit-original-id').value = "";
             document.getElementById('edit-genre').value = "";
             document.getElementById('edit-title').value = "";
@@ -1776,13 +1772,11 @@
         }
 
         function openEditModal(id) {
-            // ★ 管理者認証
             if (!checkAdminAuth()) return;
 
             const song = songs.find(s => s.id === id);
             if (!song) return;
 
-            // ▼ 追加: 編集モードの表示に戻す
             document.getElementById('edit-modal-title').innerText = "楽曲データの編集";
             document.getElementById('edit-delete-btn').style.display = '';
 
@@ -1805,7 +1799,6 @@
         }
 
         async function deleteSong() {
-            // ★ 管理者認証
             if (!checkAdminAuth()) return;
 
             if(confirm("この楽曲をリストから削除しますか？\n（全ユーザーの記録も同時に削除されます）")) {
@@ -1828,11 +1821,10 @@
         }
 
         async function saveEditModal() {
-            // ★ 管理者認証
             if (!checkAdminAuth()) return;
 
             const originalId = document.getElementById('edit-original-id').value;
-            const isNew = (originalId === ""); // IDが空なら新規追加モード
+            const isNew = (originalId === ""); 
 
             const newGenre = document.getElementById('edit-genre').value.trim();
             const newTitle = document.getElementById('edit-title').value.trim();
@@ -1853,9 +1845,6 @@
             const parsed = parseDifficulty(newDiffRaw);
 
             if (isNew) {
-                // ==========================
-                // 新規追加の処理
-                // ==========================
                 if (songs.some(s => s.id === newId)) {
                     alert("同じジャンル・曲名・ノーツ数の楽曲が既に存在します。");
                     return;
@@ -1877,9 +1866,6 @@
                 });
                 alert("楽曲を新規追加しました！");
             } else {
-                // ==========================
-                // 既存編集の処理
-                // ==========================
                 const songIndex = songs.findIndex(s => s.id === originalId);
                 if (songIndex === -1) return;
 
@@ -1922,9 +1908,6 @@
             closeEditModal();
         }
 
-        // ==========================================
-        // ★ バナー画像アップロード＆自動リサイズ処理
-        // ==========================================
         function handleBannerFileUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -1933,7 +1916,6 @@
             reader.onload = function(e) {
                 const img = new Image();
                 img.onload = function() {
-                    // データ容量を抑えるため、横幅を最大250pxに自動リサイズします
                     const MAX_WIDTH = 250;
                     let width = img.width;
                     let height = img.height;
@@ -1949,11 +1931,9 @@
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
 
-                    // 画像を文字列(Base64)に変換して、URL入力欄に自動セットする
                     const dataUrl = canvas.toDataURL(file.type === 'image/jpeg' ? 'image/jpeg' : 'image/png');
                     document.getElementById('edit-banner-url').value = dataUrl;
                     
-                    // 次回も同じファイルを選べるように入力をリセット
                     event.target.value = '';
                 };
                 img.src = e.target.result;
@@ -2061,9 +2041,6 @@
             return 0;
         }
 
-        // ==========================================
-        // ★ ランク画像のURL定義
-        // ==========================================
         const RANK_IMAGES = {
             'S+':  'https://p.eagate.573.jp/game/popn/popn29/images/p/common/medal/rank_big_s_plus.png',
             'S':   'https://p.eagate.573.jp/game/popn/popn29/images/p/common/medal/rank_big_s.png',
@@ -2106,10 +2083,9 @@
 
         function handleScoreToggle() {
             const showScore = document.getElementById('show-score-col').checked;
-            // スコア表示がオンになったときだけ、スコアの降順に設定する
             if (showScore) {
                 currentSort = 'score';
-                sortDesc = true; // trueで降順
+                sortDesc = true; 
             }
             renderTable();
         }
@@ -2132,7 +2108,6 @@
             document.getElementById('th-score').style.display = showScore ? '' : 'none';
             document.getElementById('th-compare').style.display = showCompare ? '' : 'none';
 
-            // スマホ用表示切り替えのクラス操作
             const table = document.getElementById('song-table');
             if (showScore || showCompare) {
                 table.classList.add('mobile-hide-diff');
@@ -2150,6 +2125,8 @@
                 const medalInfo = MEDAL_TYPES[medalKey];
 
                 if (filterClear === 'uncleared' && medalInfo && medalInfo.isEasyClear) return false;
+                if (filterClear === 'kurohishi_cleared' && (!medalInfo || !medalInfo.isKuroHishiClear)) return false;
+                if (filterClear === 'kuroboshi_cleared' && (!medalInfo || !medalInfo.isKuroBoshiClear)) return false;
                 if (filterClear === 'cleared' && (!medalInfo || !medalInfo.isEasyClear)) return false;
                 if (filterClear === 'normal_cleared' && (!medalInfo || !medalInfo.isNormalClear)) return false;
 
@@ -2252,6 +2229,8 @@
             const tbody = document.getElementById('song-list');
             tbody.innerHTML = '';
 
+            let kuroHishiClearCount = 0;
+            let kuroBoshiClearCount = 0;
             let easyClearCount = 0; 
             let normalClearCount = 0; 
             let rateTotal = 0; 
@@ -2262,19 +2241,19 @@
             });
 
             let diffStats = {
-                '危険': { total: 0, easy: 0, normal: 0 },
-                '別格': { total: 0, easy: 0, normal: 0 },
-                '詐称': { total: 0, easy: 0, normal: 0 },
-                '強': { total: 0, easy: 0, normal: 0 },
-                '中(+)': { total: 0, easy: 0, normal: 0 },
-                '中(-)': { total: 0, easy: 0, normal: 0 },
-                '弱': { total: 0, easy: 0, normal: 0 },
-                '逆詐称': { total: 0, easy: 0, normal: 0 },
-                '入門': { total: 0, easy: 0, normal: 0 },
-                '未分類': { total: 0, easy: 0, normal: 0 }
+                '危険': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 },
+                '別格': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 },
+                '詐称': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 },
+                '強': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 },
+                '中(+)': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 },
+                '中(-)': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 },
+                '弱': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 },
+                '逆詐称': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 },
+                '入門': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 },
+                '未分類': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 }
             };
 
-            const isMobile = window.innerWidth <= 768; // スマホ判定
+            const isMobile = window.innerWidth <= 768;
 
             displaySongs.forEach(song => {
                 const medalKey = clearRecords[song.id] || '';
@@ -2295,6 +2274,14 @@
                     rateTotal++;
                     diffStats[dClass].total++;
                     
+                    if (medalInfo.isKuroHishiClear) {
+                        kuroHishiClearCount++;
+                        diffStats[dClass].kuroHishi++;
+                    }
+                    if (medalInfo.isKuroBoshiClear) {
+                        kuroBoshiClearCount++;
+                        diffStats[dClass].kuroBoshi++;
+                    }
                     if (medalInfo.isEasyClear) {
                         easyClearCount++;
                         diffStats[dClass].easy++;
@@ -2327,7 +2314,6 @@
                     ? `<img src="${medalInfo.imgUrl}" style="width: 32px; height: 32px; object-fit: contain; cursor: pointer; display: block; margin: 0 auto;" onclick="openMedalModal('${safeId}')" title="${medalInfo.label}">`
                     : `<div onclick="openMedalModal('${safeId}')" style="cursor: pointer; font-weight: bold; padding: 4px; border: 1px solid #ccc; border-radius: 4px; background: #fff; font-size: 0.8em; color: #555; white-space: nowrap;" title="クリックして変更">${medalInfo.label}</div>`;
 
-                // ★ スマホ時はバナーのクリック機能と関連スタイルを無効化
                 const bannerAction = isMobile ? '' : `onclick="updateBannerFromClipboard('${safeId}')"`;
                 const cursorStyle = isMobile ? 'default' : 'pointer';
                 const bannerTitle = isMobile ? '' : 'title="クリックしてコピーしたURLで上書き"';
@@ -2398,7 +2384,6 @@
                 const autoWikiUrl = `https://popn.wiki/難易度表/${encodeURIComponent(searchKey)}`;
                 const finalWikiUrl = (song.wikiUrl && song.wikiUrl !== '') ? song.wikiUrl : autoWikiUrl;
 
-                // メモ機能表示設定
                 const memo = memoRecords[song.id] || {};
                 const hasMemo = memo.comment || memo.sudden || memo.affinity;
                 let tooltipLines = [];
@@ -2447,8 +2432,13 @@
 
             updateSortHeaders();
 
+            const kuroHishiPerc = rateTotal === 0 ? 0 : ((kuroHishiClearCount / rateTotal) * 100).toFixed(1);
+            const kuroBoshiPerc = rateTotal === 0 ? 0 : ((kuroBoshiClearCount / rateTotal) * 100).toFixed(1);
             const easyPerc = rateTotal === 0 ? 0 : ((easyClearCount / rateTotal) * 100).toFixed(1);
             const normalPerc = rateTotal === 0 ? 0 : ((normalClearCount / rateTotal) * 100).toFixed(1);
+            
+            const kuroHishiRemain = rateTotal - kuroHishiClearCount;
+            const kuroBoshiRemain = rateTotal - kuroBoshiClearCount;
             const easyRemain = rateTotal - easyClearCount;
             const normalRemain = rateTotal - normalClearCount;
 
@@ -2458,6 +2448,8 @@
                 levelLabel += ' (絞り込み中)';
             }
             
+            const showKuroHishiRate = document.getElementById('show-kurohishi-rate') ? document.getElementById('show-kurohishi-rate').checked : false;
+            const showKuroBoshiRate = document.getElementById('show-kuroboshi-rate') ? document.getElementById('show-kuroboshi-rate').checked : false;
             const showEasyRate = document.getElementById('show-easy-rate') ? document.getElementById('show-easy-rate').checked : false;
             const showNormalRate = document.getElementById('show-normal-rate') ? document.getElementById('show-normal-rate').checked : true;
             const showMedalStats = document.getElementById('show-medal-stats') ? document.getElementById('show-medal-stats').checked : false;
@@ -2466,6 +2458,22 @@
             let statsHtml = `<div style="display: flex; flex-wrap: wrap; gap: 15px; width: 100%; justify-content: flex-end; align-items: baseline;">
                 <div class="stats-level">【${levelLabel}】</div>`;
 
+            if (showKuroHishiRate) {
+                statsHtml += `
+                    <div class="stats-group">
+                        <span class="stats-title">黒菱クリア以上:</span>
+                        <span class="stats-fraction">${kuroHishiClearCount} / ${rateTotal} <span class="stats-remain">(未クリア: ${kuroHishiRemain})</span></span>
+                        <span class="stats-kurohishipercentage">${kuroHishiPerc}%</span>
+                    </div>`;
+            }
+            if (showKuroBoshiRate) {
+                statsHtml += `
+                    <div class="stats-group">
+                        <span class="stats-title">黒星クリア以上:</span>
+                        <span class="stats-fraction">${kuroBoshiClearCount} / ${rateTotal} <span class="stats-remain">(未クリア: ${kuroBoshiRemain})</span></span>
+                        <span class="stats-kuroboshipercentage">${kuroBoshiPerc}%</span>
+                    </div>`;
+            }
             if (showEasyRate) {
                 statsHtml += `
                     <div class="stats-group">
@@ -2558,6 +2566,8 @@
                         const stat = diffStats[dKey];
                         if (stat.total === 0) return; 
                         
+                        const khPerc = ((stat.kuroHishi / stat.total) * 100).toFixed(1);
+                        const kbPerc = ((stat.kuroBoshi / stat.total) * 100).toFixed(1);
                         const ePerc = ((stat.easy / stat.total) * 100).toFixed(1);
                         const nPerc = ((stat.normal / stat.total) * 100).toFixed(1);
                         
@@ -2573,6 +2583,14 @@
                                 <div style="display: flex; justify-content: space-between; border-bottom: 1px dotted #eee; padding-bottom: 4px; margin-bottom: 4px;">
                                     <span style="font-weight: bold; color: ${dKey === '危険' ? '#FFD700' : '#333'}; text-shadow: ${dKey === '危険' ? styleObj.shadow : 'none'};">${dKey}</span>
                                     <span style="color: #666;">対象${stat.total}曲</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                                    <span style="color: #1a237e; font-weight: bold;">黒菱以上 <span style="color: #333;">${stat.kuroHishi}/${stat.total}</span></span>
+                                    <span style="color: #666;">${khPerc}%</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                                    <span style="color: #000051; font-weight: bold;">黒星以上 <span style="color: #333;">${stat.kuroBoshi}/${stat.total}</span></span>
+                                    <span style="color: #666;">${kbPerc}%</span>
                                 </div>
                                 <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
                                     <span style="color: #2cbc21; font-weight: bold;">イージー以上 <span style="color: #333;">${stat.easy}/${stat.total}</span></span>
