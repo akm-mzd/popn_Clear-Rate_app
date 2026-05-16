@@ -1582,18 +1582,31 @@
             title.style.color = '#333';
             headerFlex.appendChild(title);
 
-            // 凡例エリア
+            // 凡例エリア (2行対応)
             const legendContainer = document.createElement('div');
             legendContainer.style.display = 'flex';
-            legendContainer.style.flexWrap = 'wrap';
-            legendContainer.style.gap = '8px';
-            legendContainer.style.justifyContent = 'flex-end';
-            legendContainer.style.maxWidth = '50%';
+            legendContainer.style.flexDirection = 'column';
+            legendContainer.style.alignItems = 'flex-end';
+            legendContainer.style.gap = '4px';
             legendContainer.style.fontSize = '12px';
+
+            const row1 = document.createElement('div');
+            row1.style.display = 'flex';
+            row1.style.gap = '8px';
+
+            const row2 = document.createElement('div');
+            row2.style.display = 'flex';
+            row2.style.gap = '8px';
+
+            let currentRow = row1;
 
             sortedMedalKeys.forEach(k => {
                 const color = MEDAL_COLORS[k] || '#ccc';
                 const label = MEDAL_TYPES[k].label;
+                
+                if (label === '黒星') {
+                    currentRow = row2;
+                }
                 
                 const legendItem = document.createElement('div');
                 legendItem.style.display = 'flex';
@@ -1612,9 +1625,11 @@
                 
                 legendItem.appendChild(colorBox);
                 legendItem.appendChild(textSpan);
-                legendContainer.appendChild(legendItem);
+                currentRow.appendChild(legendItem);
             });
 
+            legendContainer.appendChild(row1);
+            legendContainer.appendChild(row2);
             headerFlex.appendChild(legendContainer);
             exportContainer.appendChild(headerFlex);
 
