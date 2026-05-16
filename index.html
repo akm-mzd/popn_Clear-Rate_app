@@ -1567,16 +1567,58 @@
             exportContainer.style.fontFamily = 'sans-serif';
             document.body.appendChild(exportContainer);
 
+            const sortedMedalKeys = Object.keys(MEDAL_TYPES)
+                .sort((a, b) => MEDAL_TYPES[b].rank - MEDAL_TYPES[a].rank);
+
+            const headerFlex = document.createElement('div');
+            headerFlex.style.display = 'flex';
+            headerFlex.style.justifyContent = 'space-between';
+            headerFlex.style.alignItems = 'flex-start';
+            headerFlex.style.marginBottom = '15px';
+
             const title = document.createElement('h2');
             title.innerText = `全体クリア・メダル状況 (User: ${currentUser})`;
-            title.style.margin = '0 0 15px 0';
+            title.style.margin = '0';
             title.style.color = '#333';
-            exportContainer.appendChild(title);
+            headerFlex.appendChild(title);
+
+            // 凡例エリア
+            const legendContainer = document.createElement('div');
+            legendContainer.style.display = 'flex';
+            legendContainer.style.flexWrap = 'wrap';
+            legendContainer.style.gap = '8px';
+            legendContainer.style.justifyContent = 'flex-end';
+            legendContainer.style.maxWidth = '50%';
+            legendContainer.style.fontSize = '12px';
+
+            sortedMedalKeys.forEach(k => {
+                const color = MEDAL_COLORS[k] || '#ccc';
+                const label = MEDAL_TYPES[k].label;
+                
+                const legendItem = document.createElement('div');
+                legendItem.style.display = 'flex';
+                legendItem.style.alignItems = 'center';
+                
+                const colorBox = document.createElement('span');
+                colorBox.style.display = 'inline-block';
+                colorBox.style.width = '12px';
+                colorBox.style.height = '12px';
+                colorBox.style.backgroundColor = color;
+                colorBox.style.border = '1px solid #aaa';
+                colorBox.style.marginRight = '4px';
+                
+                const textSpan = document.createElement('span');
+                textSpan.innerText = label;
+                
+                legendItem.appendChild(colorBox);
+                legendItem.appendChild(textSpan);
+                legendContainer.appendChild(legendItem);
+            });
+
+            headerFlex.appendChild(legendContainer);
+            exportContainer.appendChild(headerFlex);
 
             const targetLevels = ['50', '49', '48', '47', '46'];
-            const sortedMedalKeys = Object.keys(MEDAL_TYPES)
-                .filter(k => k !== '未解禁') // 未解禁は一覧から除外
-                .sort((a, b) => MEDAL_TYPES[b].rank - MEDAL_TYPES[a].rank);
 
             const table = document.createElement('table');
             table.style.borderCollapse = 'collapse';
@@ -1595,7 +1637,6 @@
                 
                 if (isValidUrl) {
                     let proxyUrl = m.imgUrl;
-                    // 画像のCORS対策としてプロキシを確実に適用する
                     if (proxyUrl.startsWith('http') && !proxyUrl.includes('wsrv.nl')) {
                         proxyUrl = `https://wsrv.nl/?url=${encodeURIComponent(proxyUrl)}`;
                     }
