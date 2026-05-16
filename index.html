@@ -340,7 +340,7 @@
 
                 <div class="controls" style="margin: 0; padding: 0; box-shadow: none; background: transparent; display: flex; align-items: center; justify-content: flex-end; flex-grow: 1;">
                     <button id="btn-overview-image" onclick="generateOverviewImage()" class="btn-image" style="padding: 8px 16px; margin-right: 10px; background-color: #ff9800;">全体統計画像</button>
-                    <button onclick="exportAsImage()" class="btn-image" style="padding: 8px 16px; margin-right: 10px;">画像として保存</button>
+                    <button onclick="exportAsImage(event)" class="btn-image" style="padding: 8px 16px; margin-right: 10px;">画像として保存</button>
 
                     <details style="position: relative;">
                         <summary style="padding: 6px 12px; border: 1px solid #ccc; background-color: #fff; border-radius: 4px; cursor: pointer; font-size: 0.9em; font-weight: bold; color: #555;">⚙️ 画像の列設定</summary>
@@ -1555,7 +1555,7 @@
         async function generateOverviewImage() {
             const btn = document.getElementById('btn-overview-image');
             const originalText = btn.innerText;
-            btn.innerText = "生成中...";
+            btn.innerText = "生成中... (画像読込待機)";
 
             const exportContainer = document.createElement('div');
             exportContainer.style.position = 'absolute';
@@ -1574,14 +1574,16 @@
             exportContainer.appendChild(title);
 
             const targetLevels = ['50', '49', '48', '47', '46'];
-            const sortedMedalKeys = Object.keys(MEDAL_TYPES).sort((a, b) => MEDAL_TYPES[b].rank - MEDAL_TYPES[a].rank);
+            const sortedMedalKeys = Object.keys(MEDAL_TYPES)
+                .filter(k => k !== '未解禁') // 未解禁は一覧から除外
+                .sort((a, b) => MEDAL_TYPES[b].rank - MEDAL_TYPES[a].rank);
 
             const table = document.createElement('table');
             table.style.borderCollapse = 'collapse';
             table.style.width = '100%';
             table.style.border = '2px solid #333';
 
-            // ヘッダー作成
+            // ヘッダー作成 (横軸：メダル)
             let theadHtml = `<tr style="background-color: #f2f2f2;">
                 <th style="border: 1px solid #ccc; padding: 8px; width: 60px;">Lv</th>
                 <th style="border: 1px solid #ccc; padding: 8px; width: 80px;">曲数</th>`;
@@ -1589,10 +1591,17 @@
             sortedMedalKeys.forEach(k => {
                 const m = MEDAL_TYPES[k];
                 const isValidUrl = m.imgUrl.startsWith('http') || m.imgUrl.startsWith('data:');
-                const iconHtml = isValidUrl 
-                    ? `<img src="${m.imgUrl}" style="height:32px; width:auto; vertical-align:middle;">` 
-                    : `<span style="font-size:12px;">${m.label}</span>`;
-                theadHtml += `<th style="border: 1px solid #ccc; padding: 8px; min-width: 50px;">${iconHtml}</th>`;
+                let iconHtml = `<span style="font-size:12px;">${m.label}</span>`;
+                
+                if (isValidUrl) {
+                    let proxyUrl = m.imgUrl;
+                    // 画像のCORS対策としてプロキシを確実に適用する
+                    if (proxyUrl.startsWith('http') && !proxyUrl.includes('wsrv.nl')) {
+                        proxyUrl = `https://wsrv.nl/?url=${encodeURIComponent(proxyUrl)}`;
+                    }
+                    iconHtml = `<img src="${proxyUrl}" crossorigin="anonymous" style="height:32px; width:auto; vertical-align:middle;">`;
+                }
+                theadHtml += `<th style="border: 1px solid #ccc; padding: 8px; min-width: 50px; text-align: center;">${iconHtml}</th>`;
             });
             theadHtml += `</tr>`;
             table.innerHTML = `<thead>${theadHtml}</thead>`;
@@ -1608,12 +1617,14 @@
 
                 lvSongs.forEach(s => {
                     const medalKey = clearRecords[s.id] || '';
-                    counts[medalKey]++;
+                    if (counts[medalKey] !== undefined) {
+                        counts[medalKey]++;
+                    }
                 });
 
                 const absTotal = lvSongs.length;
 
-                // 統計行
+                // 統計行 (縦軸：レベル)
                 let trStats = `<tr>
                     <td style="border: 1px solid #ccc; padding: 8px; font-weight: bold; font-size: 1.4em; text-align: center; background-color: #e3f2fd; color: #0056b3;">${lv}</td>
                     <td style="border: 1px solid #ccc; padding: 8px; font-weight: bold; font-size: 1.2em; text-align: center;">${absTotal}</td>`;
@@ -1647,7 +1658,7 @@
             table.appendChild(tbody);
             exportContainer.appendChild(table);
 
-            // 画像の読み込み完了を待機 (CORSプロキシ対応)
+            // 画像の読み込み完了を確実に待機
             const images = Array.from(exportContainer.querySelectorAll('img'));
             await Promise.all(images.map(img => {
                 return new Promise(res => {
@@ -1655,15 +1666,12 @@
                         res();
                     } else {
                         img.onload = res;
-                        img.onerror = res;
-                        const src = img.getAttribute('src');
-                        if (src && src.startsWith('http') && !src.includes('wsrv.nl')) {
-                            img.setAttribute('crossOrigin', 'anonymous');
-                            img.src = `https://wsrv.nl/?url=${encodeURIComponent(src)}`;
-                        }
+                        img.onerror = () => { console.warn("Image proxy failed:", img.src); res(); };
                     }
                 });
             }));
+
+            btn.innerText = "生成中... (描画中)";
 
             try {
                 const canvas = await html2canvas(exportContainer, { backgroundColor: '#fff', scale: 2, useCORS: true });
@@ -1681,10 +1689,7 @@
             }
         }
 
-        async function exportAsImage() {
-            const btn = document.querySelector('.btn-image'); // 元のボタン
-            // ※ボタンを特定するためにthis等を使う方が確実ですが、元の実装通りにクラスで取得
-            // 複数ある場合は問題になるため、ボタンの要素を直接指定する方が安全です
+        async function exportAsImage(event) {
             const exportBtn = event.currentTarget; 
             const originalText = exportBtn.innerText;
             
