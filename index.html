@@ -2658,7 +2658,7 @@
                     <td class="col-compare" style="text-align: center; background-color: #f0f8ff; ${compareDisplay}">${compareHtml}</td>
                     <td class="col-level" style="text-align: center;"><span class="level-badge">${song.level || '-'}</span></td>
                     <td class="col-version" style="text-align: center;"><span class="ver-badge">${song.version || '-'}</span></td>
-                    <td class="col-banner" style="text-align: center;">${bannerHtml}</td>
+                    <td class="col-banner" style="text-align: center; transition: background-color 0.2s;" ondragover="event.preventDefault(); this.style.backgroundColor='#e3f2fd';" ondragleave="event.preventDefault(); this.style.backgroundColor='';" ondrop="handleSingleBannerDrop(event, '${safeId}', this)">${bannerHtml}</td>
                     <td class="col-title">
                         <div style="display: flex; justify-content: space-between; align-items: center; gap: 5px;">
                             <div style="flex: 1; min-width: 0;">
@@ -2970,6 +2970,42 @@
                 };
                 reader.readAsDataURL(file);
             });
+        }
+
+        // ==========================================
+        // ★ 個別バナー画像の直接ドロップ処理
+        // ==========================================
+        async function handleSingleBannerDrop(event, songId, element) {
+            // ブラウザの標準動作をキャンセルして、背景色を元に戻す
+            event.preventDefault();
+            element.style.backgroundColor = ''; 
+
+            const files = event.dataTransfer.files;
+            if (!files || files.length === 0) return;
+
+            const file = files[0]; // 複数ドロップされても最初の1枚だけ使う
+            if (!file.type.startsWith('image/')) {
+                alert('画像ファイルをドロップしてください。');
+                return;
+            }
+
+            // ★ 管理者パスワードの確認
+            if (!checkAdminAuth()) return;
+
+            showLoading(true, 'バナー画像を更新中...');
+            try {
+                // ドロップされた行の楽曲データをIDから探し出して更新
+                const songIndex = songs.findIndex(s => s.id === songId);
+                if (songIndex !== -1) {
+                    const dataUrl = await processImageFileToDataURL(file); // 前に追加したリサイズ関数を再利用
+                    songs[songIndex].bannerUrl = dataUrl;
+                    renderTable(); // テーブルを再描画して反映
+                }
+            } catch (err) {
+                console.error(err);
+                alert('画像の処理に失敗しました。');
+            }
+            showLoading(false);
         }
 
     </script>
