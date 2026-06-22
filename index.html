@@ -295,7 +295,22 @@
                         <button onclick="openAddModal()" style="background-color: #0056b3; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">📝 新規楽曲を手動入力して追加</button>
                     </div>
                 </details>
+
+                <details style="margin-top: 10px; cursor: pointer; background: #e3f2fd; padding: 10px; border-radius: 4px;">
+                    <summary style="font-size: 0.9em; color: #0056b3; font-weight: bold;">➕ フォームに手入力して新規追加する場合はこちら</summary>
+                    <div style="margin-top: 10px; cursor: default; text-align: center;">
+                        <button onclick="openAddModal()" style="background-color: #0056b3; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">📝 新規楽曲を手動入力して追加</button>
+                    </div>
+                </details>
                 
+                <div id="banner-drop-zone" style="margin-top: 15px; border: 2px dashed #999; border-radius: 8px; padding: 20px; text-align: center; background: #fdfdfd; transition: all 0.2s; cursor: default;">
+                    <div style="font-weight: bold; color: #333; font-size: 1.05em; margin-bottom: 5px;">🖼️ ここにバナー画像（複数可）をドロップして一括更新</div>
+                    <div style="font-size: 0.85em; color: #666; line-height: 1.4;">
+                        ※ファイル名（拡張子抜き）が「曲名」と完全一致する楽曲のバナーを更新します。<br>
+                        ※現在選択している「表示レベル」の楽曲を優先してマッチングします。<br>
+                        <span style="color: #d32f2f; font-weight: bold; display: inline-block; margin-top: 5px;">🔑 画像ドロップ時に管理者パスワードが求められます</span>
+                    </div>
+                </div>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 15px 0;">
                 
                 <div class="flex-row" style="margin-bottom: 0;">
@@ -2884,21 +2899,21 @@
 
             dropZone.addEventListener('dragleave', (e) => {
                 e.preventDefault();
-                dropZone.style.backgroundColor = '#fafafa';
-                dropZone.style.borderColor = '#ccc';
+                dropZone.style.backgroundColor = '#fdfdfd';
+                dropZone.style.borderColor = '#999';
             });
 
             // ドロップ時の処理
             dropZone.addEventListener('drop', async (e) => {
                 e.preventDefault();
-                dropZone.style.backgroundColor = '#fafafa';
-                dropZone.style.borderColor = '#ccc';
+                dropZone.style.backgroundColor = '#fdfdfd';
+                dropZone.style.borderColor = '#999';
 
                 const files = e.dataTransfer.files;
                 if (!files || files.length === 0) return;
 
-                // 楽曲データのマスター（songs）を更新するため、管理者パスワードを要求
-                if (!checkAdminAuth()) return; 
+                // ★ 管理者パスワードの確認（キャンセル・失敗時は処理ストップ）
+                if (!checkAdminAuth()) return;
 
                 showLoading(true, '画像を処理・反映中...');
                 let updatedCount = 0;
@@ -2906,7 +2921,7 @@
 
                 for (let i = 0; i < files.length; i++) {
                     const file = files[i];
-                    if (!file.type.startsWith('image/')) continue; // 画像以外はスキップ
+                    if (!file.type.startsWith('image/')) continue;
 
                     // 拡張子を除外してファイル名を取得 (例: "neu.png" -> "neu")
                     const fileNameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
@@ -2970,7 +2985,7 @@
                 reader.readAsDataURL(file);
             });
         }
-        
+
     </script>
 </body>
 </html>
