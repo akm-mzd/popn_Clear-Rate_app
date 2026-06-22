@@ -445,8 +445,16 @@
         <!-- 追従するクリアレート領域 -->
         <div class="stats-container" id="stats-display"></div>
         <!-- 追従しない拡張統計情報領域（メダル内訳・難易度別） -->
+        
         <div id="extended-stats-display"></div>
 
+        <div id="banner-drop-zone" style="border: 2px dashed #ccc; border-radius: 8px; padding: 20px; text-align: center; background: #fafafa; margin-bottom: 15px; transition: all 0.2s;">
+            <div style="font-weight: bold; color: #555; font-size: 1.1em; margin-bottom: 5px;">🖼️ ここにバナー画像（複数可）をドロップして一括更新</div>
+            <div style="font-size: 0.85em; color: #666;">
+                ※ファイル名（拡張子抜き）が「曲名」と完全一致する楽曲のバナーを更新します。<br>
+                ※現在選択している「表示レベル」の楽曲を優先してマッチングします。
+            </div>
+        </div>
         <div id="capture-area" style="background-color: #f9f9f9; padding: 10px;">
             <div id="capture-stats-placeholder"></div>
             <table id="song-table">
@@ -2860,6 +2868,109 @@
             document.getElementById('stats-display').innerHTML = statsHtml;
             document.getElementById('extended-stats-display').innerHTML = extendedStatsHtml;
         }
+
+        // ==========================================
+        // ★ バナー画像の一括ドロップ（ドラッグ＆ドロップ）機能
+        // ==========================================
+        const dropZone = document.getElementById('banner-drop-zone');
+
+        if (dropZone) {
+            // ドラッグ中の見た目変更
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.style.backgroundColor = '#e3f2fd';
+                dropZone.style.borderColor = '#2196F3';
+            });
+
+            dropZone.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                dropZone.style.backgroundColor = '#fafafa';
+                dropZone.style.borderColor = '#ccc';
+            });
+
+            // ドロップ時の処理
+            dropZone.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                dropZone.style.backgroundColor = '#fafafa';
+                dropZone.style.borderColor = '#ccc';
+
+                const files = e.dataTransfer.files;
+                if (!files || files.length === 0) return;
+
+                // 楽曲データのマスター（songs）を更新するため、管理者パスワードを要求
+                if (!checkAdminAuth()) return; 
+
+                showLoading(true, '画像を処理・反映中...');
+                let updatedCount = 0;
+                let notFoundFiles = [];
+
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    if (!file.type.startsWith('image/')) continue; // 画像以外はスキップ
+
+                    // 拡張子を除外してファイル名を取得 (例: "neu.png" -> "neu")
+                    const fileNameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
+
+                    // 1. まず「現在表示しているレベル」の中から曲名が一致するものを探す
+                    // 2. 見つからなければ、全楽曲から探す
+                    let targetSong = songs.find(s => s.title === fileNameWithoutExt && (currentViewLevel === 'ALL' || s.level === currentViewLevel));
+                    if (!targetSong) {
+                        targetSong = songs.find(s => s.title === fileNameWithoutExt);
+                    }
+
+                    if (targetSong) {
+                        // 画像をリサイズしてBase64化
+                        const dataUrl = await processImageFileToDataURL(file);
+                        targetSong.bannerUrl = dataUrl;
+                        updatedCount++;
+                    } else {
+                        notFoundFiles.push(file.name);
+                    }
+                }
+
+                showLoading(false);
+                renderTable(); // テーブルを再描画して画像を反映
+
+                // 結果のフィードバック
+                if (updatedCount > 0) {
+                    alert(`${updatedCount}件のバナー画像を更新しました！\n（※クラウドに保存するには、上部の「☁️ 変更をクラウドに保存」から楽曲データを保存してください）`);
+                }
+                if (notFoundFiles.length > 0) {
+                    alert(`以下のファイル名に一致する楽曲が見つかりませんでした:\n${notFoundFiles.join('\n')}`);
+                }
+            });
+        }
+
+        // 画像ファイルをリサイズしてDataURL(Base64)に変換するヘルパー関数
+        function processImageFileToDataURL(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.onload = function() {
+                        const MAX_WIDTH = 250;
+                        let width = img.width;
+                        let height = img.height;
+
+                        if (width > MAX_WIDTH) {
+                            height = Math.round(height * (MAX_WIDTH / width));
+                            width = MAX_WIDTH;
+                        }
+
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        resolve(canvas.toDataURL(file.type === 'image/jpeg' ? 'image/jpeg' : 'image/png'));
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+        
     </script>
 </body>
 </html>
