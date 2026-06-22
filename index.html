@@ -295,18 +295,6 @@
                         <button onclick="openAddModal()" style="background-color: #0056b3; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">📝 新規楽曲を手動入力して追加</button>
                     </div>
                 </details>
-
-                <details style="margin-top: 10px; cursor: pointer; background: #e8f5e9; padding: 10px; border-radius: 4px;">
-                    <summary style="font-size: 0.9em; color: #2e7d32; font-weight: bold;">📦 画像ファイル一括自動登録（ドラッグ＆ドロップ）</summary>
-                    <div style="margin-top: 10px; cursor: default;">
-                        <div style="font-size: 0.85em; color: #555; margin-bottom: 8px;">
-                            画像ファイル名を <b>「ジャンル名.png」</b> または <b>「曲名.png」</b> （拡張子は .jpg 等でも可）にして、下の枠に複数まとめてドロップしてください。自動で対象の楽曲にBase64画像として紐付けます。
-                        </div>
-                        <div id="banner-drop-zone" style="border: 2px dashed #4caf50; padding: 30px; text-align: center; color: #4caf50; font-weight: bold; background: #fff; border-radius: 8px; transition: background 0.2s;">
-                            ここに画像ファイル（複数可）をドラッグ＆ドロップ
-                        </div>
-                    </div>
-                </details>
                 
                 <hr style="border: none; border-top: 1px solid #eee; margin: 15px 0;">
                 
@@ -454,7 +442,9 @@
             </div>
         </div>
 
+        <!-- 追従するクリアレート領域 -->
         <div class="stats-container" id="stats-display"></div>
+        <!-- 追従しない拡張統計情報領域（メダル内訳・難易度別） -->
         <div id="extended-stats-display"></div>
 
         <div id="capture-area" style="background-color: #f9f9f9; padding: 10px;">
@@ -480,6 +470,7 @@
         </div>
     </div>
 
+    <!-- ランダム選曲モーダル -->
     <div id="random-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content" style="max-width: 500px;">
             <h3>ランダムセレクト</h3>
@@ -501,7 +492,8 @@
             <button onclick="executeRandomSelect()" style="width: 100%; padding: 12px; background: #2196F3; color: white; font-weight: bold; font-size: 1.1em; border: none; border-radius: 4px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">この条件で抽選する！</button>
             
             <div id="random-result-area" style="margin-top: 15px; padding: 15px; background: #f0f8ff; border: 1px solid #bbdefb; border-radius: 8px; display: none; text-align: center; box-shadow: inset 0 0 5px rgba(0,0,0,0.05);">
-                </div>
+                <!-- 結果表示 -->
+            </div>
 
             <div class="modal-actions" style="justify-content: flex-end; margin-top: 15px;">
                 <button onclick="closeRandomModal()" style="border: 1px solid #ccc; background: #eee; padding: 8px 20px;">閉じる</button>
@@ -509,6 +501,7 @@
         </div>
     </div>
 
+    <!-- メモ入力モーダル -->
     <div id="memo-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content" style="max-width: 400px;">
             <h3 id="memo-modal-title">メモ</h3>
@@ -546,6 +539,7 @@
         </div>
     </div>
 
+    <!-- 楽曲編集モーダル -->
     <div id="edit-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content">
             <h3 id="edit-modal-title">楽曲データの編集</h3>
@@ -597,6 +591,7 @@
         </div>
     </div>
 
+    <!-- メダル・スコアモーダル等 -->
     <div id="medal-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content" style="max-width: 400px;">
             <h3 style="text-align: center; color: #555; border-bottom: 1px solid #eee; padding-bottom: 10px;">メダルを選択</h3>
@@ -619,6 +614,7 @@
         </div>
     </div>
 
+    <!-- 画像出力結果表示モーダル（スマホ用） -->
     <div id="image-result-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content" style="max-width: 95vw; max-height: 95vh; display: flex; flex-direction: column; align-items: center; padding: 15px;">
             <h3 style="margin-top: 0; margin-bottom: 10px;">画像の生成が完了しました</h3>
@@ -2483,4 +2479,387 @@
             let kuroBoshiClearCount = 0;
             let easyClearCount = 0; 
             let normalClearCount = 0; 
-            let rateTotal = 0
+            let rateTotal = 0; 
+            
+            let medalCounts = {};
+            Object.keys(MEDAL_TYPES).forEach(k => {
+                medalCounts[k] = 0;
+            });
+
+            let diffStats = {
+                '危険': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 },
+                '別格': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 },
+                '詐称': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 },
+                '強': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 },
+                '中(+)': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 },
+                '中(-)': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 },
+                '弱': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 },
+                '逆詐称': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 },
+                '入門': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 },
+                '未分類': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 }
+            };
+
+            const isMobile = window.innerWidth <= 768;
+
+            displaySongs.forEach(song => {
+                const medalKey = clearRecords[song.id] || '';
+                const medalInfo = MEDAL_TYPES[medalKey];
+                
+                medalCounts[medalKey]++;
+                
+                let dClass = song.diffClass || '未分類';
+                if (dClass === '中') {
+                    if (song.diffIndex !== null && song.diffIndex < 0) { dClass = '中(-)'; } else { dClass = '中(+)'; }
+                }
+                
+                if (!diffStats[dClass]) dClass = '未分類';
+                
+                if (medalInfo.excludeFromRate && !showUnreleased) {
+                    
+                } else {
+                    rateTotal++;
+                    diffStats[dClass].total++;
+                    
+                    if (medalInfo.isKuroHishiClear) {
+                        kuroHishiClearCount++;
+                        diffStats[dClass].kuroHishi++;
+                    }
+                    if (medalInfo.isKuroBoshiClear) {
+                        kuroBoshiClearCount++;
+                        diffStats[dClass].kuroBoshi++;
+                    }
+                    if (medalInfo.isEasyClear) {
+                        easyClearCount++;
+                        diffStats[dClass].easy++;
+                    }
+                    if (medalInfo.isNormalClear) {
+                        normalClearCount++;
+                        diffStats[dClass].normal++;
+                    }
+                }
+
+                const tr = document.createElement('tr');
+                if (song.notes >= 1537) tr.classList.add('spicy-gauge');
+                if (medalInfo.isEasyClear) tr.classList.add('cleared-row');
+
+                const styleObj = getDifficultyColor(song.diffClass, song.diffIndex);
+                let dClassStr = song.diffClass || '';
+                let dIndexStr = song.diffRaw.replace(dClassStr, '').trim();
+                if (!song.diffRaw.includes(dClassStr)) { dClassStr = song.diffRaw; dIndexStr = ''; }
+                
+                const diffHtml = `
+                    <div class="diff-wrapper" style="color: ${styleObj.color}; text-shadow: ${styleObj.shadow}; font-weight: bold;">
+                        <span class="diff-main">${dClassStr}</span><span class="diff-sub">${dIndexStr}</span>
+                    </div>
+                `;
+                
+                const safeId = song.id.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;");
+
+                const isValidMedalUrl = medalInfo.imgUrl.startsWith('http') || medalInfo.imgUrl.startsWith('data:');
+                const medalDisplayHtml = isValidMedalUrl
+                    ? `<img src="${medalInfo.imgUrl}" style="width: 32px; height: 32px; object-fit: contain; cursor: pointer; display: block; margin: 0 auto;" onclick="openMedalModal('${safeId}')" title="${medalInfo.label}">`
+                    : `<div onclick="openMedalModal('${safeId}')" style="cursor: pointer; font-weight: bold; padding: 4px; border: 1px solid #ccc; border-radius: 4px; background: #fff; font-size: 0.8em; color: #555; white-space: nowrap;" title="クリックして変更">${medalInfo.label}</div>`;
+
+                const bannerAction = isMobile ? '' : `onclick="updateBannerFromClipboard('${safeId}')"`;
+                const cursorStyle = isMobile ? 'default' : 'pointer';
+                const bannerTitle = isMobile ? '' : 'title="クリックしてコピーしたURLで上書き"';
+                const noImageTitle = isMobile ? '' : 'title="クリックしてコピーしたURLを自動ペースト"';
+                const noImageDeco = isMobile ? 'none' : 'underline';
+
+                const bannerHtml = song.bannerUrl && song.bannerUrl.trim() !== ''
+                    ? `<img src="${song.bannerUrl}" style="max-width: 100%; height: auto; max-height: 50px; border-radius: 4px; cursor: ${cursorStyle};" ${bannerAction} ${bannerTitle} onerror="this.style.display='none'" />`
+                    : `<span style="color: #aaa; font-size: 0.85em; font-weight: bold; text-decoration: ${noImageDeco}; cursor: ${cursorStyle};" ${bannerAction} ${noImageTitle}>No Image</span>`;
+
+                const myScore = scoreRecords[song.id];
+                const isCleared = medalInfo && medalInfo.isEasyClear;
+                const rankInfo = getScoreRankInfo(myScore, isCleared);
+
+                let scoreDisplayHtml = `<div style="color: #ccc; font-size: 0.8em; font-weight: normal;">未登録</div>`;
+                if (myScore !== undefined && myScore !== '') {
+                    const rankMark = rankInfo.isImage 
+                        ? `<img src="${rankInfo.imgUrl}" alt="${rankInfo.rank}" style="height: 40px; width: auto; vertical-align: middle; margin-top: 2px;">` 
+                        : `<div style="font-weight: bold; font-size: 0.9em; color: ${rankInfo.color};">${rankInfo.rank}</div>`;
+                    
+                    scoreDisplayHtml = `
+                        <div style="font-weight: bold; font-size: 1.1em; color: #333;">${myScore}</div>
+                        ${rankMark}
+                    `;
+                }
+
+                let compareHtml = '';
+                if (showCompare) {
+                    const targetUser = document.getElementById('compare-user-select').value;
+                    let targetScore = undefined;
+                    if (targetUser && allUsersData[targetUser] && allUsersData[targetUser].scoreRecords) {
+                        targetScore = allUsersData[targetUser].scoreRecords[song.id];
+                    }
+                    
+                    if (!targetUser) {
+                        compareHtml = `<div style="color: #ccc; font-size: 0.7em;">ユーザーを選択</div>`;
+                    } else if (targetScore === undefined || targetScore === '') {
+                        compareHtml = `<div style="color: #ccc; font-size: 0.8em;">未登録</div>`;
+                    } else {
+                        const tMedal = allUsersData[targetUser].clearRecords[song.id];
+                        const tIsCleared = tMedal ? MEDAL_TYPES[tMedal].isEasyClear : false;
+                        const tRankInfo = getScoreRankInfo(targetScore, tIsCleared);
+                        
+                        const tRankMark = tRankInfo.isImage 
+                            ? `<img src="${tRankInfo.imgUrl}" alt="${tRankInfo.rank}" style="height: 40px; width: auto; vertical-align: middle; margin-top: 1px;">` 
+                            : `<div style="font-size: 0.8em; color: ${tRankInfo.color}; font-weight: bold;">${tRankInfo.rank}</div>`;
+
+                        let diff = '';
+                        if (myScore !== undefined && myScore !== '') {
+                            const d = parseInt(myScore, 10) - parseInt(targetScore, 10);
+                            if (d > 0) diff = `<span style="color: #2cbc21; font-weight: bold; font-size: 0.85em;">(+${d})</span>`;
+                            else if (d < 0) diff = `<span style="color: #d32f2f; font-weight: bold; font-size: 0.85em;">(${d})</span>`;
+                            else diff = `<span style="color: #999; font-weight: bold; font-size: 0.85em;">(±0)</span>`;
+                        }
+                        
+                        compareHtml = `
+                            <div style="font-size: 0.95em; color: #555; font-weight: bold;">${targetScore}</div>
+                            ${tRankMark}
+                            <div style="margin-top: 2px;">${diff}</div>
+                        `;
+                    }
+                }
+
+                const scoreDisplay = showScore ? '' : 'display: none;';
+                const compareDisplay = showCompare ? '' : 'display: none;';
+
+                const searchKey = (song.genre && song.genre.trim() !== '') ? song.genre : song.title;
+                const autoWikiUrl = `https://popn.wiki/難易度表/${encodeURIComponent(searchKey)}`;
+                const finalWikiUrl = (song.wikiUrl && song.wikiUrl !== '') ? song.wikiUrl : autoWikiUrl;
+
+                const memo = memoRecords[song.id] || {};
+                const hasMemo = memo.comment || memo.sudden || memo.affinity;
+                let tooltipLines = [];
+                if (memo.affinity) tooltipLines.push(`相性: ${memo.affinity}`);
+                if (memo.sudden) tooltipLines.push(`SUDDEN+: ${memo.sudden}`);
+                if (memo.comment) tooltipLines.push(`コメント:\n${memo.comment}`);
+                const memoTooltip = tooltipLines.length > 0 ? tooltipLines.join('\n') : 'メモを追加・編集';
+
+                let affinityBadge = '';
+                if (memo.affinity) {
+                    affinityBadge = `<div class="memo-badge-${memo.affinity}" style="font-size: 0.7em;">${memo.affinity.substring(0, 2)}</div>`;
+                }
+
+                tr.innerHTML = `
+                    <td class="col-medal" style="text-align: center; vertical-align: middle;">${medalDisplayHtml}</td>
+                    <td class="col-score" style="text-align: center; cursor: pointer; background-color: #fafafa; ${scoreDisplay}" onclick="openScoreModal('${safeId}')" title="クリックしてスコア入力">${scoreDisplayHtml}</td>
+                    <td class="col-compare" style="text-align: center; background-color: #f0f8ff; ${compareDisplay}">${compareHtml}</td>
+                    <td class="col-level" style="text-align: center;"><span class="level-badge">${song.level || '-'}</span></td>
+                    <td class="col-version" style="text-align: center;"><span class="ver-badge">${song.version || '-'}</span></td>
+                    <td class="col-banner" style="text-align: center;">${bannerHtml}</td>
+                    <td class="col-title">
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 5px;">
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-size: 0.85em; color: #666;">${song.genre}</div>
+                                <div style="font-weight: bold; word-break: break-all;">
+                                    <a href="${finalWikiUrl}" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none;">
+                                        ${song.title} <span style="font-size: 0.8em; color: #2196F3;">🔗</span>
+                                    </a>
+                                </div>
+                            </div>
+                            <div onclick="openMemoModal('${safeId}')" style="cursor: pointer; text-align: center; background: #f8f9fa; border-radius: 4px; padding: 4px; border: 1px solid #ddd; min-width: 36px; flex-shrink: 0;" title="${memoTooltip}">
+                                <div style="${hasMemo ? '' : 'opacity: 0.3;'} font-size: 1.2em; line-height: 1;">📝</div>
+                                ${affinityBadge}
+                            </div>
+                        </div>
+                    </td>
+                    <td class="col-bpm" style="text-align: right;"><span>${song.bpm || '-'}</span></td>
+                    <td class="col-notes" style="text-align: right;"><span>${song.notes}</span></td>
+                    <td class="col-diff" style="text-align: center;">${diffHtml}</td>
+                    <td class="col-action no-export" style="text-align: center;">
+                        <button class="edit-btn" onclick="openEditModal('${safeId}')">✏️編集</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            updateSortHeaders();
+
+            const kuroHishiPerc = rateTotal === 0 ? 0 : ((kuroHishiClearCount / rateTotal) * 100).toFixed(1);
+            const kuroBoshiPerc = rateTotal === 0 ? 0 : ((kuroBoshiClearCount / rateTotal) * 100).toFixed(1);
+            const easyPerc = rateTotal === 0 ? 0 : ((easyClearCount / rateTotal) * 100).toFixed(1);
+            const normalPerc = rateTotal === 0 ? 0 : ((normalClearCount / rateTotal) * 100).toFixed(1);
+            
+            const kuroHishiRemain = rateTotal - kuroHishiClearCount;
+            const kuroBoshiRemain = rateTotal - kuroBoshiClearCount;
+            const easyRemain = rateTotal - easyClearCount;
+            const normalRemain = rateTotal - normalClearCount;
+
+            let levelLabel = currentViewLevel === 'ALL' ? '全体' : `Lv${currentViewLevel}`;
+            if (searchQuery) levelLabel = `検索結果 ("${searchQuery}")`;
+            if (filterClear !== 'ALL' || filterMedal !== 'ALL' || filterVersion !== 'ALL' || filterDiff !== 'ALL' || filterAffinity !== 'ALL') {
+                levelLabel += ' (絞り込み中)';
+            }
+            
+            const showKuroHishiRate = document.getElementById('show-kurohishi-rate') ? document.getElementById('show-kurohishi-rate').checked : false;
+            const showKuroBoshiRate = document.getElementById('show-kuroboshi-rate') ? document.getElementById('show-kuroboshi-rate').checked : false;
+            const showEasyRate = document.getElementById('show-easy-rate') ? document.getElementById('show-easy-rate').checked : false;
+            const showNormalRate = document.getElementById('show-normal-rate') ? document.getElementById('show-normal-rate').checked : true;
+            const showMedalStats = document.getElementById('show-medal-stats') ? document.getElementById('show-medal-stats').checked : false;
+            const showDiffStats = document.getElementById('show-diff-stats') ? document.getElementById('show-diff-stats').checked : false;
+
+            let statsHtml = `<div style="display: flex; flex-wrap: wrap; gap: 15px; width: 100%; justify-content: flex-end; align-items: baseline;">
+                <div class="stats-level">【${levelLabel}】</div>`;
+
+            if (showKuroHishiRate) {
+                statsHtml += `
+                    <div class="stats-group">
+                        <span class="stats-title">黒菱クリア以上:</span>
+                        <span class="stats-fraction">${kuroHishiClearCount} / ${rateTotal} <span class="stats-remain">(未クリア: ${kuroHishiRemain})</span></span>
+                        <span class="stats-kurohishipercentage">${kuroHishiPerc}%</span>
+                    </div>`;
+            }
+            if (showKuroBoshiRate) {
+                statsHtml += `
+                    <div class="stats-group">
+                        <span class="stats-title">黒星クリア以上:</span>
+                        <span class="stats-fraction">${kuroBoshiClearCount} / ${rateTotal} <span class="stats-remain">(未クリア: ${kuroBoshiRemain})</span></span>
+                        <span class="stats-kuroboshipercentage">${kuroBoshiPerc}%</span>
+                    </div>`;
+            }
+            if (showEasyRate) {
+                statsHtml += `
+                    <div class="stats-group">
+                        <span class="stats-title">イージークリア以上:</span>
+                        <span class="stats-fraction">${easyClearCount} / ${rateTotal} <span class="stats-remain">(未クリア: ${easyRemain})</span></span>
+                        <span class="stats-easypercentage">${easyPerc}%</span>
+                    </div>`;
+            }
+            if (showNormalRate) {
+                statsHtml += `
+                    <div class="stats-group">
+                        <span class="stats-title">ノーマルクリア以上:</span>
+                        <span class="stats-fraction">${normalClearCount} / ${rateTotal} <span class="stats-remain">(未クリア: ${normalRemain})</span></span>
+                        <span class="stats-percentage">${normalPerc}%</span>
+                    </div>`;
+            }
+            statsHtml += `</div>`;
+
+            let extendedStatsHtml = '';
+
+            if (showMedalStats || showDiffStats) {
+                extendedStatsHtml += `<div style="width: 100%; padding: 15px; background: #f1f8ff; border-radius: 6px; border: 1px solid #e3f2fd; box-sizing: border-box;">`;
+                
+                if (showMedalStats) {
+                    let chartData = [];
+                    let totalForChart = 0;
+                    
+                    const sortedMedalKeys = Object.keys(MEDAL_TYPES).sort((a, b) => MEDAL_TYPES[b].rank - MEDAL_TYPES[a].rank);
+
+                    sortedMedalKeys.forEach(k => {
+                        const m = MEDAL_TYPES[k];
+                        const count = medalCounts[k];
+                        
+                        if (m.excludeFromRate && !showUnreleased) return; 
+                        
+                        if (count > 0) {
+                            chartData.push({ key: k, label: m.label, count: count, color: MEDAL_COLORS[k] || '#ccc', rank: m.rank });
+                            totalForChart += count;
+                        }
+                    });
+
+                    let legendHtml = '';
+                    chartData.forEach(d => {
+                        let perc = totalForChart === 0 ? 0 : (d.count / totalForChart) * 100;
+                        let safeLabel = d.label.replace('🔒', '');
+                        legendHtml += `
+                            <div style="display: flex; align-items: center; font-size: 0.85em; white-space: nowrap;">
+                                <span style="display: inline-block; width: 12px; height: 12px; background: ${d.color}; border: 1px solid #aaa; margin-right: 4px; border-radius: 2px;"></span>
+                                <span style="color: #333;">${safeLabel}: <span style="font-weight:bold;">${perc.toFixed(1)}%</span></span>
+                            </div>
+                        `;
+                    });
+
+                    const pieChartUrl = generatePieChartBase64(chartData, 200);
+
+                    extendedStatsHtml += `
+                        <div style="font-weight: bold; color: #555; margin-bottom: 6px; font-size: 0.9em;">🏅 メダル別内訳</div>
+                        
+                        <div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: center; margin-bottom: 15px; padding: 15px; background: #fff; border-radius: 6px; border: 1px solid #e0e0e0; box-shadow: 0 1px 2px rgba(0,0,0,0.05); flex-shrink: 0;" alt="円グラフ">
+                            <img src="${pieChartUrl}" style="width: 120px; height: 120px; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.1); flex-shrink: 0;" alt="円グラフ">
+                            <div style="flex: 1; display: flex; flex-wrap: wrap; gap: 8px 12px; align-content: center;">
+                                ${legendHtml}
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(55px, 1fr)); gap: 6px; margin-bottom: ${showDiffStats ? '15px' : '0'};">
+                    `;
+                    sortedMedalKeys.forEach(k => {
+                        const m = MEDAL_TYPES[k];
+                        const count = medalCounts[k];
+                        const isValidMedalUrl = m.imgUrl.startsWith('http') || m.imgUrl.startsWith('data:');
+                        const iconHtml = isValidMedalUrl 
+                            ? `<img src="${m.imgUrl}" style="width: 26px; height: 26px; object-fit: contain; margin-bottom: 2px;">` 
+                            : `<div style="font-weight: bold; color: #555; font-size: 0.7em;">${m.label}</div>`;
+
+                        extendedStatsHtml += `
+                            <div style="background: #fff; padding: 6px 2px; border-radius: 4px; border: 1px solid #ddd; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                            ${iconHtml}
+                            <span style="color: #333; font-weight: bold; font-size: 1.1em; line-height: 1;">${count}</span>
+                            </div>
+                        `;
+                    });
+                    extendedStatsHtml += `</div>`;
+                }
+
+                if (showDiffStats) {
+                    extendedStatsHtml += `
+                        <div style="font-weight: bold; color: #555; margin-bottom: 6px; font-size: 0.9em; ${showMedalStats ? 'border-top: 1px dashed #ccc; padding-top: 10px;' : ''}">🎯 難易度（指数）別クリア率</div>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px;">
+                    `;
+                    const diffOrder = ['危険', '別格', '詐称', '強', '中(+)', '中(-)', '弱', '逆詐称', '入門', '未分類'];
+                    diffOrder.forEach(dKey => {
+                        const stat = diffStats[dKey];
+                        if (stat.total === 0) return; 
+                        
+                        const khPerc = ((stat.kuroHishi / stat.total) * 100).toFixed(1);
+                        const kbPerc = ((stat.kuroBoshi / stat.total) * 100).toFixed(1);
+                        const ePerc = ((stat.easy / stat.total) * 100).toFixed(1);
+                        const nPerc = ((stat.normal / stat.total) * 100).toFixed(1);
+                        
+                        let baseClass = dKey.startsWith('中') ? '中' : dKey;
+                        let baseIndex = dKey === '中(+)' ? 0.5 : (dKey === '中(-)' ? -0.5 : 0);
+                        
+                        const styleObj = getDifficultyColor(baseClass, baseIndex);
+                        let borderColor = styleObj.color.replace('0.3', '0.8').replace('1.0', '0.8');
+                        if (dKey === '危険') borderColor = '#333';
+                        
+                        extendedStatsHtml += `
+                            <div style="background: #fff; padding: 8px; border-radius: 4px; border: 1px solid #ddd; border-left: 4px solid ${borderColor}; box-shadow: 0 1px 2px rgba(0,0,0,0.05); font-size: 0.85em;">
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px dotted #eee; padding-bottom: 4px; margin-bottom: 4px;">
+                                    <span style="font-weight: bold; color: ${dKey === '危険' ? '#FFD700' : '#333'}; text-shadow: ${dKey === '危険' ? styleObj.shadow : 'none'};">${dKey}</span>
+                                    <span style="color: #666;">対象${stat.total}曲</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                                    <span style="color: #1a237e; font-weight: bold;">黒菱以上 <span style="color: #333;">${stat.kuroHishi}/${stat.total}</span></span>
+                                    <span style="color: #666;">${khPerc}%</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                                    <span style="color: #000051; font-weight: bold;">黒星以上 <span style="color: #333;">${stat.kuroBoshi}/${stat.total}</span></span>
+                                    <span style="color: #666;">${kbPerc}%</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                                    <span style="color: #2cbc21; font-weight: bold;">イージー以上 <span style="color: #333;">${stat.easy}/${stat.total}</span></span>
+                                    <span style="color: #666;">${ePerc}%</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: #d32f2f; font-weight: bold;">ノーマル以上 <span style="color: #333;">${stat.normal}/${stat.total}</span></span>
+                                    <span style="color: #666;">${nPerc}%</span>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    extendedStatsHtml += `</div>`;
+                }
+                extendedStatsHtml += `</div>`;
+            }
+            
+            document.getElementById('stats-display').innerHTML = statsHtml;
+            document.getElementById('extended-stats-display').innerHTML = extendedStatsHtml;
+        }
+    </script>
+</body>
+</html>
