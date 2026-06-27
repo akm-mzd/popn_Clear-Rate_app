@@ -54,7 +54,10 @@
                     <button onclick="syncLocalToCloud()" style="background-color: #4caf50; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">⬆️ 今のデバイスのデータを移行</button>
                     <button onclick="downloadSongsAndClearsJson()" style="background-color: #ff9800; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">💾 バックアップ (データ＋記録)</button>
                     <button onclick="downloadSongsJsonOnly()" style="background-color: #795548; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">💾 バックアップ (楽曲のみ)</button>
-                </div>
+
+                    <button onclick="document.getElementById('restore-file').click()" style="background-color: #9c27b0; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">📂 ファイルから復元</button>
+                    <input type="file" id="restore-file" accept=".json" style="display: none;" onchange="restoreFromJson(event)">
+                    </div>
                 
                 <details style="margin-top: 10px; cursor: pointer; background: #f5f5f5; padding: 10px; border-radius: 4px;">
                     <summary style="font-size: 0.9em; color: #666; font-weight: bold;">📝 手動でペーストして追加する場合はこちら</summary>
