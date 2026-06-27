@@ -254,37 +254,39 @@
 
         /* トップに戻るボタン用スタイル */
         #back-to-top {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 50px;
-            height: 50px;
-            background-color: #2196F3;
-            color: white;
-            border: none;
-            border-radius: 50%;
-            font-size: 24px;
-            font-weight: bold;
+            position: fixed !important;
+            bottom: 30px !important;
+            right: 20px !important;
+            width: 50px !important;
+            height: 50px !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background-color: #2196F3 !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 50% !important;
+            font-size: 24px !important;
+            font-weight: bold !important;
             cursor: pointer;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3) !important;
             display: none; /* 初期状態は非表示 */
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
+            justify-content: center !important;
+            align-items: center !important;
+            z-index: 9000 !important; /* 必ず一番上に表示 */
             transition: background-color 0.2s, transform 0.2s;
         }
         #back-to-top:hover {
-            background-color: #1976D2;
+            background-color: #1976D2 !important;
             transform: scale(1.1);
         }
 
         @media screen and (max-width: 768px) {
             #back-to-top {
-                bottom: 15px;
-                right: 15px;
-                width: 45px;
-                height: 45px;
-                font-size: 20px;
+                bottom: 80px !important; /* スマホ画面下のメニューバーを避ける */
+                right: 15px !important;
+                width: 45px !important;
+                height: 45px !important;
+                font-size: 20px !important;
             }
         }
         
@@ -3078,8 +3080,11 @@
         window.addEventListener('scroll', () => {
             const topBtn = document.getElementById('back-to-top');
             if (topBtn) {
+                // スマホでも確実にスクロール量を取得できるように修正
+                const scrollAmount = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+                
                 // 上から300px以上スクロールしたらボタンを表示
-                if (window.scrollY > 300) {
+                if (scrollAmount > 300) {
                     topBtn.style.display = 'flex';
                 } else {
                     topBtn.style.display = 'none';
@@ -3090,7 +3095,7 @@
         function scrollToTop() {
             window.scrollTo({
                 top: 0,
-                behavior: 'smooth' // スムーズにスクロール
+                behavior: 'smooth'
             });
         }
         
