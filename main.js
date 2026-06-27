@@ -2390,9 +2390,91 @@ window.addEventListener('scroll', () => {
     }
 });
 
+
+
 function scrollToTop() {
     window.scrollTo({
         top: 0,
         behavior: 'smooth'
     });
+}
+
+// ==========================================
+// ★ バックアップJSONからの復元機能
+// ==========================================
+async function restoreFromJson(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            
+            // ファイルの形式チェック
+            const hasSongs = data.songs && Array.isArray(data.songs) && data.songs.length > 0;
+            const hasRecords = data.clearRecords || data.scoreRecords || data.memoRecords;
+            const isSongOnly = Array.isArray(data) && data.length > 0 && data[0].id; // 「楽曲のみ」で出力した場合
+
+            if (!hasSongs && !hasRecords && !isSongOnly) {
+                alert('対応していないファイル形式です。');
+                return;
+            }
+
+            // 楽曲データが含まれる場合は管理者パスワードを要求
+            if (hasSongs || isSongOnly) {
+                if (!checkAdminAuth()) {
+                    event.target.value = ''; // ファイル選択をリセット
+                    return;
+                }
+            }
+
+            if (!confirm(`現在のデータを選択したファイル「${file.name}」の内容で上書きしますか？\n※現在の未保存の記録は消去され、元に戻せません。`)) {
+                event.target.value = '';
+                return;
+            }
+
+            showLoading(true, 'データを復元中...');
+
+            // 楽曲のみの配列だった場合
+            if (isSongOnly) {
+                songs = data;
+                localStorage.setItem(STORAGE_KEY_SONGS, JSON.stringify(songs));
+            } else {
+                // フルバックアップ形式の場合
+                if (hasSongs) {
+                    songs = data.songs;
+                    localStorage.setItem(STORAGE_KEY_SONGS, JSON.stringify(songs));
+                }
+                if (data.clearRecords) clearRecords = data.clearRecords;
+                if (data.scoreRecords) scoreRecords = data.scoreRecords;
+                if (data.memoRecords) memoRecords = data.memoRecords;
+
+                // 現在のユーザーデータに反映
+                if (!allUsersData[currentUser]) allUsersData[currentUser] = { clearRecords: {}, scoreRecords: {}, memoRecords: {} };
+                allUsersData[currentUser].clearRecords = clearRecords;
+                allUsersData[currentUser].scoreRecords = scoreRecords;
+                allUsersData[currentUser].memoRecords = memoRecords;
+
+                // ローカルストレージに保存
+                localStorage.setItem(STORAGE_KEY_CLEARS, JSON.stringify(clearRecords));
+                localStorage.setItem(STORAGE_KEY_SCORES, JSON.stringify(scoreRecords));
+                localStorage.setItem(STORAGE_KEY_MEMOS, JSON.stringify(memoRecords));
+            }
+
+            updateDynamicFilters();
+            renderTable();
+            showLoading(false);
+            
+            alert('データの復元が完了しました！\n※クラウドへも反映する場合は、上部の「☁️ 変更をクラウドに保存」または「⬆️ 今のデバイスのデータを移行」を実行してください。');
+
+        } catch (err) {
+            console.error(err);
+            alert('ファイルの読み込みに失敗しました。JSONファイルが壊れている可能性があります。');
+            showLoading(false);
+        }
+        
+        event.target.value = ''; // 次回も同じファイルを選択できるようにリセット
+    };
+    reader.readAsText(file);
 }
