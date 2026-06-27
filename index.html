@@ -229,6 +229,28 @@
             .user-selector-area select { flex-grow: 1; margin: 0; min-width: 150px; font-size: 16px; }
             .user-selector-area button { width: 100%; margin: 5px 0 0 0 !important; padding: 10px !important; font-size: 1em !important; box-sizing: border-box; }
         }
+    /* レベル選択ボタン用スタイル */
+        .level-btn {
+            padding: 6px 12px;
+            cursor: pointer;
+            border: 1px solid #ccc;
+            background-color: #fff;
+            border-radius: 4px;
+            font-size: 0.95em;
+            font-weight: bold;
+            color: #555;
+            transition: all 0.2s ease;
+        }
+        .level-btn:hover {
+            background-color: #f0f8ff;
+            border-color: #2196F3;
+        }
+        .level-btn.active {
+            background-color: #2196F3;
+            color: #fff;
+            border-color: #2196F3;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
@@ -334,11 +356,12 @@
 
         <div class="view-header">
             <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
-                <label style="font-weight: bold; font-size: 1.1em;">表示レベル: 
-                    <select id="view-level" onchange="changeViewLevel()">
-                        <option value="ALL">すべて表示</option>
-                    </select>
-                </label>
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <span style="font-weight: bold; font-size: 1.1em;">表示レベル:</span>
+                    <div id="view-level-buttons" style="display: flex; flex-wrap: wrap; gap: 6px;">
+                        <!-- JavaScriptでここにボタンが生成されます -->
+                    </div>
+                </div>
                 
                 <div style="display: flex; align-items: center; gap: 5px; flex-wrap: wrap;">
                     <input type="text" id="search-input" class="search-box" placeholder="🔍 ジャンル・曲名で全レベル検索..." oninput="handleSearch()">
@@ -1107,9 +1130,15 @@
                 }
             }
 
-            const viewLevelSelect = document.getElementById('view-level');
-            if (viewLevelSelect) {
-                viewLevelSelect.innerHTML = '<option value="ALL">すべて表示</option>';
+            const viewLevelContainer = document.getElementById('view-level-buttons');
+            if (viewLevelContainer) {
+                viewLevelContainer.innerHTML = '';
+                
+                const allBtn = document.createElement('button');
+                allBtn.className = `level-btn ${currentViewLevel === 'ALL' ? 'active' : ''}`;
+                allBtn.innerText = 'すべて';
+                allBtn.onclick = () => changeViewLevel('ALL');
+                viewLevelContainer.appendChild(allBtn);
                 
                 const levels = [...new Set(songs.map(s => s.level))].filter(l => l);
                 levels.sort((a, b) => {
@@ -1121,21 +1150,18 @@
                     return 0;
                 });
                 
-                levels.forEach(l => {
-                    const option = document.createElement('option');
-                    option.value = l;
-                    option.text = isNaN(parseInt(l, 10)) ? l : `Lv ${l}`;
-                    viewLevelSelect.appendChild(option);
-                });
-                
-                if (currentViewLevel === 'ALL') {
-                    viewLevelSelect.value = 'ALL';
-                } else if (levels.includes(currentViewLevel)) {
-                    viewLevelSelect.value = currentViewLevel;
-                } else if (levels.length > 0) {
-                    viewLevelSelect.value = 'ALL';
+                if (currentViewLevel !== 'ALL' && !levels.includes(currentViewLevel)) {
                     currentViewLevel = 'ALL';
+                    allBtn.classList.add('active');
                 }
+                
+                levels.forEach(l => {
+                    const btn = document.createElement('button');
+                    btn.className = `level-btn ${currentViewLevel === l ? 'active' : ''}`;
+                    btn.innerText = isNaN(parseInt(l, 10)) ? l : `Lv${l}`;
+                    btn.onclick = () => changeViewLevel(l);
+                    viewLevelContainer.appendChild(btn);
+                });
             }
         }
 
@@ -2209,9 +2235,10 @@
             }
         }
 
-        function changeViewLevel() {
+        function changeViewLevel(level) {
             document.getElementById('search-input').value = '';
-            currentViewLevel = document.getElementById('view-level').value;
+            currentViewLevel = level;
+            updateDynamicFilters();
             renderTable();
         }
 
