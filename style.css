@@ -147,6 +147,9 @@ details > summary::-webkit-details-marker { display: none; }
     /* スマホで管理メニューを非表示にする */
     #admin-controls { display: none !important; }
 
+    /* スマホで画像出力を非表示にする */
+    #image-export-area { display: none !important; }
+
     .flex-row { flex-direction: column; align-items: stretch; gap: 6px; }
     
     button, select, input.search-box { 
