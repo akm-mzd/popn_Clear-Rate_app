@@ -261,26 +261,60 @@ function addNewUser() {
     switchUser();
 }
 
+// ==========================================
+// ★ クラウド手動保存（3の両方で全ユーザー対応版）
+// ==========================================
 async function manualSaveToCloud() {
     if (!GAS_URL || GAS_URL.trim() === '') {
         alert("クラウド保存先のURLが設定されていません。");
         return;
     }
-    const mode = prompt(`何をクラウドに保存（同期）しますか？\n\n1 : 現在のユーザー [${currentUser}] の記録（クリア・スコア・メモ）\n2 : 楽曲リスト全体（※管理者パスワード必須）\n3 : 両方\n\n半角数字の 1, 2, 3 のいずれかを入力してください。`, "1");
+    const mode = prompt(`何をクラウドに保存（同期）しますか？\n\n1 : 現在のユーザー [${currentUser}] の記録（クリア・スコア・メモ）\n2 : 楽曲リスト全体（※管理者パスワード必須）\n3 : 両方（楽曲リスト ＋ 全ユーザーの記録）\n\n半角数字の 1, 2, 3 のいずれかを入力してください。`, "1");
 
     if (mode !== "1" && mode !== "2" && mode !== "3") {
         return; 
     }
 
+    // 保存を実行する前に、現在の画面の最新状態を確実に allUsersData へ反映させておく
+    if (!allUsersData[currentUser]) allUsersData[currentUser] = { clearRecords: {}, scoreRecords: {}, memoRecords: {} };
+    allUsersData[currentUser].clearRecords = clearRecords;
+    allUsersData[currentUser].scoreRecords = scoreRecords;
+    allUsersData[currentUser].memoRecords = memoRecords;
+
     let success1 = true;
     let success2 = true;
 
-    if (mode === "1" || mode === "3") {
-        success1 = await saveToCloud(false);
+    // 「1: 現在のユーザーのみ」の場合
+    if (mode === "1") {
+        success1 = await saveToCloud(false, currentUser);
     }
-    if (mode === "2" || mode === "3") {
+    
+    // 「2: 楽曲リストのみ」の場合
+    if (mode === "2") {
         if (!checkAdminAuth()) return;
         success2 = await saveToCloud(true);
+    }
+
+    // 「3: 両方（楽曲リスト ＋ 全ユーザーの記録）」の場合
+    if (mode === "3") {
+        if (!checkAdminAuth()) return;
+        
+        // ① まず楽曲リスト全体を保存
+        success2 = await saveToCloud(true);
+        if (!success2) return; // 楽曲の保存に失敗した場合は安全のため中断
+
+        // ② 続いて、登録されている全ユーザーを順番にクラウドへ保存
+        const users = Object.keys(allUsersData);
+        for (let i = 0; i < users.length; i++) {
+            const targetU = users[i];
+            const progressText = `全ユーザーを保存中 (${i + 1}/${users.length}): [${targetU}]`;
+            const res = await saveToCloud(false, targetU, progressText);
+            if (!res) {
+                success1 = false;
+                alert(`ユーザー [${targetU}] の保存中に通信エラーが発生しました。`);
+                break;
+            }
+        }
     }
     
     if (success1 && success2) {
@@ -288,19 +322,26 @@ async function manualSaveToCloud() {
     }
 }
 
-async function saveToCloud(isSongUpdate = false) {
+async function saveToCloud(isSongUpdate = false, targetUserName = currentUser, customLoadingText = null) {
     if (!GAS_URL || GAS_URL.trim() === '') return false;
 
-    showLoading(true, 'クラウドに保存中...');
+    // ローディング表示（カスタムテキストがあればそれを優先表示）
+    const defaultText = `クラウドに保存中... (${isSongUpdate ? '楽曲リスト' : targetUserName})`;
+    showLoading(true, customLoadingText || defaultText);
     let isSuccess = false;
     try {
+        // 指定されたターゲットユーザーのデータをallUsersDataから安全に取得
+        const targetClear = allUsersData[targetUserName]?.clearRecords || {};
+        const targetScore = allUsersData[targetUserName]?.scoreRecords || {};
+        const targetMemo = allUsersData[targetUserName]?.memoRecords || {};
+
         const payload = {
             type: isSongUpdate ? "updateSongs" : "updateClears",
-            targetUser: currentUser,
+            targetUser: targetUserName,
             songs: isSongUpdate ? songs : [], 
-            clearRecords: clearRecords,
-            scoreRecords: scoreRecords,
-            memoRecords: memoRecords
+            clearRecords: targetClear,
+            scoreRecords: targetScore,
+            memoRecords: targetMemo
         };
 
         if (isSongUpdate) {
@@ -316,11 +357,12 @@ async function saveToCloud(isSongUpdate = false) {
         if (result.status === 'error') {
             alert(result.message);
         } else {
-            if (!isSongUpdate) {
+            // 現在のユーザーを保存した場合は、メモリ内のデータも最新として同期
+            if (!isSongUpdate && targetUserName === currentUser) {
                 if (!allUsersData[currentUser]) allUsersData[currentUser] = { clearRecords: {}, scoreRecords: {}, memoRecords: {} };
-                allUsersData[currentUser].clearRecords = clearRecords;
-                allUsersData[currentUser].scoreRecords = scoreRecords;
-                allUsersData[currentUser].memoRecords = memoRecords;
+                allUsersData[currentUser].clearRecords = targetClear;
+                allUsersData[currentUser].scoreRecords = targetScore;
+                allUsersData[currentUser].memoRecords = targetMemo;
             }
             isSuccess = true;
         }
