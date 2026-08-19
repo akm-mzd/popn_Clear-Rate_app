@@ -1801,10 +1801,15 @@ function renderTable() {
     if (showScore) table.classList.add('has-score'); else table.classList.remove('has-score');
     if (showCompare) table.classList.add('has-compare'); else table.classList.remove('has-compare');
 
-    let displaySongs = songs.filter(s => {
+    // 1. 統計の計算に使うベース楽曲（レベル・検索キーワードのみ適用）
+    let baseSongs = songs.filter(s => {
         if (currentViewLevel !== 'ALL' && s.level !== currentViewLevel) return false;
         if (searchQuery && !(s.genre.toLowerCase().includes(searchQuery) || s.title.toLowerCase().includes(searchQuery))) return false;
+        return true;
+    });
 
+    // 2. 実際にテーブルに表示する楽曲（すべての絞り込みを適用）
+    let displaySongs = baseSongs.filter(s => {
         const medalKey = clearRecords[s.id] || '';
         const medalInfo = MEDAL_TYPES[medalKey];
 
@@ -1843,7 +1848,6 @@ function renderTable() {
         }
         return true;
     });
-
     if (currentSort === 'clear') {
         displaySongs.sort((a, b) => {
             let valA = MEDAL_TYPES[clearRecords[a.id] || ''].rank;
@@ -1939,7 +1943,8 @@ function renderTable() {
 
     const isMobile = window.innerWidth <= 768;
 
-    displaySongs.forEach(song => {
+    // ★ 統計の計算は「絞り込み前」の baseSongs で行う
+    baseSongs.forEach(song => {
         const medalKey = clearRecords[song.id] || '';
         const medalInfo = MEDAL_TYPES[medalKey];
         
@@ -1953,7 +1958,7 @@ function renderTable() {
         if (!diffStats[dClass]) dClass = '未分類';
         
         if (medalInfo.excludeFromRate && !showUnreleased) {
-            
+            // 除外
         } else {
             rateTotal++;
             diffStats[dClass].total++;
@@ -1975,6 +1980,12 @@ function renderTable() {
                 diffStats[dClass].normal++;
             }
         }
+    });
+
+    // ★ テーブルの描画は「絞り込み後」の displaySongs で行う
+    displaySongs.forEach(song => {
+        const medalKey = clearRecords[song.id] || '';
+        const medalInfo = MEDAL_TYPES[medalKey];
 
         const tr = document.createElement('tr');
         if (song.notes >= 1537) tr.classList.add('spicy-gauge');
