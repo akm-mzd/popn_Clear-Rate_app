@@ -560,19 +560,23 @@ function initMedalGrid() {
     const sortedMedalKeys = Object.keys(MEDAL_TYPES).sort((a, b) => MEDAL_TYPES[b].rank - MEDAL_TYPES[a].rank);
     
     sortedMedalKeys.forEach(k => {
-        const m = MEDAL_TYPES[k];
-        const isValidUrl = m.imgUrl.startsWith('http') || m.imgUrl.startsWith('data:');
-        const display = isValidUrl 
-            ? `<img src="${m.imgUrl}" alt="${m.label}">` 
-            : `<div class="fallback-text">${m.label}</div>`;
-        
-        html += `
-            <div class="medal-item" onclick="selectMedal('${k}')">
-                ${display}
-                <div style="font-size: 0.8em; color: #555; font-weight: bold;">${m.label}</div>
-            </div>
-        `;
-    });
+                const m = MEDAL_TYPES[k];
+                const count = medalCounts[k];
+                const isValidMedalUrl = m.imgUrl.startsWith('http') || m.imgUrl.startsWith('data:');
+                const iconHtml = isValidMedalUrl 
+                    ? `<img src="${m.imgUrl}" style="width: 26px; height: 26px; object-fit: contain; margin-bottom: 2px;">` 
+                    : `<div style="font-weight: bold; color: #555; font-size: 0.7em;">${m.label}</div>`;
+
+                // 未プレイ(空文字)の処理に対応
+                const filterKey = k === '' ? 'unplayed' : k;
+
+                extendedStatsHtml += `
+                    <div onclick="setMedalFilter('${filterKey}')" title="クリックしてこのメダルで絞り込む" style="cursor: pointer; background: #fff; padding: 6px 2px; border-radius: 4px; border: 1px solid #ddd; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: 0.2s;" onmouseover="this.style.background='#f0f8ff'; this.style.borderColor='#2196F3'" onmouseout="this.style.background='#fff'; this.style.borderColor='#ddd'">
+                    ${iconHtml}
+                    <span style="color: #333; font-weight: bold; font-size: 1.1em; line-height: 1;">${count}</span>
+                    </div>
+                `;
+            });
     grid.innerHTML = html;
 }
 
@@ -2518,4 +2522,27 @@ async function restoreFromJson(event) {
         event.target.value = ''; // 次回も同じファイルを選択できるようにリセット
     };
     reader.readAsText(file);
+}
+
+function setMedalFilter(filterVal) {
+    const medalSelect = document.getElementById('filter-medal');
+    if (medalSelect) {
+        medalSelect.value = filterVal;
+        
+        // 「さらに条件で絞り込む」メニューが閉じていたら自動で開く
+        const details = medalSelect.closest('details');
+        if (details && !details.open) {
+            details.open = true;
+        }
+        
+        // 絞り込みを適用
+        renderTable();
+        
+        // テーブルの少し上まで自動でスクロールする
+        const tableElement = document.getElementById('song-table');
+        if (tableElement) {
+            const y = tableElement.getBoundingClientRect().top + window.pageYOffset - 120;
+            window.scrollTo({top: y, behavior: 'smooth'});
+        }
+    }
 }
