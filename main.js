@@ -2042,7 +2042,7 @@ function renderTable() {
         const compareDisplay = showCompare ? '' : 'display: none;';
 
         const searchKey = (song.genre && song.genre.trim() !== '') ? song.genre : song.title;
-        const autoWikiUrl = `https://popn.wiki/難易度表/${encodeURIComponent(searchKey)}`;
+        const autoWikiUrl = `https://popn.wiki/search?q=${encodeURIComponent(searchKey)}`;
         const finalWikiUrl = (song.wikiUrl && song.wikiUrl !== '') ? song.wikiUrl : autoWikiUrl;
 
         const memo = memoRecords[song.id] || {};
