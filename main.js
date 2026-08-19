@@ -2155,119 +2155,67 @@ function renderTable() {
     let extendedStatsHtml = '';
 
     if (showMedalStats || showDiffStats) {
-            extendedStatsHtml += `<div style="width: 100%; padding: 15px; background: #f1f8ff; border-radius: 6px; border: 1px solid #e3f2fd; box-sizing: border-box;">`;
+        extendedStatsHtml += `<div style="width: 100%; padding: 15px; background: #f1f8ff; border-radius: 6px; border: 1px solid #e3f2fd; box-sizing: border-box;">`;
+        
+        if (showMedalStats) {
+            let chartData = [];
+            let totalForChart = 0;
             
-            if (showDiffStats) {
-                extendedStatsHtml += `
-                    <div style="font-weight: bold; color: #555; margin-bottom: 6px; font-size: 0.9em;">🎯 難易度（指数）別クリア率</div>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; margin-bottom: ${showMedalStats ? '15px' : '0'};">
-                `;
-                const diffOrder = ['危険', '別格', '詐称', '強', '中(+)', '中(-)', '弱', '逆詐称', '入門', '未分類'];
-                diffOrder.forEach(dKey => {
-                    const stat = diffStats[dKey];
-                    if (stat.total === 0) return; 
-                    
-                    const khPerc = ((stat.kuroHishi / stat.total) * 100).toFixed(1);
-                    const kbPerc = ((stat.kuroBoshi / stat.total) * 100).toFixed(1);
-                    const ePerc = ((stat.easy / stat.total) * 100).toFixed(1);
-                    const nPerc = ((stat.normal / stat.total) * 100).toFixed(1);
-                    
-                    let baseClass = dKey.startsWith('中') ? '中' : dKey;
-                    let baseIndex = dKey === '中(+)' ? 0.5 : (dKey === '中(-)' ? -0.5 : 0);
-                    
-                    const styleObj = getDifficultyColor(baseClass, baseIndex);
-                    let borderColor = styleObj.color.replace('0.3', '0.8').replace('1.0', '0.8');
-                    if (dKey === '危険') borderColor = '#333';
-                    
-                    extendedStatsHtml += `
-                        <div style="background: #fff; padding: 8px; border-radius: 4px; border: 1px solid #ddd; border-left: 4px solid ${borderColor}; box-shadow: 0 1px 2px rgba(0,0,0,0.05); font-size: 0.85em;">
-                            <div style="display: flex; justify-content: space-between; border-bottom: 1px dotted #eee; padding-bottom: 4px; margin-bottom: 4px;">
-                                <span style="font-weight: bold; color: ${dKey === '危険' ? '#FFD700' : '#333'}; text-shadow: ${dKey === '危険' ? styleObj.shadow : 'none'};">${dKey}</span>
-                                <span style="color: #666;">対象${stat.total}曲</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
-                                <span style="color: #1a237e; font-weight: bold;">黒菱以上 <span style="color: #333;">${stat.kuroHishi}/${stat.total}</span></span>
-                                <span style="color: #666;">${khPerc}%</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
-                                <span style="color: #000051; font-weight: bold;">黒星以上 <span style="color: #333;">${stat.kuroBoshi}/${stat.total}</span></span>
-                                <span style="color: #666;">${kbPerc}%</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
-                                <span style="color: #2cbc21; font-weight: bold;">イージー以上 <span style="color: #333;">${stat.easy}/${stat.total}</span></span>
-                                <span style="color: #666;">${ePerc}%</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between;">
-                                <span style="color: #d32f2f; font-weight: bold;">ノーマル以上 <span style="color: #333;">${stat.normal}/${stat.total}</span></span>
-                                <span style="color: #666;">${nPerc}%</span>
-                            </div>
-                        </div>
-                    `;
-                });
-                extendedStatsHtml += `</div>`;
-            }
+            const sortedMedalKeys = Object.keys(MEDAL_TYPES).sort((a, b) => MEDAL_TYPES[b].rank - MEDAL_TYPES[a].rank);
 
-            if (showMedalStats) {
-                let chartData = [];
-                let totalForChart = 0;
+            sortedMedalKeys.forEach(k => {
+                const m = MEDAL_TYPES[k];
+                const count = medalCounts[k];
                 
-                const sortedMedalKeys = Object.keys(MEDAL_TYPES).sort((a, b) => MEDAL_TYPES[b].rank - MEDAL_TYPES[a].rank);
+                if (m.excludeFromRate && !showUnreleased) return; 
+                
+                if (count > 0) {
+                    chartData.push({ key: k, label: m.label, count: count, color: MEDAL_COLORS[k] || '#ccc', rank: m.rank });
+                    totalForChart += count;
+                }
+            });
 
-                sortedMedalKeys.forEach(k => {
-                    const m = MEDAL_TYPES[k];
-                    const count = medalCounts[k];
-                    
-                    if (m.excludeFromRate && !showUnreleased) return; 
-                    
-                    if (count > 0) {
-                        chartData.push({ key: k, label: m.label, count: count, color: MEDAL_COLORS[k] || '#ccc', rank: m.rank });
-                        totalForChart += count;
-                    }
-                });
+            let legendHtml = '';
+            chartData.forEach(d => {
+                let perc = totalForChart === 0 ? 0 : (d.count / totalForChart) * 100;
+                let safeLabel = d.label.replace('🔒', '');
+                legendHtml += `
+                    <div style="display: flex; align-items: center; font-size: 0.85em; white-space: nowrap;">
+                        <span style="display: inline-block; width: 12px; height: 12px; background: ${d.color}; border: 1px solid #aaa; margin-right: 4px; border-radius: 2px;"></span>
+                        <span style="color: #333;">${safeLabel}: <span style="font-weight:bold;">${perc.toFixed(1)}%</span></span>
+                    </div>
+                `;
+            });
 
-                let legendHtml = '';
-                chartData.forEach(d => {
-                    let perc = totalForChart === 0 ? 0 : (d.count / totalForChart) * 100;
-                    let safeLabel = d.label.replace('🔒', '');
-                    legendHtml += `
-                        <div style="display: flex; align-items: center; font-size: 0.85em; white-space: nowrap;">
-                            <span style="display: inline-block; width: 12px; height: 12px; background: ${d.color}; border: 1px solid #aaa; margin-right: 4px; border-radius: 2px;"></span>
-                            <span style="color: #333;">${safeLabel}: <span style="font-weight:bold;">${perc.toFixed(1)}%</span></span>
-                        </div>
-                    `;
-                });
+            const pieChartUrl = generatePieChartBase64(chartData, 200);
 
-                const pieChartUrl = generatePieChartBase64(chartData, 200);
+            extendedStatsHtml += `
+                <div style="font-weight: bold; color: #555; margin-bottom: 6px; font-size: 0.9em;">🏅 メダル別内訳</div>
+                
+                <div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: center; margin-bottom: 15px; padding: 15px; background: #fff; border-radius: 6px; border: 1px solid #e0e0e0; box-shadow: 0 1px 2px rgba(0,0,0,0.05); flex-shrink: 0;" alt="円グラフ">
+                    <img src="${pieChartUrl}" style="width: 120px; height: 120px; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.1); flex-shrink: 0;" alt="円グラフ">
+                    <div style="flex: 1; display: flex; flex-wrap: wrap; gap: 8px 12px; align-content: center;">
+                        ${legendHtml}
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(55px, 1fr)); gap: 6px; margin-bottom: ${showDiffStats ? '15px' : '0'};">
+            `;
+            sortedMedalKeys.forEach(k => {
+                const m = MEDAL_TYPES[k];
+                const count = medalCounts[k];
+                const isValidMedalUrl = m.imgUrl.startsWith('http') || m.imgUrl.startsWith('data:');
+                const iconHtml = isValidMedalUrl 
+                    ? `<img src="${m.imgUrl}" style="width: 26px; height: 26px; object-fit: contain; margin-bottom: 2px;">` 
+                    : `<div style="font-weight: bold; color: #555; font-size: 0.7em;">${m.label}</div>`;
 
                 extendedStatsHtml += `
-                    <div style="font-weight: bold; color: #555; margin-bottom: 6px; font-size: 0.9em; ${showDiffStats ? 'border-top: 1px dashed #ccc; padding-top: 10px;' : ''}">🏅 メダル別内訳</div>
-                    
-                    <div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: center; margin-bottom: 15px; padding: 15px; background: #fff; border-radius: 6px; border: 1px solid #e0e0e0; box-shadow: 0 1px 2px rgba(0,0,0,0.05); flex-shrink: 0;" alt="円グラフ">
-                        <img src="${pieChartUrl}" style="width: 120px; height: 120px; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.1); flex-shrink: 0;" alt="円グラフ">
-                        <div style="flex: 1; display: flex; flex-wrap: wrap; gap: 8px 12px; align-content: center;">
-                            ${legendHtml}
-                        </div>
+                    <div style="background: #fff; padding: 6px 2px; border-radius: 4px; border: 1px solid #ddd; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                    ${iconHtml}
+                    <span style="color: #333; font-weight: bold; font-size: 1.1em; line-height: 1;">${count}</span>
                     </div>
-
-                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(55px, 1fr)); gap: 6px;">
                 `;
-                sortedMedalKeys.forEach(k => {
-                    const m = MEDAL_TYPES[k];
-                    const count = medalCounts[k];
-                    const isValidMedalUrl = m.imgUrl.startsWith('http') || m.imgUrl.startsWith('data:');
-                    const iconHtml = isValidMedalUrl 
-                        ? `<img src="${m.imgUrl}" style="width: 26px; height: 26px; object-fit: contain; margin-bottom: 2px;">` 
-                        : `<div style="font-weight: bold; color: #555; font-size: 0.7em;">${m.label}</div>`;
-
-                    extendedStatsHtml += `
-                        <div style="background: #fff; padding: 6px 2px; border-radius: 4px; border: 1px solid #ddd; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-                        ${iconHtml}
-                        <span style="color: #333; font-weight: bold; font-size: 1.1em; line-height: 1;">${count}</span>
-                        </div>
-                    `;
-                });
-                extendedStatsHtml += `</div>`;
-            }
+            });
             extendedStatsHtml += `</div>`;
         }
 
@@ -2322,6 +2270,7 @@ function renderTable() {
         }
         extendedStatsHtml += `</div>`;
     }
+
     
     document.getElementById('stats-display').innerHTML = statsHtml;
     document.getElementById('extended-stats-display').innerHTML = extendedStatsHtml;
