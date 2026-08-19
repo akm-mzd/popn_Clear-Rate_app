@@ -2055,7 +2055,7 @@ function renderTable() {
 
         let affinityBadge = '';
         if (memo.affinity) {
-            affinityBadge = `<div class="memo-badge-${memo.affinity}" style="font-size: 0.7em;">${memo.affinity.substring(0, 2)}</div>`;
+            affinityBadge = `<span class="memo-badge-${memo.affinity}" style="font-size: 0.8em; margin-left: 2px;">[${memo.affinity.substring(0, 2)}]</span>`;
         }
 
         tr.innerHTML = `
@@ -2066,18 +2066,17 @@ function renderTable() {
             <td class="col-version" style="text-align: center;"><span class="ver-badge">${song.version || '-'}</span></td>
             <td class="col-banner" style="text-align: center; transition: background-color 0.2s;" ondragover="event.preventDefault(); this.style.backgroundColor='#e3f2fd';" ondragleave="event.preventDefault(); this.style.backgroundColor='';" ondrop="handleSingleBannerDrop(event, '${safeId}', this)">${bannerHtml}</td>
             <td class="col-title">
-                <div style="display: flex; justify-content: space-between; align-items: center; gap: 5px;">
-                    <div style="flex: 1; min-width: 0;">
-                        <div style="font-size: 0.85em; color: #666;">${song.genre}</div>
-                        <div style="font-weight: bold; word-break: break-all;">
-                            <a href="${finalWikiUrl}" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none;">
-                                ${song.title} <span style="font-size: 0.8em; color: #2196F3;">🔗</span>
-                            </a>
-                        </div>
+                <div style="flex: 1; min-width: 0;">
+                    <div style="font-size: 0.85em; color: #666; display: flex; align-items: center; flex-wrap: wrap;">
+                        <span>${song.genre}</span>
+                        <span onclick="openMemoModal('${safeId}')" style="cursor: pointer; font-size: 1.2em; margin-left: 4px; padding: 2px; ${hasMemo ? '' : 'opacity: 0.4;'}" title="${memoTooltip}">
+                            📝${affinityBadge}
+                        </span>
                     </div>
-                    <div onclick="openMemoModal('${safeId}')" style="cursor: pointer; text-align: center; background: #f8f9fa; border-radius: 4px; padding: 4px; border: 1px solid #ddd; min-width: 36px; flex-shrink: 0;" title="${memoTooltip}">
-                        <div style="${hasMemo ? '' : 'opacity: 0.3;'} font-size: 1.2em; line-height: 1;">📝</div>
-                        ${affinityBadge}
+                    <div style="font-weight: bold; word-break: break-all; margin-top: 2px;">
+                        <a href="${finalWikiUrl}" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none;">
+                            ${song.title} <span style="font-size: 0.8em; color: #2196F3;">🔗</span>
+                        </a>
                     </div>
                 </div>
             </td>
