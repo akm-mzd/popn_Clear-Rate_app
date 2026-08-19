@@ -553,6 +553,29 @@ function resetFilters() {
     renderTable();
 }
 
+function setMedalFilter(filterVal) {
+    const medalSelect = document.getElementById('filter-medal');
+    if (medalSelect) {
+        medalSelect.value = filterVal;
+        
+        // 「さらに条件で絞り込む」メニューが閉じていたら自動で開く
+        const details = medalSelect.closest('details');
+        if (details && !details.open) {
+            details.open = true;
+        }
+        
+        // 絞り込みを適用
+        renderTable();
+        
+        // テーブルの少し上まで自動でスクロールする
+        const tableElement = document.getElementById('song-table');
+        if (tableElement) {
+            const y = tableElement.getBoundingClientRect().top + window.pageYOffset - 120;
+            window.scrollTo({top: y, behavior: 'smooth'});
+        }
+    }
+}
+
 function initMedalGrid() {
     const grid = document.getElementById('medal-grid');
     let html = '';
@@ -2524,25 +2547,4 @@ async function restoreFromJson(event) {
     reader.readAsText(file);
 }
 
-function setMedalFilter(filterVal) {
-    const medalSelect = document.getElementById('filter-medal');
-    if (medalSelect) {
-        medalSelect.value = filterVal;
-        
-        // 「さらに条件で絞り込む」メニューが閉じていたら自動で開く
-        const details = medalSelect.closest('details');
-        if (details && !details.open) {
-            details.open = true;
-        }
-        
-        // 絞り込みを適用
-        renderTable();
-        
-        // テーブルの少し上まで自動でスクロールする
-        const tableElement = document.getElementById('song-table');
-        if (tableElement) {
-            const y = tableElement.getBoundingClientRect().top + window.pageYOffset - 120;
-            window.scrollTo({top: y, behavior: 'smooth'});
-        }
-    }
-}
+
