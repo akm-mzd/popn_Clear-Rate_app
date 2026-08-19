@@ -1094,7 +1094,7 @@ async function generateOverviewImage() {
     // ヘッダー作成 (横軸：メダル)
     let theadHtml = `<tr style="background-color: #f2f2f2;">
         <th style="border: 1px solid #ccc; padding: 8px; width: 60px;">Lv</th>
-        <th style="border: 1px solid #ccc; padding: 8px; width: 80px;">曲数</th>`;
+        <th style="border: 1px solid #ccc; padding: 8px; width: 100px; font-size: 0.9em;">クリア数<br>/ 曲数</th>`;
     
     sortedMedalKeys.forEach(k => {
         const m = MEDAL_TYPES[k];
@@ -1121,11 +1121,16 @@ async function generateOverviewImage() {
 
         let counts = {};
         sortedMedalKeys.forEach(k => counts[k] = 0);
+        let clearedCount = 0; // クリア数をカウントする変数を追加
 
         lvSongs.forEach(s => {
             const medalKey = clearRecords[s.id] || '';
             if (counts[medalKey] !== undefined) {
                 counts[medalKey]++;
+            }
+            // イージークリア以上のメダルがついているものをクリアとしてカウント
+            if (MEDAL_TYPES[medalKey] && MEDAL_TYPES[medalKey].isEasyClear) {
+                clearedCount++;
             }
         });
 
@@ -1134,7 +1139,10 @@ async function generateOverviewImage() {
         // 統計行 (縦軸：レベル)
         let trStats = `<tr>
             <td style="border: 1px solid #ccc; padding: 8px; font-weight: bold; font-size: 1.4em; text-align: center; background-color: #e3f2fd; color: #0056b3;">${lv}</td>
-            <td style="border: 1px solid #ccc; padding: 8px; font-weight: bold; font-size: 1.2em; text-align: center;">${absTotal}</td>`;
+            <td style="border: 1px solid #ccc; padding: 8px; font-weight: bold; text-align: center; line-height: 1.2;">
+                <span style="font-size: 1.2em; color: #d32f2f;">${clearedCount}</span><br>
+                <span style="font-size: 0.85em; color: #666;">/ ${absTotal}</span>
+            </td>`;
         
         sortedMedalKeys.forEach(k => {
             const count = counts[k];
