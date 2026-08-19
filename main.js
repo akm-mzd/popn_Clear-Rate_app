@@ -2270,7 +2270,6 @@ function renderTable() {
         }
         extendedStatsHtml += `</div>`;
     }
-
     
     document.getElementById('stats-display').innerHTML = statsHtml;
     document.getElementById('extended-stats-display').innerHTML = extendedStatsHtml;
