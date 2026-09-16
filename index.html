@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pop’n Clear Rate app</title>
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
 
@@ -79,7 +78,15 @@
                     <div style="font-size: 0.85em; color: #666; line-height: 1.4;">
                         ※ファイル名（拡張子抜き）が「曲名」と完全一致する楽曲のバナーを更新します。<br>
                         ※現在選択している「表示レベル」の楽曲を優先してマッチングします。<br>
+                        ※アップロードされた画像はクラウド（Google Drive）にURLとして保存されます。<br>
                         <span style="color: #d32f2f; font-weight: bold; display: inline-block; margin-top: 5px;">🔑 画像ドロップ時に管理者パスワードが求められます</span>
+                    </div>
+                </div>
+
+                <div style="margin-top: 10px; text-align: center;">
+                    <button onclick="migrateBannersToCloud()" style="background-color: #ff9800; color: white; font-weight: bold; padding: 10px 16px; border: none; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">🖼️ 既存のバナー画像をクラウドURLへ一括移行</button>
+                    <div style="font-size: 0.8em; color: #666; margin-top: 5px;">
+                        以前アップロードした画像（Base64埋め込み）を、クラウドの画像URLに変換して軽量化します。
                     </div>
                 </div>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 15px 0;">
