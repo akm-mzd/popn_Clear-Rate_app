@@ -1,7 +1,7 @@
 // ==========================================
 // ★クラウド同期設定（GAS）と管理者パスワード
 // ==========================================
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbxHiAAGAO39wPDRMeavONe93xQDj9ULCCyi-VNqkV3a866gyahctinmXSjFO72hfEohCg/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbxgqligDs082E6MZANDpYOJvpHQr9Kvy_ndRMLBuRtO6v_idgBLjeYuM1OhMPpSNt30oQ/exec';
 
 // ★ 楽曲リストの編集用パスワード
 const ADMIN_PASSWORD = "1005"; 
@@ -100,6 +100,22 @@ function generatePieChartBase64(data, size = 240) {
     });
 
     return canvas.toDataURL();
+}
+
+// html2canvas は画像出力ボタンを使う時だけ必要なので、
+// 初期表示をブロックしないよう使用直前に動的読み込みする
+let html2canvasLoadPromise = null;
+function ensureHtml2Canvas() {
+    if (typeof html2canvas !== 'undefined') return Promise.resolve();
+    if (html2canvasLoadPromise) return html2canvasLoadPromise;
+    html2canvasLoadPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+    return html2canvasLoadPromise;
 }
 
 let currentMedalEditId = null;
@@ -1006,6 +1022,8 @@ function clearSearch() { document.getElementById('search-input').value = ''; ren
 async function generateOverviewImage() {
     const btn = document.getElementById('btn-overview-image');
     const originalText = btn.innerText;
+    btn.innerText = "準備中... (ライブラリ読込)";
+    await ensureHtml2Canvas();
     btn.innerText = "生成中... (画像読込待機)";
 
     const exportContainer = document.createElement('div');
@@ -1224,6 +1242,10 @@ async function exportAsImage(event) {
         alert("画像に出力する項目を1つ以上選択してください。");
         return;
     }
+
+    exportBtn.innerText = "準備中... (ライブラリ読込)";
+    await ensureHtml2Canvas();
+    exportBtn.innerText = originalText;
 
     exportBtn.innerText = "生成中... (画像読込待機)";
     
@@ -1600,6 +1622,31 @@ async function saveEditModal() {
     closeEditModal();
 }
 
+// ★追加：Base64のDataURLをGAS経由でDriveにアップロードし、公開URLを取得する
+// 失敗した場合はnullを返す（呼び出し側でBase64のままフォールバックする）
+async function uploadImageToCloud(dataUrl, fileNameHint = 'banner') {
+    if (!GAS_URL || GAS_URL.trim() === '') return null;
+    try {
+        const response = await fetch(GAS_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                type: 'uploadBanner',
+                imageData: dataUrl,
+                fileName: fileNameHint
+            })
+        });
+        const result = await response.json();
+        if (result.status === 'success' && result.url) {
+            return result.url;
+        }
+        console.warn('画像アップロード失敗:', result.message);
+        return null;
+    } catch (err) {
+        console.error('画像アップロード通信エラー:', err);
+        return null;
+    }
+}
+
 function handleBannerFileUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -1607,7 +1654,7 @@ function handleBannerFileUpload(event) {
     const reader = new FileReader();
     reader.onload = function(e) {
         const img = new Image();
-        img.onload = function() {
+        img.onload = async function() {
             const MAX_WIDTH = 250;
             let width = img.width;
             let height = img.height;
@@ -1624,8 +1671,19 @@ function handleBannerFileUpload(event) {
             ctx.drawImage(img, 0, 0, width, height);
 
             const dataUrl = canvas.toDataURL(file.type === 'image/jpeg' ? 'image/jpeg' : 'image/png');
-            document.getElementById('edit-banner-url').value = dataUrl;
-            
+
+            // ★変更：Base64のまま埋め込まず、クラウドにアップロードしてURL化する
+            showLoading(true, '画像をアップロード中...');
+            const uploadedUrl = await uploadImageToCloud(dataUrl, 'banner');
+            showLoading(false);
+
+            if (uploadedUrl) {
+                document.getElementById('edit-banner-url').value = uploadedUrl;
+            } else {
+                document.getElementById('edit-banner-url').value = dataUrl;
+                alert('クラウドへの画像アップロードに失敗したため、一時的にローカル画像（Base64）として保存します。\n通信環境を確認のうえ、後でもう一度アップロードし直すことをおすすめします。');
+            }
+
             event.target.value = '';
         };
         img.src = e.target.result;
@@ -2033,7 +2091,7 @@ function renderTable() {
 
         const isValidMedalUrl = medalInfo.imgUrl.startsWith('http') || medalInfo.imgUrl.startsWith('data:');
         const medalDisplayHtml = isValidMedalUrl
-            ? `<img src="${medalInfo.imgUrl}" style="width: 32px; height: 32px; object-fit: contain; cursor: pointer; display: block; margin: 0 auto;" onclick="openMedalModal('${safeId}')" title="${medalInfo.label}">`
+            ? `<img src="${medalInfo.imgUrl}" loading="lazy" style="width: 32px; height: 32px; object-fit: contain; cursor: pointer; display: block; margin: 0 auto;" onclick="openMedalModal('${safeId}')" title="${medalInfo.label}">`
             : `<div onclick="openMedalModal('${safeId}')" style="cursor: pointer; font-weight: bold; padding: 4px; border: 1px solid #ccc; border-radius: 4px; background: #fff; font-size: 0.8em; color: #555; white-space: nowrap;" title="クリックして変更">${medalInfo.label}</div>`;
 
         const bannerAction = isMobile ? '' : `onclick="updateBannerFromClipboard('${safeId}')"`;
@@ -2392,9 +2450,10 @@ if (dropZone) {
             }
 
             if (targetSong) {
-                // 画像をリサイズしてBase64化
-                const dataUrl = await processImageFileToDataURL(file);
-                targetSong.bannerUrl = dataUrl;
+                // 画像をリサイズしてクラウドにアップロード（失敗時はBase64のままフォールバック）
+                showLoading(true, `画像を処理・反映中... (${i + 1}/${files.length})`);
+                const bannerUrl = await processImageFileAndUpload(file, fileNameWithoutExt);
+                targetSong.bannerUrl = bannerUrl;
                 updatedCount++;
             } else {
                 notFoundFiles.push(file.name);
@@ -2412,6 +2471,13 @@ if (dropZone) {
             alert(`以下のファイル名に一致する楽曲が見つかりませんでした:\n${notFoundFiles.join('\n')}`);
         }
     });
+}
+
+// ★追加：画像ファイルをリサイズ→クラウドにアップロードしてURLを返す。失敗時はBase64にフォールバック
+async function processImageFileAndUpload(file, fileNameHint) {
+    const dataUrl = await processImageFileToDataURL(file);
+    const uploadedUrl = await uploadImageToCloud(dataUrl, fileNameHint || file.name.replace(/\.[^/.]+$/, ""));
+    return uploadedUrl || dataUrl;
 }
 
 // 画像ファイルをリサイズしてDataURL(Base64)に変換するヘルパー関数
@@ -2445,6 +2511,57 @@ function processImageFileToDataURL(file) {
 }
 
 // ==========================================
+// ★ 既存のBase64バナー画像をクラウドURLへ一括移行
+// ==========================================
+async function migrateBannersToCloud() {
+    if (!checkAdminAuth()) return;
+    if (!GAS_URL || GAS_URL.trim() === '') {
+        alert("GAS_URLが設定されていません。");
+        return;
+    }
+
+    const targets = songs.filter(s => s.bannerUrl && s.bannerUrl.startsWith('data:image'));
+    if (targets.length === 0) {
+        alert("移行対象のBase64画像はありませんでした。（すでに全てURL方式です）");
+        return;
+    }
+
+    if (!confirm(`${targets.length}件のBase64バナー画像をクラウド上のURLに移行します。\n移行後、楽曲リストをクラウドに保存する必要があります（続けて確認が出ます）。\n\n実行しますか？`)) return;
+
+    let successCount = 0;
+    let failCount = 0;
+    const failedTitles = [];
+
+    for (let i = 0; i < targets.length; i++) {
+        const song = targets[i];
+        showLoading(true, `画像を移行中... (${i + 1}/${targets.length}) ${song.title}`);
+        const uploadedUrl = await uploadImageToCloud(song.bannerUrl, song.title);
+        if (uploadedUrl) {
+            song.bannerUrl = uploadedUrl;
+            successCount++;
+        } else {
+            failCount++;
+            failedTitles.push(song.title);
+        }
+    }
+
+    showLoading(false);
+    renderTable();
+
+    let msg = `移行完了：成功 ${successCount}件`;
+    if (failCount > 0) {
+        msg += ` / 失敗 ${failCount}件\n失敗した曲:\n${failedTitles.join('\n')}\n（失敗分はBase64のまま残っているので、後でもう一度このボタンを押せば再試行されます）`;
+    }
+    alert(msg);
+
+    if (successCount > 0) {
+        if (confirm("続けて、更新された楽曲リストをクラウドに保存しますか？\n（保存しないと、次回読み込み時にまたBase64の状態に戻ってしまいます）")) {
+            await saveToCloud(true);
+        }
+    }
+}
+
+// ==========================================
 // ★ 個別バナー画像の直接ドロップ処理
 // ==========================================
 async function handleSingleBannerDrop(event, songId, element) {
@@ -2469,8 +2586,8 @@ async function handleSingleBannerDrop(event, songId, element) {
         // ドロップされた行の楽曲データをIDから探し出して更新
         const songIndex = songs.findIndex(s => s.id === songId);
         if (songIndex !== -1) {
-            const dataUrl = await processImageFileToDataURL(file); // 前に追加したリサイズ関数を再利用
-            songs[songIndex].bannerUrl = dataUrl;
+            const bannerUrl = await processImageFileAndUpload(file, songs[songIndex].title); // リサイズ＋クラウドアップロード
+            songs[songIndex].bannerUrl = bannerUrl;
             renderTable(); // テーブルを再描画して反映
         }
     } catch (err) {
