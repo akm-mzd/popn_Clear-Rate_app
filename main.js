@@ -1727,6 +1727,15 @@ function getVersionSortValue(ver) {
     return 999; 
 }
 
+function getTitleSortCategory(title) {
+    // 曲名の先頭文字から並び替えカテゴリを判定する
+    // 0: 数字, 1: 英単語（英字）, 2: 日本語・その他
+    const ch = (title || "").charAt(0);
+    if (/[0-9]/.test(ch)) return 0;
+    if (/[a-zA-Z]/.test(ch)) return 1;
+    return 2;
+}
+
 function getBpmSortValue(bpmStr) {
     if (!bpmStr || bpmStr === '-') return 0;
     const matches = bpmStr.match(/\d+/g);
@@ -1866,8 +1875,17 @@ function renderTable() {
         });
     } else if (currentSort === 'title') {
         displaySongs.sort((a, b) => {
-            let valA = (a.title || "").toLowerCase();
-            let valB = (b.title || "").toLowerCase();
+            let titleA = a.title || "";
+            let titleB = b.title || "";
+            let catA = getTitleSortCategory(titleA);
+            let catB = getTitleSortCategory(titleB);
+            // まず「数字→英単語→日本語」の順でカテゴリ分けし、
+            // 同じカテゴリ内では従来通り文字列で比較する
+            if (catA !== catB) {
+                return sortDesc ? catB - catA : catA - catB;
+            }
+            let valA = titleA.toLowerCase();
+            let valB = titleB.toLowerCase();
             if (valA === valB) return a.originalOrder - b.originalOrder;
             if (valA < valB) return sortDesc ? 1 : -1;
             if (valA > valB) return sortDesc ? -1 : 1;
@@ -2568,5 +2586,3 @@ async function restoreFromJson(event) {
     };
     reader.readAsText(file);
 }
-
-
