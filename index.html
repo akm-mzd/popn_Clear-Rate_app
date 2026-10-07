@@ -117,7 +117,10 @@
             </div>
         </details>
 
-        <div class="view-header">
+        <button id="menu-btn" onclick="toggleMenu()" title="メニュー">☰</button>
+        <div id="menu-backdrop" onclick="toggleMenu(false)"></div>
+        <div class="view-header" id="menu-panel">
+            <div class="menu-title">メニュー</div>
             <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
                 <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                     <span style="font-weight: bold; font-size: 1.1em;">表示レベル:</span>
