@@ -1,7 +1,7 @@
 // ==========================================
 // ★クラウド同期設定（GAS）と管理者パスワード
 // ==========================================
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbxgqligDs082E6MZANDpYOJvpHQr9Kvy_ndRMLBuRtO6v_idgBLjeYuM1OhMPpSNt30oQ/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzBTSbL6gtZfUW2eeFtX7rbS2bb06j4W1KFVCngRMoRNDlebMWMHU8oGBnWrkFSPOrk/exec';
 
 // ★ 楽曲リストの編集用パスワード
 const ADMIN_PASSWORD = "1005"; 
@@ -199,14 +199,14 @@ function saveCache(data) {
 // ==========================================
 // ★ 自動保存・他端末の変更の自動反映
 // ==========================================
-const SYNC_INTERVAL_MS = 60000;  // 他端末の変更を確認する間隔（60000 = 60秒）
+const SYNC_INTERVAL_MS = 20000;  // 他端末の変更を確認する間隔（20000 = 20秒）
 
 let cloudReady = false;          // 最初のクラウド読み込みが成功したか
 const dirtyUsers = new Set();    // 未保存の変更があるユーザー
 let autoSaveTimer = null;
 let autoSaving = false;
 let localChangeSeq = 0;          // この端末で変更・保存があるたびに増える
-let lastFetchedRaw = '';         // 最後に取得したクラウドデータ
+let knownVersion;                // この端末が把握しているクラウドの版番号
 let syncing = false;
 let lastSyncAt = 0;
 
@@ -269,6 +269,11 @@ async function runAutoSave() {
             });
             const result = await res.json();
             if (result.status === 'error') throw new Error(result.message);
+            // 自分の保存だけで版が進んだ場合は、取り直さなくて済むよう版番号を進める
+            // （間に他の端末の保存が挟まっていたら進めず、次の確認で取り直す）
+            if (result.version !== undefined && result.prevVersion === knownVersion) {
+                knownVersion = result.version;
+            }
         } catch (e) {
             console.error('自動保存エラー:', e);
             dirtyUsers.add(u);
@@ -308,6 +313,14 @@ function userRecordsStr(u) {
     return stableStr([u.clearRecords || {}, u.scoreRecords || {}, u.memoRecords || {}]);
 }
 
+// 版番号だけを取得する（とても軽い）
+async function fetchCloudVersion() {
+    const res = await fetch(GAS_URL + '?mode=version', { signal: AbortSignal.timeout(15000) });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    return data.version;
+}
+
 async function checkRemoteChanges() {
     if (!cloudReady || syncing || document.hidden) return;
     // 管理者として編集中・未保存の変更がある間は上書きしない
@@ -317,30 +330,33 @@ async function checkRemoteChanges() {
     lastSyncAt = Date.now();
     const seq = localChangeSeq;
     try {
-        const fresh = await fetchCloudData(0);
-        const raw = JSON.stringify(fresh);
-        const localChanged = seq !== localChangeSeq || autoSaving || dirtyUsers.size > 0 || isAdminAuthenticated;
+        const v = await fetchCloudVersion();
+        if (v !== undefined && v !== knownVersion) {
+            // 変更があったときだけ全データを取り直す
+            const fresh = await fetchCloudData(0);
+            const localChanged = seq !== localChangeSeq || autoSaving || dirtyUsers.size > 0 || isAdminAuthenticated;
 
-        if (!localChanged && raw !== lastFetchedRaw) {
-            lastFetchedRaw = raw;
-            fresh.users = fresh.users || {};
-            const mineChanged = !!fresh.users[currentUser] &&
-                userRecordsStr(fresh.users[currentUser]) !== userRecordsStr(allUsersData[currentUser]);
+            if (!localChanged) {
+                knownVersion = fresh.version;
+                fresh.users = fresh.users || {};
+                const mineChanged = !!fresh.users[currentUser] &&
+                    userRecordsStr(fresh.users[currentUser]) !== userRecordsStr(allUsersData[currentUser]);
 
-            // この端末で作ったばかりの未保存ユーザーは残す
-            for (const u in allUsersData) {
-                if (!fresh.users[u]) fresh.users[u] = allUsersData[u];
-            }
+                // この端末で作ったばかりの未保存ユーザーは残す
+                for (const u in allUsersData) {
+                    if (!fresh.users[u]) fresh.users[u] = allUsersData[u];
+                }
 
-            saveCache(fresh);
-            applyFetchedData(fresh);
-            initUserSelector();
-            updateCompareUserSelect();
-            updateDynamicFilters();
-            renderTable();
+                saveCache(fresh);
+                applyFetchedData(fresh);
+                initUserSelector();
+                updateCompareUserSelect();
+                updateDynamicFilters();
+                renderTable();
 
-            if (mineChanged) {
-                showToast('toast-sync', '🔄 他の端末での変更を反映しました', '#7b1fa2', 5000);
+                if (mineChanged) {
+                    showToast('toast-sync', '🔄 他の端末での変更を反映しました', '#7b1fa2', 5000);
+                }
             }
         }
     } catch (e) {
@@ -352,7 +368,7 @@ async function checkRemoteChanges() {
 function startRemoteSync() {
     setInterval(checkRemoteChanges, SYNC_INTERVAL_MS);
     document.addEventListener('visibilitychange', () => {
-        if (!document.hidden && Date.now() - lastSyncAt > 10000) checkRemoteChanges();
+        if (!document.hidden && Date.now() - lastSyncAt > 5000) checkRemoteChanges();
     });
 }
 
@@ -392,7 +408,7 @@ window.onload = async () => {
     // ② 最新データを取得（キャッシュ表示中は裏で）
     try {
         const fresh = await fetchCloudData();
-        lastFetchedRaw = JSON.stringify(fresh);
+        knownVersion = fresh.version;
         lastSyncAt = Date.now();
 
         const before = snapshot ? JSON.parse(snapshot) : null;
