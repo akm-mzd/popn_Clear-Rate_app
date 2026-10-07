@@ -197,27 +197,49 @@ function saveCache(data) {
 }
 
 // ==========================================
-// ★ 自動保存
+// ★ 自動保存・他端末の変更の自動反映
 // ==========================================
+const SYNC_INTERVAL_MS = 60000;  // 他端末の変更を確認する間隔（60000 = 60秒）
+
 let cloudReady = false;          // 最初のクラウド読み込みが成功したか
 const dirtyUsers = new Set();    // 未保存の変更があるユーザー
 let autoSaveTimer = null;
 let autoSaving = false;
+let localChangeSeq = 0;          // この端末で変更・保存があるたびに増える
+let lastFetchedRaw = '';         // 最後に取得したクラウドデータ
+let syncing = false;
+let lastSyncAt = 0;
 
-function setSaveStatus(text, color) {
-    let el = document.getElementById('autosave-status');
+// 画面上部中央に出す通知
+function showToast(id, text, color, hideAfterMs) {
+    let box = document.getElementById('toast-box');
+    if (!box) {
+        box = document.createElement('div');
+        box.id = 'toast-box';
+        box.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:9500;display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none;width:max-content;max-width:90vw;';
+        document.body.appendChild(box);
+    }
+    let el = document.getElementById(id);
     if (!el) {
         el = document.createElement('div');
-        el.id = 'autosave-status';
-        el.style.cssText = 'position:fixed;left:10px;bottom:10px;z-index:9000;padding:6px 12px;border-radius:16px;font-size:13px;font-weight:bold;color:#fff;box-shadow:0 2px 6px rgba(0,0,0,.3);';
-        document.body.appendChild(el);
+        el.id = id;
+        el.style.cssText = 'padding:8px 16px;border-radius:20px;font-size:14px;font-weight:bold;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.35);text-align:center;';
+        box.appendChild(el);
     }
+    clearTimeout(el._hideTimer);
     el.textContent = text;
     el.style.background = color;
     el.style.display = text ? 'block' : 'none';
+    if (text && hideAfterMs) el._hideTimer = setTimeout(() => { el.style.display = 'none'; }, hideAfterMs);
 }
 
+function setSaveStatus(text, color, hideAfterMs) {
+    showToast('toast-save', text, color, hideAfterMs);
+}
+
+// ---------- 自動保存 ----------
 function scheduleAutoSave() {
+    localChangeSeq++;
     dirtyUsers.add(currentUser);
     setSaveStatus('● 未保存', '#ff9800');
     clearTimeout(autoSaveTimer);
@@ -227,7 +249,7 @@ function scheduleAutoSave() {
 async function runAutoSave() {
     if (!cloudReady || autoSaving || dirtyUsers.size === 0) return;
     autoSaving = true;
-    setSaveStatus('保存中…', '#2196F3');
+    setSaveStatus('☁️ 保存中…', '#2196F3');
     const targets = [...dirtyUsers];
     dirtyUsers.clear();
     let failed = false;
@@ -255,6 +277,7 @@ async function runAutoSave() {
     }
 
     autoSaving = false;
+    localChangeSeq++;
     if (failed) {
         setSaveStatus('⚠ 保存失敗（自動で再試行します）', '#d32f2f');
         clearTimeout(autoSaveTimer);
@@ -264,8 +287,7 @@ async function runAutoSave() {
     } else {
         const c = loadCache();
         if (c) { c.users = allUsersData; saveCache(c); }
-        setSaveStatus('✓ 保存済み', '#4caf50');
-        setTimeout(() => { if (!autoSaving && dirtyUsers.size === 0) setSaveStatus('', ''); }, 2000);
+        setSaveStatus('✓ 保存しました', '#4caf50', 2000);
     }
 }
 
@@ -273,6 +295,66 @@ async function runAutoSave() {
 window.addEventListener('beforeunload', (e) => {
     if (dirtyUsers.size > 0 || autoSaving) { e.preventDefault(); e.returnValue = ''; }
 });
+
+// ---------- 他端末の変更の反映 ----------
+// キーの順番に左右されない比較用の文字列を作る
+function stableStr(v) {
+    if (v === null || typeof v !== 'object') return JSON.stringify(v);
+    if (Array.isArray(v)) return '[' + v.map(stableStr).join(',') + ']';
+    return '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + stableStr(v[k])).join(',') + '}';
+}
+function userRecordsStr(u) {
+    u = u || {};
+    return stableStr([u.clearRecords || {}, u.scoreRecords || {}, u.memoRecords || {}]);
+}
+
+async function checkRemoteChanges() {
+    if (!cloudReady || syncing || document.hidden) return;
+    // 管理者として編集中・未保存の変更がある間は上書きしない
+    if (isAdminAuthenticated || autoSaving || dirtyUsers.size > 0) return;
+
+    syncing = true;
+    lastSyncAt = Date.now();
+    const seq = localChangeSeq;
+    try {
+        const fresh = await fetchCloudData(0);
+        const raw = JSON.stringify(fresh);
+        const localChanged = seq !== localChangeSeq || autoSaving || dirtyUsers.size > 0 || isAdminAuthenticated;
+
+        if (!localChanged && raw !== lastFetchedRaw) {
+            lastFetchedRaw = raw;
+            fresh.users = fresh.users || {};
+            const mineChanged = !!fresh.users[currentUser] &&
+                userRecordsStr(fresh.users[currentUser]) !== userRecordsStr(allUsersData[currentUser]);
+
+            // この端末で作ったばかりの未保存ユーザーは残す
+            for (const u in allUsersData) {
+                if (!fresh.users[u]) fresh.users[u] = allUsersData[u];
+            }
+
+            saveCache(fresh);
+            applyFetchedData(fresh);
+            initUserSelector();
+            updateCompareUserSelect();
+            updateDynamicFilters();
+            renderTable();
+
+            if (mineChanged) {
+                showToast('toast-sync', '🔄 他の端末での変更を反映しました', '#7b1fa2', 5000);
+            }
+        }
+    } catch (e) {
+        console.warn('同期チェック失敗', e);
+    }
+    syncing = false;
+}
+
+function startRemoteSync() {
+    setInterval(checkRemoteChanges, SYNC_INTERVAL_MS);
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && Date.now() - lastSyncAt > 10000) checkRemoteChanges();
+    });
+}
 
 // 前回データ表示中に行った編集を、届いた最新データに重ねる
 function mergeLocalEdits(fresh, before, now) {
@@ -310,6 +392,9 @@ window.onload = async () => {
     // ② 最新データを取得（キャッシュ表示中は裏で）
     try {
         const fresh = await fetchCloudData();
+        lastFetchedRaw = JSON.stringify(fresh);
+        lastSyncAt = Date.now();
+
         const before = snapshot ? JSON.parse(snapshot) : null;
         const songsEdited = before && JSON.stringify(songs) !== JSON.stringify(before.songs);
         if (!songsEdited) {
@@ -319,7 +404,8 @@ window.onload = async () => {
         }
         saveCache(fresh);
         cloudReady = true;
-        runAutoSave(); // 待っている間の編集があれば保存
+        runAutoSave();      // 待っている間の編集があれば保存
+        startRemoteSync();  // 他端末の変更の確認を開始
     } catch (e) {
         console.warn('クラウド読み込み失敗', e);
         alert(cached
@@ -2801,6 +2887,7 @@ async function restoreFromJson(event) {
                 localStorage.setItem(STORAGE_KEY_MEMOS, JSON.stringify(memoRecords));
             }
 
+            scheduleAutoSave();   // ←追加
             updateDynamicFilters();
             renderTable();
             showLoading(false);
