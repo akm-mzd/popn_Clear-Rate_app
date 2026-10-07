@@ -2943,4 +2943,10 @@ const openRandomModalOriginal = openRandomModal;
 openRandomModal = function () {
     toggleMenu(false);
     openRandomModalOriginal();
+    
+// レベルを選んだらメニューを閉じる
+const changeViewLevelOriginal = changeViewLevel;
+changeViewLevel = function (level) {
+    toggleMenu(false);
+    changeViewLevelOriginal(level);
 };
