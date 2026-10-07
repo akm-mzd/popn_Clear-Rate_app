@@ -196,6 +196,103 @@ function saveCache(data) {
     catch (e) { localStorage.removeItem(STORAGE_KEY_CACHE); } // 容量オーバー時
 }
 
+// ==========================================
+// ★ 自動保存
+// ==========================================
+let cloudReady = false;          // 最初のクラウド読み込みが成功したか
+const dirtyUsers = new Set();    // 未保存の変更があるユーザー
+let autoSaveTimer = null;
+let autoSaving = false;
+
+function setSaveStatus(text, color) {
+    let el = document.getElementById('autosave-status');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'autosave-status';
+        el.style.cssText = 'position:fixed;left:10px;bottom:10px;z-index:9000;padding:6px 12px;border-radius:16px;font-size:13px;font-weight:bold;color:#fff;box-shadow:0 2px 6px rgba(0,0,0,.3);';
+        document.body.appendChild(el);
+    }
+    el.textContent = text;
+    el.style.background = color;
+    el.style.display = text ? 'block' : 'none';
+}
+
+function scheduleAutoSave() {
+    dirtyUsers.add(currentUser);
+    setSaveStatus('● 未保存', '#ff9800');
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(runAutoSave, 1500);
+}
+
+async function runAutoSave() {
+    if (!cloudReady || autoSaving || dirtyUsers.size === 0) return;
+    autoSaving = true;
+    setSaveStatus('保存中…', '#2196F3');
+    const targets = [...dirtyUsers];
+    dirtyUsers.clear();
+    let failed = false;
+
+    for (const u of targets) {
+        try {
+            const res = await fetch(GAS_URL, {
+                method: 'POST',
+                body: JSON.stringify({
+                    type: 'updateClears',
+                    targetUser: u,
+                    songs: [],
+                    clearRecords: allUsersData[u]?.clearRecords || {},
+                    scoreRecords: allUsersData[u]?.scoreRecords || {},
+                    memoRecords: allUsersData[u]?.memoRecords || {}
+                })
+            });
+            const result = await res.json();
+            if (result.status === 'error') throw new Error(result.message);
+        } catch (e) {
+            console.error('自動保存エラー:', e);
+            dirtyUsers.add(u);
+            failed = true;
+        }
+    }
+
+    autoSaving = false;
+    if (failed) {
+        setSaveStatus('⚠ 保存失敗（自動で再試行します）', '#d32f2f');
+        clearTimeout(autoSaveTimer);
+        autoSaveTimer = setTimeout(runAutoSave, 10000);
+    } else if (dirtyUsers.size > 0) {
+        runAutoSave(); // 保存中に新しい変更があった場合
+    } else {
+        const c = loadCache();
+        if (c) { c.users = allUsersData; saveCache(c); }
+        setSaveStatus('✓ 保存済み', '#4caf50');
+        setTimeout(() => { if (!autoSaving && dirtyUsers.size === 0) setSaveStatus('', ''); }, 2000);
+    }
+}
+
+// 未保存のままページを閉じようとしたら警告
+window.addEventListener('beforeunload', (e) => {
+    if (dirtyUsers.size > 0 || autoSaving) { e.preventDefault(); e.returnValue = ''; }
+});
+
+// 前回データ表示中に行った編集を、届いた最新データに重ねる
+function mergeLocalEdits(fresh, before, now) {
+    const users = fresh.users || (fresh.users = {});
+    for (const u in now) {
+        if (!users[u]) { users[u] = now[u]; continue; } // 新規追加ユーザー
+        ['clearRecords', 'scoreRecords', 'memoRecords'].forEach(type => {
+            const b = (before[u] && before[u][type]) || {};
+            const n = now[u][type] || {};
+            if (!users[u][type]) users[u][type] = {};
+            for (const id in n) {
+                if (JSON.stringify(n[id]) !== JSON.stringify(b[id])) users[u][type][id] = n[id];
+            }
+            for (const id in b) {
+                if (!(id in n)) delete users[u][type][id];
+            }
+        });
+    }
+}
+
 window.onload = async () => {
     initMedalGrid();
 
@@ -213,17 +310,20 @@ window.onload = async () => {
     // ② 最新データを取得（キャッシュ表示中は裏で）
     try {
         const fresh = await fetchCloudData();
-        saveCache(fresh);
-        // 待っている間に編集されていたら、上書きしない
-        const edited = snapshot !== null && JSON.stringify({ songs, allUsersData }) !== snapshot;
-        if (!edited) {
+        const before = snapshot ? JSON.parse(snapshot) : null;
+        const songsEdited = before && JSON.stringify(songs) !== JSON.stringify(before.songs);
+        if (!songsEdited) {
+            if (before) mergeLocalEdits(fresh, before.allUsersData, allUsersData);
             applyFetchedData(fresh);
             refreshUI();
         }
+        saveCache(fresh);
+        cloudReady = true;
+        runAutoSave(); // 待っている間の編集があれば保存
     } catch (e) {
         console.warn('クラウド読み込み失敗', e);
         alert(cached
-            ? '最新データの取得に失敗しました。前回のデータを表示しています。'
+            ? '最新データの取得に失敗しました。前回のデータを表示しています。\n（自動保存は止まっています。再読み込みするか、手動で保存してください）'
             : 'データの読み込みに失敗しました。ページを再読み込みしてください。');
     }
     showLoading(false);
@@ -643,6 +743,7 @@ async function selectMedal(medalKey) {
         }
         if (!allUsersData[currentUser]) allUsersData[currentUser] = { clearRecords: {}, scoreRecords: {}, memoRecords: {} };
         allUsersData[currentUser].clearRecords = clearRecords;
+        scheduleAutoSave();   // ←追加
         renderTable();
         closeMedalModal();
     }
@@ -681,6 +782,7 @@ async function saveScoreModal() {
     allUsersData[currentUser].scoreRecords = scoreRecords;
 
     closeScoreModal();
+    scheduleAutoSave();   // ←追加
     renderTable();
 }
 
@@ -714,6 +816,7 @@ function clearMemo() {
         localStorage.setItem(STORAGE_KEY_MEMOS, JSON.stringify(memoRecords));
 
         closeMemoModal();
+        scheduleAutoSave();   // ←追加
         renderTable();
     }
 }
@@ -735,6 +838,7 @@ function saveMemoModal() {
     localStorage.setItem(STORAGE_KEY_MEMOS, JSON.stringify(memoRecords));
 
     closeMemoModal();
+    scheduleAutoSave();   // ←追加
     renderTable();
 }
 
@@ -1709,6 +1813,7 @@ async function clearRecordsOnly() {
         scoreRecords = allUsersData[currentUser].scoreRecords;
         memoRecords = allUsersData[currentUser].memoRecords;
         localStorage.setItem(STORAGE_KEY_MEMOS, JSON.stringify(memoRecords));
+        scheduleAutoSave();   // ←追加
         renderTable();
     }
 }
