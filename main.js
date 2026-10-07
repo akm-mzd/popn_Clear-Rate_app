@@ -128,97 +128,105 @@ function showLoading(show, text = '通信中...') {
     document.getElementById('loading').style.display = show ? 'flex' : 'none';
 }
 
-window.onload = async () => {
-    if (GAS_URL && GAS_URL.trim() !== '') {
-        showLoading(true, 'データを取得中...');
-        try {
-            const response = await fetch(GAS_URL);
-            if (!response.ok) throw new Error('Network error');
-            const fetchedData = await response.json();
-            
-            if (fetchedData && fetchedData.songs) {
-                songs = fetchedData.songs;
-                allUsersData = fetchedData.users || {};
-                
-                if (Object.keys(allUsersData).length === 0) {
-                    allUsersData["Guest"] = { clearRecords: {}, scoreRecords: {}, memoRecords: {} };
-                }
-                
-                for (let u in allUsersData) {
-                    if (!allUsersData[u].scoreRecords) allUsersData[u].scoreRecords = {};
-                    if (!allUsersData[u].memoRecords) allUsersData[u].memoRecords = {};
-                }
-                
-                if (allUsersData[currentUser]) {
-                    clearRecords = allUsersData[currentUser].clearRecords || {};
-                    scoreRecords = allUsersData[currentUser].scoreRecords || {};
-                    memoRecords = allUsersData[currentUser].memoRecords || {};
-                } else {
-                    currentUser = "Guest";
-                    localStorage.setItem('popn_current_user', currentUser);
-                    if(!allUsersData["Guest"]) allUsersData["Guest"] = { clearRecords: {}, scoreRecords: {}, memoRecords: {} };
-                    clearRecords = allUsersData[currentUser].clearRecords;
-                    scoreRecords = allUsersData[currentUser].scoreRecords;
-                    memoRecords = allUsersData[currentUser].memoRecords || {};
-                }
-            }
-        } catch (error) {
-            console.warn('クラウドからの読み込みに失敗しました。ローカルデータを使用します。', error);
-            songs = JSON.parse(localStorage.getItem(STORAGE_KEY_SONGS)) || [];
-            allUsersData = { "Guest": { 
-                clearRecords: JSON.parse(localStorage.getItem(STORAGE_KEY_CLEARS)) || {},
-                scoreRecords: JSON.parse(localStorage.getItem(STORAGE_KEY_SCORES)) || {},
-                memoRecords: JSON.parse(localStorage.getItem(STORAGE_KEY_MEMOS)) || {}
-            } };
-            currentUser = "Guest";
-            clearRecords = allUsersData["Guest"].clearRecords;
-            scoreRecords = allUsersData["Guest"].scoreRecords;
-            memoRecords = allUsersData["Guest"].memoRecords;
-        }
-        showLoading(false);
-    } else {
-        songs = JSON.parse(localStorage.getItem(STORAGE_KEY_SONGS)) || [];
-        allUsersData = { "Guest": { 
-            clearRecords: JSON.parse(localStorage.getItem(STORAGE_KEY_CLEARS)) || {},
-            scoreRecords: JSON.parse(localStorage.getItem(STORAGE_KEY_SCORES)) || {},
-            memoRecords: JSON.parse(localStorage.getItem(STORAGE_KEY_MEMOS)) || {}
-        } };
-        currentUser = "Guest";
-        clearRecords = allUsersData["Guest"].clearRecords;
-        scoreRecords = allUsersData["Guest"].scoreRecords;
-        memoRecords = allUsersData["Guest"].memoRecords;
+const STORAGE_KEY_CACHE = 'popn_cloud_cache_v1';
+let dataLoaded = false; // キャッシュかクラウドのどちらかを読めたか
+
+const emptyUser = () => ({ clearRecords: {}, scoreRecords: {}, memoRecords: {} });
+
+function applyFetchedData(data) {
+    songs = data.songs || [];
+    allUsersData = data.users || {};
+    if (Object.keys(allUsersData).length === 0) allUsersData["Guest"] = emptyUser();
+    for (let u in allUsersData) {
+        if (!allUsersData[u].clearRecords) allUsersData[u].clearRecords = {};
+        if (!allUsersData[u].scoreRecords) allUsersData[u].scoreRecords = {};
+        if (!allUsersData[u].memoRecords) allUsersData[u].memoRecords = {};
     }
+    if (!allUsersData[currentUser]) {
+        currentUser = "Guest";
+        if (!allUsersData["Guest"]) allUsersData["Guest"] = emptyUser();
+    }
+    clearRecords = allUsersData[currentUser].clearRecords;
+    scoreRecords = allUsersData[currentUser].scoreRecords;
+    memoRecords = allUsersData[currentUser].memoRecords;
 
     songs.forEach(s => {
-        if (!s.level) { s.level = '48'; }
-        const reporsed = parseDifficulty(s.diffRaw);
-        if(s.diffClass !== reporsed.diffClass || s.diffIndex !== reporsed.diffIndex) {
-            s.diffClass = reporsed.diffClass;
-            s.diffIndex = reporsed.diffIndex;
-        }
+        if (!s.level) s.level = '48';
+        const p = parseDifficulty(s.diffRaw);
+        s.diffClass = p.diffClass;
+        s.diffIndex = p.diffIndex;
         const expectedId = s.genre + "_" + s.title + "_" + s.notes;
         if (s.id !== expectedId) {
-            if (clearRecords[s.id] !== undefined) {
-                clearRecords[expectedId] = clearRecords[s.id];
-                delete clearRecords[s.id];
-            }
-            if (scoreRecords[s.id] !== undefined) {
-                scoreRecords[expectedId] = scoreRecords[s.id];
-                delete scoreRecords[s.id];
-            }
-            if (memoRecords[s.id] !== undefined) {
-                memoRecords[expectedId] = memoRecords[s.id];
-                delete memoRecords[s.id];
-            }
+            [clearRecords, scoreRecords, memoRecords].forEach(rec => {
+                if (rec[s.id] !== undefined) { rec[expectedId] = rec[s.id]; delete rec[s.id]; }
+            });
             s.id = expectedId;
         }
     });
+    dataLoaded = true;
+}
 
+function refreshUI() {
     initUserSelector();
     updateCompareUserSelect();
     initFilters();
-    initMedalGrid();
     renderTable();
+}
+
+async function fetchCloudData(retries = 2, timeoutMs = 20000) {
+    for (let i = 0; i <= retries; i++) {
+        try {
+            const res = await fetch(GAS_URL, { signal: AbortSignal.timeout(timeoutMs) });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            if (!data || !Array.isArray(data.songs)) throw new Error('データ形式が不正');
+            return data;
+        } catch (e) {
+            if (i === retries) throw e;
+            await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+        }
+    }
+}
+
+function loadCache() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY_CACHE)); } catch (e) { return null; }
+}
+function saveCache(data) {
+    try { localStorage.setItem(STORAGE_KEY_CACHE, JSON.stringify(data)); }
+    catch (e) { localStorage.removeItem(STORAGE_KEY_CACHE); } // 容量オーバー時
+}
+
+window.onload = async () => {
+    initMedalGrid();
+
+    // ① キャッシュがあれば即表示
+    let snapshot = null;
+    const cached = loadCache();
+    if (cached && Array.isArray(cached.songs)) {
+        applyFetchedData(cached);
+        refreshUI();
+        snapshot = JSON.stringify({ songs, allUsersData });
+    } else {
+        showLoading(true, 'データを取得中...');
+    }
+
+    // ② 最新データを取得（キャッシュ表示中は裏で）
+    try {
+        const fresh = await fetchCloudData();
+        saveCache(fresh);
+        // 待っている間に編集されていたら、上書きしない
+        const edited = snapshot !== null && JSON.stringify({ songs, allUsersData }) !== snapshot;
+        if (!edited) {
+            applyFetchedData(fresh);
+            refreshUI();
+        }
+    } catch (e) {
+        console.warn('クラウド読み込み失敗', e);
+        alert(cached
+            ? '最新データの取得に失敗しました。前回のデータを表示しています。'
+            : 'データの読み込みに失敗しました。ページを再読み込みしてください。');
+    }
+    showLoading(false);
 };
 
 function initUserSelector() {
@@ -340,6 +348,7 @@ async function manualSaveToCloud() {
 
 async function saveToCloud(isSongUpdate = false, targetUserName = currentUser, customLoadingText = null) {
     if (!GAS_URL || GAS_URL.trim() === '') return false;
+    if (!dataLoaded) { alert("データを読み込めていないため保存できません。再読み込みしてください。"); return false; } // ←追加
 
     // ローディング表示（カスタムテキストがあればそれを優先表示）
     const defaultText = `クラウドに保存中... (${isSongUpdate ? '楽曲リスト' : targetUserName})`;
