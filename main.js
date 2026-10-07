@@ -2920,3 +2920,27 @@ async function restoreFromJson(event) {
     };
     reader.readAsText(file);
 }
+
+// ==========================================
+// ★ メニューの開閉
+// ==========================================
+function toggleMenu(force) {
+    const panel = document.getElementById('menu-panel');
+    if (!panel) return;
+    const open = (typeof force === 'boolean') ? force : !panel.classList.contains('open');
+    panel.classList.toggle('open', open);
+    document.getElementById('menu-backdrop').classList.toggle('open', open);
+    document.getElementById('menu-btn').textContent = open ? '✕' : '☰';
+}
+
+// Escキーでも閉じる
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') toggleMenu(false);
+});
+
+// ランダムセレクトを開くときは、結果が隠れないようメニューを閉じる
+const openRandomModalOriginal = openRandomModal;
+openRandomModal = function () {
+    toggleMenu(false);
+    openRandomModalOriginal();
+};
