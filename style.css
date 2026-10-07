@@ -286,3 +286,72 @@ details > summary::-webkit-details-marker { display: none; }
         font-size: 20px !important;
     }
 }
+
+/* =========================================
+    ☰ メニューボタンとメニューパネル
+    ========================================= */
+#menu-btn {
+    position: fixed !important;
+    top: 10px !important;
+    right: 15px !important;
+    width: 50px !important;
+    height: 50px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background-color: #2196F3 !important;
+    color: #fff !important;
+    border: none !important;
+    border-radius: 50% !important;
+    font-size: 24px !important;
+    font-weight: bold !important;
+    cursor: pointer;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3) !important;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9100 !important;
+}
+#menu-btn:hover { background-color: #1976D2 !important; }
+
+#menu-backdrop {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.25); z-index: 9040; display: none;
+}
+#menu-backdrop.open { display: block; }
+
+#menu-panel {
+    position: fixed !important;
+    top: 0; right: 0;
+    width: 440px; max-width: 92vw; height: 100%;
+    margin: 0; padding: 20px 15px 40px; box-sizing: border-box;
+    background: #f9f9f9; border-bottom: none;
+    box-shadow: -4px 0 12px rgba(0,0,0,0.25);
+    z-index: 9050; overflow-y: auto;
+    display: flex; flex-direction: column; flex-wrap: nowrap;
+    justify-content: flex-start; align-items: stretch; gap: 15px;
+    transform: translateX(105%); visibility: hidden;
+    transition: transform 0.25s ease, visibility 0.25s;
+}
+#menu-panel.open { transform: translateX(0); visibility: visible; }
+#menu-panel > * { flex-shrink: 0; }
+#menu-panel .stats-toggles { margin: 0; justify-content: flex-start; }
+
+.menu-title {
+    font-size: 1.2em; font-weight: bold; color: #333;
+    padding: 10px 60px 10px 0; border-bottom: 2px solid #ddd;
+}
+
+/* メニューボタンと重ならないよう右側を空ける */
+.user-selector-area { padding-right: 80px; }
+.stats-container { padding-right: 80px; }
+
+@media screen and (max-width: 768px) {
+    #menu-btn {
+        top: 8px !important;
+        right: 10px !important;
+        width: 45px !important;
+        height: 45px !important;
+        font-size: 20px !important;
+    }
+    .user-selector-area { padding-right: 65px; }
+}
