@@ -72,6 +72,13 @@
                         <button onclick="openAddModal()" style="background-color: #0056b3; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">📝 新規楽曲を手動入力して追加</button>
                     </div>
                 </details>
+
+                <details style="margin-top: 10px; cursor: pointer; background: #fff3e0; padding: 10px; border-radius: 4px;">
+                    <summary style="font-size: 0.9em; color: #e65100; font-weight: bold;">🎯 難易度・指数をまとめて割り当てる場合はこちら</summary>
+                    <div style="margin-top: 10px; cursor: default; text-align: center;">
+                        <button onclick="openBulkDiffModal()" style="background-color: #e65100; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">🎯 難易度・指数を一括割り当て</button>
+                    </div>
+                </details>
                 
                 <div id="banner-drop-zone" style="margin-top: 15px; border: 2px dashed #999; border-radius: 8px; padding: 20px; text-align: center; background: #fdfdfd; transition: all 0.2s; cursor: default;">
                     <div style="font-weight: bold; color: #333; font-size: 1.05em; margin-bottom: 5px;">🖼️ ここにバナー画像（複数可）をドロップして一括更新</div>
@@ -412,6 +419,25 @@
             </div>
             <div class="modal-actions" style="width: 100%; justify-content: center; margin-top: 15px;">
                 <button onclick="document.getElementById('image-result-modal').style.display='none'" style="padding: 10px 30px; font-size: 16px; background: #2196F3; color: white; border: none; font-weight: bold;">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="bulk-diff-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 800px;">
+        <h3>🎯 難易度・指数の一括割り当て</h3>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px;">
+            <label style="font-weight: bold;">対象レベル:
+                <select id="bulk-diff-level" style="padding: 6px;"></select>
+            </label>
+            <label class="check-label"><input type="checkbox" id="bulk-diff-partial" checked> 部分一致でも探す</label>
+        </div>
+        <textarea id="bulk-diff-text" style="height: 150px;" placeholder="難易度表などからコピーしたテキストを貼り付けてください。&#10;例1) |ver|ジャンル|曲名|BPM|ノーツ|強(+0.5)|&#10;例2) 曲名 詐称(+1.2)&#10;例3) ■強(+1.0) の見出しの下に曲名を並べる"></textarea>
+        <button onclick="analyzeBulkDiff()" style="background-color: #2196F3; color: white; font-weight: bold; border: none;">🔍 解析してプレビュー</button>
+        <div id="bulk-diff-preview" style="margin-top: 12px;"></div>
+        <div class="modal-actions">
+            <button onclick="closeBulkDiffModal()" style="border: 1px solid #ccc; background: #eee;">閉じる</button>
+            <button id="bulk-diff-apply-btn" onclick="applyBulkDiff()" style="display: none; background-color: #4caf50; color: white; font-weight: bold; border: 1px solid #388e3c;">✓ チェックした曲に適用</button>
             </div>
         </div>
     </div>
