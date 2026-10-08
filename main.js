@@ -3009,3 +3009,323 @@ changeViewLevel = function (level) {
     toggleMenu(false);
     changeViewLevelOriginal(level);
 };
+
+// ==========================================
+// ★ 難易度・指数の一括割り当て
+// ==========================================
+const BULK_CLS = '危険|別格|逆詐称|詐称|入門|強|中|弱';
+const BULK_NUM = '[+\\-±]?\\d+(?:\\.\\d+)?';
+const BULK_SIGNED = '[+\\-±]\\d+(?:\\.\\d+)?';
+const BULK_DECO = '[■□◆◇●○★☆▼▽▶▷【】《》「」『』<>:#*・=、,\\[\\]]+';
+const BULK_RE_DECO_START = new RegExp('^' + BULK_DECO);
+const BULK_RE_DECO_END = new RegExp(BULK_DECO + '$');
+const BULK_RE_STRICT = new RegExp('^(' + BULK_CLS + ')?(?:([(\\[])?(' + BULK_NUM + ')[)\\]]?)?$');
+const BULK_RE_FREE_CLS = new RegExp('(' + BULK_CLS + ')\\s*(?:[(\\[]\\s*(' + BULK_NUM + ')\\s*[)\\]]|(' + BULK_SIGNED + '))?', 'g');
+const BULK_RE_FREE_NUM = new RegExp('[(\\[]\\s*(' + BULK_SIGNED + ')\\s*[)\\]]|(?:^|\\s)(' + BULK_SIGNED + ')(?=\\s|$)');
+
+let bulkDiffResults = [];
+
+function bulkEsc(s) {
+    return String(s === undefined || s === null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// 表記ゆれを吸収する（全角/半角・大文字/小文字・ハイフンや波ダッシュの違い）
+function bulkNormText(s) {
+    return String(s || '')
+        .replace(/[\u2212\u2010-\u2015]/g, '-')
+        .replace(/[\u301C\u223C]/g, '~')
+        .replace(/[\u2018\u2019\u0060\u00B4]/g, "'")
+        .replace(/[\u201C\u201D]/g, '"')
+        .normalize('NFKC')
+        .toLowerCase();
+}
+function bulkKey(s) { return bulkNormText(s).replace(/\s+/g, ''); }
+
+function bulkIdxOk(idx) { return Math.abs(parseFloat(idx.replace('±', ''))) <= 10; }
+
+// 文字列全体が「強(+0.5)」「詐称」「+1.5」のような難易度表記かどうか
+function bulkParseStrict(part) {
+    const t = part.replace(/\s+/g, '').replace(BULK_RE_DECO_START, '').replace(BULK_RE_DECO_END, '');
+    if (!t) return null;
+    const m = t.match(BULK_RE_STRICT);
+    if (!m || (!m[1] && !m[3])) return null;
+    if (m[3] && !bulkIdxOk(m[3])) return null;
+    // 区分なしの数字だけの場合は、符号かカッコが無ければ無視（BPMやノーツ数との混同防止）
+    if (!m[1] && !m[2] && !/^[+\-±]/.test(m[3])) return null;
+    return { cls: m[1] || null, idx: m[3] || null };
+}
+
+// 曲名以外の部分から難易度表記を探す
+function bulkExtractDiff(parts) {
+    for (let i = parts.length - 1; i >= 0; i--) {
+        let d = bulkParseStrict(parts[i]);
+        if (d) return d;
+        const tokens = parts[i].split(/\s+/);
+        for (let j = tokens.length - 1; j >= 0; j--) {
+            d = bulkParseStrict(tokens[j]);
+            if (d) return d;
+        }
+    }
+    for (let i = parts.length - 1; i >= 0; i--) {
+        let best = null;
+        for (const m of parts[i].matchAll(BULK_RE_FREE_CLS)) {
+            const idx = m[2] || m[3] || null;
+            if (!idx && m[1].length === 1) continue; // 「強」「中」「弱」単独は誤検出しやすいので無視
+            if (idx && !bulkIdxOk(idx)) continue;
+            if (!best || (idx && !best.idx)) best = { cls: m[1], idx: idx };
+        }
+        if (best) return best;
+    }
+    for (let i = parts.length - 1; i >= 0; i--) {
+        const m = parts[i].match(BULK_RE_FREE_NUM);
+        if (m) {
+            const idx = m[1] || m[2];
+            if (bulkIdxOk(idx)) return { cls: null, idx: idx };
+        }
+    }
+    return null;
+}
+
+// 保存する難易度の文字列を作る（例: 強(+0.5)）
+function bulkBuildDiff(d, song) {
+    let idx = d.idx;
+    if (idx && /^\d/.test(idx) && parseFloat(idx) > 0) idx = '+' + idx;
+    let cls = d.cls;
+    let keptClass = false;
+    if (!cls && song.diffClass && song.diffClass !== '未分類') { cls = song.diffClass; keptClass = true; }
+    return { raw: (cls || '') + (idx ? '(' + idx + ')' : ''), keptClass: keptClass };
+}
+
+// 曲名・ジャンル名から曲を引くための索引
+function bulkBuildNameIndex(targetSongs) {
+    const map = new Map();
+    const add = (name, song, kind) => {
+        const key = bulkKey(name);
+        if (!key) return;
+        if (!map.has(key)) map.set(key, { key: key, len: key.length, entries: [], re: null });
+        map.get(key).entries.push({ song: song, kind: kind });
+    };
+    targetSongs.forEach(s => { add(s.title, s, 'title'); add(s.genre, s, 'genre'); });
+
+    map.forEach(e => {
+        if (e.len < 2) return; // 1文字の名前は完全一致のみ
+        let src = Array.from(e.key).map(c => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s*');
+        // 英数字の名前は単語の途中に一致させない（例: "neu" が "neutral" に一致しないように）
+        if (/^[a-z0-9]/.test(e.key)) src = '(?<![a-z0-9])' + src;
+        if (/[a-z0-9]$/.test(e.key)) src = src + '(?![a-z0-9])';
+        try { e.re = new RegExp(src, 'g'); } catch (err) { e.re = null; }
+    });
+
+    const list = [...map.values()].sort((a, b) => b.len - a.len); // 長い名前を優先
+    return { map: map, list: list };
+}
+
+function openBulkDiffModal() {
+    if (!checkAdminAuth()) return;
+
+    const select = document.getElementById('bulk-diff-level');
+    const levels = [...new Set(songs.map(s => s.level))].filter(l => l);
+    levels.sort((a, b) => {
+        const na = parseInt(a, 10), nb = parseInt(b, 10);
+        if (!isNaN(na) && !isNaN(nb)) return nb - na;
+        if (isNaN(na)) return 1;
+        if (isNaN(nb)) return -1;
+        return 0;
+    });
+    select.innerHTML = '';
+    levels.forEach(l => {
+        const opt = document.createElement('option');
+        opt.value = l;
+        opt.text = isNaN(parseInt(l, 10)) ? l : `Lv ${l}`;
+        select.appendChild(opt);
+    });
+    const optAll = document.createElement('option');
+    optAll.value = 'ALL';
+    optAll.text = 'すべてのレベル';
+    select.appendChild(optAll);
+    select.value = levels.includes(currentViewLevel) ? currentViewLevel : 'ALL';
+
+    bulkDiffResults = [];
+    document.getElementById('bulk-diff-preview').innerHTML = '';
+    document.getElementById('bulk-diff-apply-btn').style.display = 'none';
+    document.getElementById('bulk-diff-modal').style.display = 'flex';
+}
+
+function closeBulkDiffModal() {
+    document.getElementById('bulk-diff-modal').style.display = 'none';
+}
+
+function analyzeBulkDiff() {
+    const level = document.getElementById('bulk-diff-level').value;
+    const text = document.getElementById('bulk-diff-text').value;
+    const usePartial = document.getElementById('bulk-diff-partial').checked;
+
+    if (!text.trim()) { alert('テキストが空です。'); return; }
+
+    const targetSongs = songs.filter(s => level === 'ALL' || s.level === level);
+    if (targetSongs.length === 0) { alert('対象レベルの楽曲がありません。'); return; }
+
+    const index = bulkBuildNameIndex(targetSongs);
+    const found = new Map();     // 曲ID -> 割り当て結果
+    const noSongLines = [];      // 曲が見つからなかった行
+    const noDiffLines = [];      // 曲はあったが難易度が読み取れなかった行
+    let header = { cls: null, idx: null }; // 直前の見出し（例: ■強(+1.0)）
+
+    text.split(/\r?\n/).forEach(rawLine => {
+        const line = rawLine
+            .replace(/<[^>]+>/g, '')
+            .replace(/\[\[[^\]]*?\|([^\]]*?)\]\]/g, '$1')
+            .replace(/\[\[(.*?)\]\]/g, '$1');
+        const lineN = bulkNormText(line).trim();
+        if (!lineN) return;
+
+        const cells = lineN.split(/[\t|]/).map(c => c.trim()).filter(c => c);
+        if (cells.length === 0) return;
+
+        const hits = new Map(); // song -> { title, genre, partial, ambiguous }
+        const groups = [];
+        let rest = [];
+        const hit = (entry, partial) => {
+            groups.push(entry);
+            entry.entries.forEach(x => {
+                const h = hits.get(x.song) || { title: false, genre: false, partial: partial, ambiguous: false };
+                h[x.kind] = true;
+                hits.set(x.song, h);
+            });
+        };
+
+        // ① セル単位の完全一致
+        cells.forEach(c => {
+            const e = index.map.get(bulkKey(c));
+            if (e) hit(e, false); else rest.push(c);
+        });
+
+        // ② 見つからなければ、行の中に曲名・ジャンル名が含まれているか探す
+        if (hits.size === 0 && usePartial) {
+            let work = cells.join(' \t ');
+            index.list.forEach(e => {
+                if (!e.re) return;
+                e.re.lastIndex = 0;
+                if (e.re.test(work)) {
+                    e.re.lastIndex = 0;
+                    work = work.replace(e.re, ' \u0001 '); // 一致した部分を伏せて、短い名前の重複一致を防ぐ
+                    hit(e, true);
+                }
+            });
+            if (hits.size > 0) {
+                rest = work.split('\t').map(p => p.replace(/\u0001/g, ' ').trim()).filter(p => p);
+            }
+        }
+
+        // 曲が無い行：難易度だけの行なら「見出し」として覚える
+        if (hits.size === 0) {
+            const h = cells.length === 1 ? bulkParseStrict(cells[0]) : null;
+            if (h) header = h.cls ? h : { cls: header.cls, idx: h.idx };
+            else noSongLines.push(rawLine.trim());
+            return;
+        }
+
+        // 同じ名前の曲が複数ある場合：ジャンルと曲名の両方が一致した曲を優先
+        groups.forEach(e => {
+            const ss = [...new Set(e.entries.map(x => x.song))];
+            if (ss.length < 2) return;
+            const both = ss.filter(s => hits.get(s) && hits.get(s).title && hits.get(s).genre);
+            if (both.length > 0) {
+                ss.forEach(s => { if (!both.includes(s)) hits.delete(s); });
+            } else {
+                ss.forEach(s => { const h = hits.get(s); if (h) h.ambiguous = true; });
+            }
+        });
+
+        // 難易度の読み取り（行内に無ければ見出しを使う）
+        let d = bulkExtractDiff(rest);
+        let fromHeader = false;
+        if (d && !d.cls && header.cls) d = { cls: header.cls, idx: d.idx };
+        if (!d && (header.cls || header.idx)) { d = header; fromHeader = true; }
+        if (!d) { noDiffLines.push(rawLine.trim()); return; }
+
+        hits.forEach((h, song) => {
+            const built = bulkBuildDiff(d, song);
+            if (!built.raw) return;
+            const notes = [];
+            if (h.partial) notes.push('部分一致');
+            if (h.ambiguous) notes.push('同名の曲あり');
+            if (fromHeader) notes.push('見出しから');
+            if (built.keptClass) notes.push('区分は現状維持');
+            const prev = found.get(song.id);
+            if (prev && prev.newRaw !== built.raw) notes.push('複数行に登場(後の行を採用)');
+            found.set(song.id, { id: song.id, song: song, newRaw: built.raw, notes: notes, ambiguous: h.ambiguous });
+        });
+    });
+
+    const all = [...found.values()];
+    bulkDiffResults = all.filter(r => (r.song.diffRaw || '') !== r.newRaw);
+    const unchangedCount = all.length - bulkDiffResults.length;
+    const unmatchedSongs = targetSongs.filter(s => !found.has(s.id));
+
+    let html = `<div style="font-weight: bold; margin-bottom: 8px;">一致 ${all.length}曲（変更あり <span style="color:#d32f2f;">${bulkDiffResults.length}</span> / 変更なし ${unchangedCount}） ・ 対象レベルの未一致 ${unmatchedSongs.length}曲</div>`;
+
+    if (bulkDiffResults.length > 0) {
+        html += `<div style="max-height: 40vh; overflow-y: auto; border: 1px solid #ddd;">
+            <table style="font-size: 0.85em; box-shadow: none;">
+                <thead><tr>
+                    <th style="width: 30px; text-align: center;"><input type="checkbox" checked onchange="document.querySelectorAll('.bulk-diff-check').forEach(c => c.checked = this.checked)"></th>
+                    <th>ジャンル / 曲名</th><th>現在</th><th>変更後</th><th>備考</th>
+                </tr></thead><tbody>`;
+        bulkDiffResults.forEach((r, i) => {
+            const p = parseDifficulty(r.newRaw);
+            const st = getDifficultyColor(p.diffClass, p.diffIndex);
+            html += `<tr>
+                <td style="text-align: center;"><input type="checkbox" class="bulk-diff-check" value="${i}" ${r.ambiguous ? '' : 'checked'}></td>
+                <td><div style="font-size: 0.85em; color: #666;">${bulkEsc(r.song.genre)}</div><b>${bulkEsc(r.song.title)}</b>${level === 'ALL' ? ` <span class="level-badge">${bulkEsc(r.song.level)}</span>` : ''}</td>
+                <td style="color: #888;">${bulkEsc(r.song.diffRaw) || '（なし）'}</td>
+                <td style="font-weight: bold; color: ${st.color}; text-shadow: ${st.shadow};">${bulkEsc(r.newRaw)}</td>
+                <td style="font-size: 0.85em; color: #e65100;">${bulkEsc(r.notes.join(' / '))}</td>
+            </tr>`;
+        });
+        html += `</tbody></table></div>`;
+    } else {
+        html += `<div style="color: #d32f2f; font-weight: bold; padding: 8px 0;">変更が必要な曲は見つかりませんでした。</div>`;
+    }
+
+    const listBlock = (title, items) => items.length === 0 ? '' : `
+        <details style="margin-top: 8px; background: #f5f5f5; padding: 8px; border-radius: 4px;">
+            <summary style="cursor: pointer; font-size: 0.85em; font-weight: bold; color: #555;">${title} (${items.length})</summary>
+            <div style="max-height: 150px; overflow-y: auto; font-size: 0.8em; margin-top: 6px; white-space: pre-wrap; word-break: break-all;">${items.map(bulkEsc).join('\n')}</div>
+        </details>`;
+
+    html += listBlock('⚠ 曲は見つかったが難易度を読み取れなかった行', noDiffLines);
+    html += listBlock('対象レベルで割り当てが無かった曲', unmatchedSongs.map(s => (s.genre && s.genre !== s.title ? s.genre + ' / ' : '') + s.title));
+    html += listBlock('曲が見つからなかった行', noSongLines);
+
+    document.getElementById('bulk-diff-preview').innerHTML = html;
+    document.getElementById('bulk-diff-apply-btn').style.display = bulkDiffResults.length > 0 ? '' : 'none';
+}
+
+async function applyBulkDiff() {
+    if (!checkAdminAuth()) return;
+
+    const picked = [...document.querySelectorAll('.bulk-diff-check:checked')].map(cb => bulkDiffResults[parseInt(cb.value, 10)]);
+    if (picked.length === 0) { alert('適用する曲が選択されていません。'); return; }
+
+    let applied = 0;
+    picked.forEach(r => {
+        const song = songs.find(s => s.id === r.id);
+        if (!song) return;
+        const p = parseDifficulty(r.newRaw);
+        song.diffRaw = r.newRaw;
+        song.diffClass = p.diffClass;
+        song.diffIndex = p.diffIndex;
+        applied++;
+    });
+
+    bulkDiffResults = [];
+    closeBulkDiffModal();
+    renderTable();
+
+    if (confirm(`${applied}曲に難易度を割り当てました。\n続けて楽曲リストをクラウドに保存しますか？\n（保存しないと、再読み込みしたときに元に戻ります）`)) {
+        const ok = await saveToCloud(true);
+        if (ok) alert('楽曲リストをクラウドに保存しました！');
+    }
+}
