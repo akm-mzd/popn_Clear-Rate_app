@@ -3032,15 +3032,17 @@ function bulkEsc(s) {
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// 表記ゆれを吸収する（全角/半角・大文字/小文字・ハイフンや波ダッシュの違い）
+// 表記ゆれを吸収する（全角/半角・大文字/小文字・ハイフンや波ダッシュの違い・ⓊとUPPER）
 function bulkNormText(s) {
     return String(s || '')
+        .replace(/[\u24CA\u24E4]/g, '(UPPER)')   // Ⓤ → (UPPER)
         .replace(/[\u2212\u2010-\u2015]/g, '-')
         .replace(/[\u301C\u223C]/g, '~')
         .replace(/[\u2018\u2019\u0060\u00B4]/g, "'")
         .replace(/[\u201C\u201D]/g, '"')
         .normalize('NFKC')
-        .toLowerCase();
+        .toLowerCase()
+        .replace(/[(\[]\s*upper\s*[)\]]/g, '(upper)'); // （UPPER）や [UPPER] も同じ扱いに
 }
 function bulkKey(s) { return bulkNormText(s).replace(/\s+/g, ''); }
 function bulkIdxOk(idx) { return Math.abs(parseFloat(idx.replace('±', ''))) <= 10; }
