@@ -553,39 +553,32 @@ async function manualSaveToCloud() {
         alert("クラウド保存先のURLが設定されていません。");
         return;
     }
-    const mode = prompt(`何をクラウドに保存（同期）しますか？\n\n1 : 現在のユーザー [${currentUser}] の記録（クリア・スコア・メモ）\n2 : 楽曲リスト全体（※管理者パスワード必須）\n3 : 両方（楽曲リスト ＋ 全ユーザーの記録）\n\n半角数字の 1, 2, 3 のいずれかを入力してください。`, "1");
+    const mode = prompt(`何をクラウドに保存（同期）しますか？\n\n1 : 現在のユーザー [${currentUser}] の記録（クリア・スコア・メモ）\n2 : 楽曲リスト ＋ 全ユーザーの記録（※管理者パスワード必須）\n\n半角数字の 1, 2 のいずれかを入力してください。`, "1");
 
-    if (mode !== "1" && mode !== "2" && mode !== "3") {
-        return; 
+    if (mode !== "1" && mode !== "2") {
+        return;
     }
 
     // 保存を実行する前に、現在の画面の最新状態を確実に allUsersData へ反映させておく
-    if (!allUsersData[currentUser]) allUsersData[currentUser] = { clearRecords: {}, scoreRecords: {}, memoRecords: {} };
+    if (!allUsersData[currentUser]) allUsersData[currentUser] = emptyUser();
     allUsersData[currentUser].clearRecords = clearRecords;
     allUsersData[currentUser].scoreRecords = scoreRecords;
     allUsersData[currentUser].memoRecords = memoRecords;
 
-    let success1 = true;
-    let success2 = true;
+    let success = true;
 
     // 「1: 現在のユーザーのみ」の場合
     if (mode === "1") {
-        success1 = await saveToCloud(false, currentUser);
-    }
-    
-    // 「2: 楽曲リストのみ」の場合
-    if (mode === "2") {
-        if (!checkAdminAuth()) return;
-        success2 = await saveToCloud(true);
+        success = await saveToCloud(false, currentUser);
     }
 
-    // 「3: 両方（楽曲リスト ＋ 全ユーザーの記録）」の場合
-    if (mode === "3") {
+    // 「2: 楽曲リスト ＋ 全ユーザーの記録」の場合
+    if (mode === "2") {
         if (!checkAdminAuth()) return;
-        
+
         // ① まず楽曲リスト全体を保存
-        success2 = await saveToCloud(true);
-        if (!success2) return; // 楽曲の保存に失敗した場合は安全のため中断
+        success = await saveToCloud(true);
+        if (!success) return; // 楽曲の保存に失敗した場合は安全のため中断
 
         // ② 続いて、登録されている全ユーザーを順番にクラウドへ保存
         const users = Object.keys(allUsersData);
@@ -594,14 +587,14 @@ async function manualSaveToCloud() {
             const progressText = `全ユーザーを保存中 (${i + 1}/${users.length}): [${targetU}]`;
             const res = await saveToCloud(false, targetU, progressText);
             if (!res) {
-                success1 = false;
+                success = false;
                 alert(`ユーザー [${targetU}] の保存中に通信エラーが発生しました。`);
                 break;
             }
         }
     }
-    
-    if (success1 && success2) {
+
+    if (success) {
         alert("クラウドへの保存が完了しました！");
     }
 }
