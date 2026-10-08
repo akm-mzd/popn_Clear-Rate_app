@@ -3016,12 +3016,14 @@ changeViewLevel = function (level) {
 const BULK_CLS = '危険|別格|逆詐称|詐称|入門|強|中|弱';
 const BULK_NUM = '[+\\-±]?\\d+(?:\\.\\d+)?';
 const BULK_SIGNED = '[+\\-±]\\d+(?:\\.\\d+)?';
+const BULK_ERR = '(?:\\s*±\\s*\\d+(?:\\.\\d+)?)?'; // 指数の後ろの誤差（例: ±0.5）
 const BULK_DECO = '[■□◆◇●○★☆▼▽▶▷【】《》「」『』<>:#*・=、,\\[\\]]+';
 const BULK_RE_DECO_START = new RegExp('^' + BULK_DECO);
 const BULK_RE_DECO_END = new RegExp(BULK_DECO + '$');
-const BULK_RE_STRICT = new RegExp('^(' + BULK_CLS + ')?(?:([(\\[])?(' + BULK_NUM + ')[)\\]]?)?$');
-const BULK_RE_FREE_CLS = new RegExp('(' + BULK_CLS + ')\\s*(?:[(\\[]\\s*(' + BULK_NUM + ')\\s*[)\\]]|(' + BULK_SIGNED + '))?', 'g');
-const BULK_RE_FREE_NUM = new RegExp('[(\\[]\\s*(' + BULK_SIGNED + ')\\s*[)\\]]|(?:^|\\s)(' + BULK_SIGNED + ')(?=\\s|$)');
+const BULK_RE_STRICT = new RegExp('^(' + BULK_CLS + ')?(?:([(\\[])?(' + BULK_NUM + ')(' + BULK_ERR + ')[)\\]]?)?$');
+const BULK_RE_FREE_CLS = new RegExp('(' + BULK_CLS + ')\\s*(?:[(\\[]\\s*(' + BULK_NUM + ')(' + BULK_ERR + ')\\s*[)\\]]|(' + BULK_SIGNED + ')(' + BULK_ERR + '))?', 'g');
+const BULK_RE_FREE_NUM = new RegExp('[(\\[]\\s*(' + BULK_SIGNED + ')(' + BULK_ERR + ')\\s*[)\\]]|(?:^|\\s)(' + BULK_SIGNED + ')(' + BULK_ERR + ')(?=\\s|$)');
+const BULK_RE_CHART_SUFFIX = /\((?:ex|h|n|e)\)$/; // ジャンル名の末尾の譜面表記
 
 let bulkDiffResults = [];
 
@@ -3041,10 +3043,10 @@ function bulkNormText(s) {
         .toLowerCase();
 }
 function bulkKey(s) { return bulkNormText(s).replace(/\s+/g, ''); }
-
 function bulkIdxOk(idx) { return Math.abs(parseFloat(idx.replace('±', ''))) <= 10; }
+function bulkCleanErr(s) { return (s || '').replace(/\s+/g, ''); }
 
-// 文字列全体が「強(+0.5)」「詐称」「+1.5」のような難易度表記かどうか
+// 文字列全体が「強(+0.5)」「中(+0.213±0.5)」「詐称」「+1.5」のような難易度表記かどうか
 function bulkParseStrict(part) {
     const t = part.replace(/\s+/g, '').replace(BULK_RE_DECO_START, '').replace(BULK_RE_DECO_END, '');
     if (!t) return null;
@@ -3053,7 +3055,7 @@ function bulkParseStrict(part) {
     if (m[3] && !bulkIdxOk(m[3])) return null;
     // 区分なしの数字だけの場合は、符号かカッコが無ければ無視（BPMやノーツ数との混同防止）
     if (!m[1] && !m[2] && !/^[+\-±]/.test(m[3])) return null;
-    return { cls: m[1] || null, idx: m[3] || null };
+    return { cls: m[1] || null, idx: m[3] || null, err: bulkCleanErr(m[4]) };
 }
 
 // 曲名以外の部分から難易度表記を探す
@@ -3070,31 +3072,33 @@ function bulkExtractDiff(parts) {
     for (let i = parts.length - 1; i >= 0; i--) {
         let best = null;
         for (const m of parts[i].matchAll(BULK_RE_FREE_CLS)) {
-            const idx = m[2] || m[3] || null;
+            const idx = m[2] || m[4] || null;
+            const err = idx ? bulkCleanErr(m[2] ? m[3] : m[5]) : '';
             if (!idx && m[1].length === 1) continue; // 「強」「中」「弱」単独は誤検出しやすいので無視
             if (idx && !bulkIdxOk(idx)) continue;
-            if (!best || (idx && !best.idx)) best = { cls: m[1], idx: idx };
+            if (!best || (idx && !best.idx)) best = { cls: m[1], idx: idx, err: err };
         }
         if (best) return best;
     }
     for (let i = parts.length - 1; i >= 0; i--) {
         const m = parts[i].match(BULK_RE_FREE_NUM);
         if (m) {
-            const idx = m[1] || m[2];
-            if (bulkIdxOk(idx)) return { cls: null, idx: idx };
+            const idx = m[1] || m[3];
+            const err = bulkCleanErr(m[1] ? m[2] : m[4]);
+            if (bulkIdxOk(idx)) return { cls: null, idx: idx, err: err };
         }
     }
     return null;
 }
 
-// 保存する難易度の文字列を作る（例: 強(+0.5)）
+// 保存する難易度の文字列を作る（例: 強(+0.5) / 中(+0.213±0.5)）
 function bulkBuildDiff(d, song) {
     let idx = d.idx;
     if (idx && /^\d/.test(idx) && parseFloat(idx) > 0) idx = '+' + idx;
     let cls = d.cls;
     let keptClass = false;
     if (!cls && song.diffClass && song.diffClass !== '未分類') { cls = song.diffClass; keptClass = true; }
-    return { raw: (cls || '') + (idx ? '(' + idx + ')' : ''), keptClass: keptClass };
+    return { raw: (cls || '') + (idx ? '(' + idx + (d.err || '') + ')' : ''), keptClass: keptClass };
 }
 
 // 曲名・ジャンル名から曲を引くための索引
@@ -3106,7 +3110,13 @@ function bulkBuildNameIndex(targetSongs) {
         if (!map.has(key)) map.set(key, { key: key, len: key.length, entries: [], re: null });
         map.get(key).entries.push({ song: song, kind: kind });
     };
-    targetSongs.forEach(s => { add(s.title, s, 'title'); add(s.genre, s, 'genre'); });
+    targetSongs.forEach(s => {
+        add(s.title, s, 'title');
+        add(s.genre, s, 'genre');
+        const g = bulkKey(s.genre);
+        const loose = g.replace(BULK_RE_CHART_SUFFIX, '');
+        if (loose && loose !== g) add(loose, s, 'genre'); // (EX) などを外した名前でも引けるように
+    });
 
     map.forEach(e => {
         if (e.len < 2) return; // 1文字の名前は完全一致のみ
@@ -3170,7 +3180,7 @@ function analyzeBulkDiff() {
     const found = new Map();     // 曲ID -> 割り当て結果
     const noSongLines = [];      // 曲が見つからなかった行
     const noDiffLines = [];      // 曲はあったが難易度が読み取れなかった行
-    let header = { cls: null, idx: null }; // 直前の見出し（例: ■強(+1.0)）
+    let header = { cls: null, idx: null, err: '' }; // 直前の見出し（例: ■強(+1.0)）
 
     text.split(/\r?\n/).forEach(rawLine => {
         const line = rawLine
@@ -3197,7 +3207,8 @@ function analyzeBulkDiff() {
 
         // ① セル単位の完全一致
         cells.forEach(c => {
-            const e = index.map.get(bulkKey(c));
+            const k = bulkKey(c);
+            const e = index.map.get(k) || index.map.get(k.replace(BULK_RE_CHART_SUFFIX, ''));
             if (e) hit(e, false); else rest.push(c);
         });
 
@@ -3221,7 +3232,7 @@ function analyzeBulkDiff() {
         // 曲が無い行：難易度だけの行なら「見出し」として覚える
         if (hits.size === 0) {
             const h = cells.length === 1 ? bulkParseStrict(cells[0]) : null;
-            if (h) header = h.cls ? h : { cls: header.cls, idx: h.idx };
+            if (h) header = h.cls ? h : { cls: header.cls, idx: h.idx, err: h.err };
             else noSongLines.push(rawLine.trim());
             return;
         }
@@ -3241,7 +3252,7 @@ function analyzeBulkDiff() {
         // 難易度の読み取り（行内に無ければ見出しを使う）
         let d = bulkExtractDiff(rest);
         let fromHeader = false;
-        if (d && !d.cls && header.cls) d = { cls: header.cls, idx: d.idx };
+        if (d && !d.cls && header.cls) d = { cls: header.cls, idx: d.idx, err: d.err };
         if (!d && (header.cls || header.idx)) { d = header; fromHeader = true; }
         if (!d) { noDiffLines.push(rawLine.trim()); return; }
 
