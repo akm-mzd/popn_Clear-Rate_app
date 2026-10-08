@@ -7,11 +7,6 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbz7aEE4z7w7KLxSVRU5Mm8x
 const ADMIN_PASSWORD = "1005"; 
 // ==========================================
 
-const STORAGE_KEY_SONGS = 'popn_songs_data_v2';
-const STORAGE_KEY_CLEARS = 'popn_clear_data_v2';
-const STORAGE_KEY_SCORES = 'popn_score_data_v2';
-const STORAGE_KEY_MEMOS = 'popn_memo_data_v2';
-
 let songs = [];
 let allUsersData = {}; 
 let currentUser = localStorage.getItem('popn_current_user') || "Guest";
@@ -652,101 +647,6 @@ async function saveToCloud(isSongUpdate = false, targetUserName = currentUser, c
     return isSuccess;
 }
 
-async function syncLocalToCloud() {
-    if (!GAS_URL || GAS_URL.trim() === '') {
-        alert("GAS_URLが設定されていません。先にGASのデプロイとURLの貼り付けを行ってください。");
-        return;
-    }
-    
-    if (currentUser === "Guest") {
-        alert("「Guest」ユーザーにはデータを上書きできません。\n右上の「+ 新規追加」からユーザーを作成し、選択してから実行してください。");
-        return;
-    }
-
-    const localSongs = JSON.parse(localStorage.getItem(STORAGE_KEY_SONGS)) || [];
-    const localClears = JSON.parse(localStorage.getItem(STORAGE_KEY_CLEARS)) || {};
-    const localScores = JSON.parse(localStorage.getItem(STORAGE_KEY_SCORES)) || {};
-    const localMemos = JSON.parse(localStorage.getItem(STORAGE_KEY_MEMOS)) || {};
-    
-    if (localSongs.length === 0 && Object.keys(localClears).length === 0) {
-        alert("このデバイス（ブラウザ）にデータが見つかりません。");
-        return;
-    }
-
-    const mode = prompt(`何をクラウドに同期（上書き）しますか？\n\n1 : 現在のユーザー [${currentUser}] の記録だけを移行\n2 : 楽曲リスト全体を移行（※管理者パスワード必須）\n3 : 両方移行\n\n半角数字の 1, 2, 3 のいずれかを入力してください。`, "1");
-
-    if (mode !== "1" && mode !== "2" && mode !== "3") {
-        return; 
-    }
-
-    if (mode === "1" || mode === "3") {
-        if (!confirm(`このデバイスに保存されている記録を、ユーザー [${currentUser}] のデータとしてクラウドに上書きしますか？`)) return;
-        
-        showLoading(true, `ユーザー [${currentUser}] の記録を移行中...`);
-        try {
-            const payload = {
-                type: "updateClears",
-                targetUser: currentUser,
-                clearRecords: localClears,
-                scoreRecords: localScores,
-                memoRecords: localMemos
-            };
-            const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
-            const result = await res.json();
-            
-            if (result.status === 'error') {
-                alert("記録の移行エラー: " + result.message);
-                showLoading(false);
-                return;
-            } else {
-                clearRecords = localClears;
-                scoreRecords = localScores;
-                memoRecords = localMemos;
-                if (!allUsersData[currentUser]) allUsersData[currentUser] = { clearRecords: {}, scoreRecords: {}, memoRecords: {} };
-                allUsersData[currentUser].clearRecords = clearRecords;
-                allUsersData[currentUser].scoreRecords = scoreRecords;
-                allUsersData[currentUser].memoRecords = memoRecords;
-                alert(`ユーザー [${currentUser}] への記録の移行が完了しました！`);
-            }
-        } catch (e) {
-            alert("通信エラーが発生しました。");
-            showLoading(false);
-            return;
-        }
-    }
-
-    if (mode === "2" || mode === "3") {
-        if (!checkAdminAuth()) {
-            showLoading(false);
-            renderTable();
-            return;
-        }
-
-        showLoading(true, '楽曲リスト全体を移行中...');
-        try {
-            const payload = {
-                type: "updateSongs",
-                targetUser: currentUser, 
-                password: ADMIN_PASSWORD,
-                songs: localSongs
-            };
-            const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
-            const result = await res.json();
-            
-            if (result.status === 'error') {
-                alert("楽曲リストの移行エラー: " + result.message);
-            } else {
-                songs = localSongs;
-                alert("楽曲リスト全体の移行が完了しました！");
-            }
-        } catch (e) {
-            alert("通信エラーが発生しました。");
-        }
-    }
-
-    showLoading(false);
-    renderTable();
-}
 
 function initFilters() {
     const medalSelect = document.getElementById('filter-medal');
@@ -966,7 +866,6 @@ function clearMemo() {
         
         if (!allUsersData[currentUser]) allUsersData[currentUser] = { clearRecords: {}, scoreRecords: {}, memoRecords: {} };
         allUsersData[currentUser].memoRecords = memoRecords;
-        localStorage.setItem(STORAGE_KEY_MEMOS, JSON.stringify(memoRecords));
 
         closeMemoModal();
         scheduleAutoSave();   // ←追加
@@ -988,7 +887,6 @@ function saveMemoModal() {
 
     if (!allUsersData[currentUser]) allUsersData[currentUser] = { clearRecords: {}, scoreRecords: {}, memoRecords: {} };
     allUsersData[currentUser].memoRecords = memoRecords;
-    localStorage.setItem(STORAGE_KEY_MEMOS, JSON.stringify(memoRecords));
 
     closeMemoModal();
     scheduleAutoSave();   // ←追加
@@ -1965,7 +1863,6 @@ async function clearRecordsOnly() {
         clearRecords = allUsersData[currentUser].clearRecords;
         scoreRecords = allUsersData[currentUser].scoreRecords;
         memoRecords = allUsersData[currentUser].memoRecords;
-        localStorage.setItem(STORAGE_KEY_MEMOS, JSON.stringify(memoRecords));
         scheduleAutoSave();   // ←追加
         renderTable();
     }
@@ -2895,83 +2792,122 @@ function scrollToTop() {
 // ★ バックアップJSONからの復元機能
 // ==========================================
 async function restoreFromJson(event) {
-    const file = event.target.files[0];
+    const input = event.target;
+    const file = input.files[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async function(e) {
-        try {
-            const data = JSON.parse(e.target.result);
-            
-            // ファイルの形式チェック
-            const hasSongs = data.songs && Array.isArray(data.songs) && data.songs.length > 0;
-            const hasRecords = data.clearRecords || data.scoreRecords || data.memoRecords;
-            const isSongOnly = Array.isArray(data) && data.length > 0 && data[0].id; // 「楽曲のみ」で出力した場合
-
-            if (!hasSongs && !hasRecords && !isSongOnly) {
-                alert('対応していないファイル形式です。');
-                return;
-            }
-
-            // 楽曲データが含まれる場合は管理者パスワードを要求
-            if (hasSongs || isSongOnly) {
-                if (!checkAdminAuth()) {
-                    event.target.value = ''; // ファイル選択をリセット
-                    return;
-                }
-            }
-
-            if (!confirm(`現在のデータを選択したファイル「${file.name}」の内容で上書きしますか？\n※現在の未保存の記録は消去され、元に戻せません。`)) {
-                event.target.value = '';
-                return;
-            }
-
-            showLoading(true, 'データを復元中...');
-
-            // 楽曲のみの配列だった場合
-            if (isSongOnly) {
-                songs = data;
-                localStorage.setItem(STORAGE_KEY_SONGS, JSON.stringify(songs));
-            } else {
-                // フルバックアップ形式の場合
-                if (hasSongs) {
-                    songs = data.songs;
-                    localStorage.setItem(STORAGE_KEY_SONGS, JSON.stringify(songs));
-                }
-                if (data.clearRecords) clearRecords = data.clearRecords;
-                if (data.scoreRecords) scoreRecords = data.scoreRecords;
-                if (data.memoRecords) memoRecords = data.memoRecords;
-
-                // 現在のユーザーデータに反映
-                if (!allUsersData[currentUser]) allUsersData[currentUser] = { clearRecords: {}, scoreRecords: {}, memoRecords: {} };
-                allUsersData[currentUser].clearRecords = clearRecords;
-                allUsersData[currentUser].scoreRecords = scoreRecords;
-                allUsersData[currentUser].memoRecords = memoRecords;
-
-                // ローカルストレージに保存
-                localStorage.setItem(STORAGE_KEY_CLEARS, JSON.stringify(clearRecords));
-                localStorage.setItem(STORAGE_KEY_SCORES, JSON.stringify(scoreRecords));
-                localStorage.setItem(STORAGE_KEY_MEMOS, JSON.stringify(memoRecords));
-            }
-
-            scheduleAutoSave();   // ←追加
-            updateDynamicFilters();
-            renderTable();
-            showLoading(false);
-            
-            alert('データの復元が完了しました！\n※クラウドへも反映する場合は、上部の「☁️ 変更をクラウドに保存」または「⬆️ 今のデバイスのデータを移行」を実行してください。');
-
-        } catch (err) {
-            console.error(err);
-            alert('ファイルの読み込みに失敗しました。JSONファイルが壊れている可能性があります。');
-            showLoading(false);
+    try {
+        if (!cloudReady) {
+            alert('クラウドの最新データを読み込めていないため、復元できません。\nページを再読み込みしてからやり直してください。');
+            return;
         }
-        
-        event.target.value = ''; // 次回も同じファイルを選択できるようにリセット
-    };
-    reader.readAsText(file);
-}
 
+        const data = JSON.parse(await file.text());
+        if (!data || typeof data !== 'object') { alert('対応していないファイル形式です。'); return; }
+
+        const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
+        const fileSongs = Array.isArray(data) ? data : data.songs;   // 「楽曲のみ」のバックアップは配列
+        const hasSongs = Array.isArray(fileSongs) && fileSongs.length > 0 &&
+            fileSongs.every(s => isObj(s) && 'title' in s && 'notes' in s);
+        const hasRecords = isObj(data) &&
+            (isObj(data.clearRecords) || isObj(data.scoreRecords) || isObj(data.memoRecords));
+
+        if (!hasSongs && !hasRecords) { alert('対応していないファイル形式です。'); return; }
+
+        // 何を復元するか
+        let restoreSongs = hasSongs;
+        let restoreRecords = hasRecords;
+        if (hasSongs && hasRecords) {
+            const mode = prompt(`「${file.name}」から何を復元しますか？\n\n1 : 記録（クリア・スコア・メモ）だけ\n2 : 楽曲リスト ＋ 記録（※管理者パスワード必須）\n\n半角数字の 1, 2 のいずれかを入力してください。`, '1');
+            if (mode !== '1' && mode !== '2') return;
+            restoreSongs = (mode === '2');
+        }
+        if (restoreSongs && !checkAdminAuth()) return;
+
+        // 確認（ファイル名のユーザーと選択中のユーザーが違えば注意を出す）
+        const nameMatch = file.name.match(/^popn_data_(.+?)(?: \(\d+\))?\.json$/);
+        const fileUser = nameMatch ? nameMatch[1] : null;
+        let msg = `「${file.name}」の内容で復元します。\n`;
+        if (restoreRecords) {
+            msg += `\n・ユーザー [${currentUser}] の記録を、ファイルの内容に置き換えます`;
+            if (fileUser && fileUser !== currentUser) {
+                msg += `\n  ⚠ このファイルは [${fileUser}] のバックアップのようです。ユーザーが違っていないか確認してください`;
+            }
+        }
+        if (restoreSongs) msg += `\n・楽曲リスト全体を、ファイルの ${fileSongs.length} 曲に置き換えます（全ユーザーに影響）`;
+        msg += `\n\nクラウドにも反映され、元に戻せません。よろしいですか？`;
+        if (!confirm(msg)) return;
+
+        // 楽曲リストの復元
+        if (restoreSongs) {
+            songs = fileSongs.map((s, i) => {
+                const p = parseDifficulty(s.diffRaw);
+                return Object.assign({}, s, {
+                    id: s.id || (s.genre + '_' + s.title + '_' + s.notes),
+                    level: s.level || '48',
+                    diffRaw: s.diffRaw || '',
+                    diffClass: p.diffClass,
+                    diffIndex: p.diffIndex,
+                    originalOrder: s.originalOrder !== undefined ? s.originalOrder : i
+                });
+            });
+        }
+
+        // 記録の復元（ファイルに入っている種類だけ置き換える）
+        let skippedMedals = 0;
+        let orphanCount = 0;
+        if (restoreRecords) {
+            if (!allUsersData[currentUser]) allUsersData[currentUser] = emptyUser();
+            const user = allUsersData[currentUser];
+
+            if (isObj(data.clearRecords)) {
+                const clears = {};
+                for (const id in data.clearRecords) {
+                    const medal = data.clearRecords[id];
+                    // アプリが知らないメダル名は取り込まない（画面が壊れるのを防ぐ）
+                    if (medal !== '' && MEDAL_TYPES[medal]) clears[id] = medal; else skippedMedals++;
+                }
+                user.clearRecords = clears;
+            }
+            if (isObj(data.scoreRecords)) user.scoreRecords = data.scoreRecords;
+            if (isObj(data.memoRecords)) user.memoRecords = data.memoRecords;
+
+            clearRecords = user.clearRecords;
+            scoreRecords = user.scoreRecords;
+            memoRecords = user.memoRecords;
+
+            const songIds = new Set(songs.map(s => s.id));
+            orphanCount = Object.keys(clearRecords).filter(id => !songIds.has(id)).length;
+        }
+
+        updateDynamicFilters();
+        renderTable();
+
+        // クラウドへ反映（楽曲リストはその場で保存、記録は自動保存に任せる）
+        let songsSaved = true;
+        if (restoreSongs) songsSaved = await saveToCloud(true);
+        if (restoreRecords) scheduleAutoSave();
+
+        let done = '復元が完了しました。';
+        if (restoreRecords) {
+            done += `\n・記録：クリア ${Object.keys(clearRecords).length}件 / スコア ${Object.keys(scoreRecords).length}件 / メモ ${Object.keys(memoRecords).length}件（自動でクラウドに保存されます）`;
+            if (orphanCount > 0) done += `\n・うち ${orphanCount}件は、今の楽曲リストに無い曲の記録です（表示されません）`;
+            if (skippedMedals > 0) done += `\n・不明なメダル ${skippedMedals}件は取り込みませんでした`;
+        }
+        if (restoreSongs) {
+            done += songsSaved
+                ? '\n・楽曲リスト：クラウドに保存しました'
+                : '\n・楽曲リスト：クラウド保存に失敗しました。「☁️ 変更をクラウドに保存」からやり直してください';
+        }
+        alert(done);
+
+    } catch (err) {
+        console.error(err);
+        alert('ファイルの読み込みに失敗しました。JSONファイルが壊れている可能性があります。');
+    } finally {
+        input.value = ''; // 次回も同じファイルを選択できるようにリセット
+    }
+}
 // ==========================================
 // ★ メニューの開閉
 // ==========================================
