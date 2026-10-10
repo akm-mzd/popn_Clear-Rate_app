@@ -508,7 +508,13 @@ window.onload = async () => {
     showLoading(false);
 };
 
+function updateCurrentUserLabel() {
+    const label = document.getElementById('current-user-label');
+    if (label) label.textContent = `👤 ユーザー: ${currentUser}`;
+}
+
 function initUserSelector() {
+    updateCurrentUserLabel();
     const select = document.getElementById('current-user-select');
     select.innerHTML = "";
     const users = Object.keys(allUsersData);
@@ -542,6 +548,7 @@ function updateCompareUserSelect() {
 function switchUser() {
     currentUser = document.getElementById('current-user-select').value;
     localStorage.setItem('popn_current_user', currentUser);
+    updateCurrentUserLabel();
     clearRecords = allUsersData[currentUser]?.clearRecords || {};
     scoreRecords = allUsersData[currentUser]?.scoreRecords || {};
     memoRecords = allUsersData[currentUser]?.memoRecords || {};
@@ -565,51 +572,54 @@ function addNewUser() {
 }
 
 // ==========================================
-// ★ クラウド手動保存（3の両方で全ユーザー対応版）
+// ★ クラウド手動保存
 // ==========================================
-async function manualSaveToCloud() {
-    if (!GAS_URL || GAS_URL.trim() === '') {
-        alert("クラウド保存先のURLが設定されていません。");
-        return;
-    }
-    const mode = prompt(`何をクラウドに保存（同期）しますか？\n\n1 : 現在のユーザー [${currentUser}] の記録（クリア・スコア・メモ）\n2 : 楽曲リスト ＋ 全ユーザーの記録（※管理者パスワード必須）\n\n半角数字の 1, 2 のいずれかを入力してください。`, "1");
-
-    if (mode !== "1" && mode !== "2") {
-        return;
-    }
-
-    // 保存を実行する前に、現在の画面の最新状態を確実に allUsersData へ反映させておく
+// 画面の最新状態を allUsersData へ反映させておく
+function syncCurrentUserToAllUsers() {
     if (!allUsersData[currentUser]) allUsersData[currentUser] = emptyUser();
     allUsersData[currentUser].clearRecords = clearRecords;
     allUsersData[currentUser].scoreRecords = scoreRecords;
     allUsersData[currentUser].memoRecords = memoRecords;
+}
 
-    let success = true;
-
-    // 「1: 現在のユーザーのみ」の場合
-    if (mode === "1") {
-        success = await saveToCloud(false, currentUser);
+// 「保存」ボタン：現在開いているユーザーの記録（クリア・スコア・メモ）を保存
+async function saveCurrentUserToCloud() {
+    if (!GAS_URL || GAS_URL.trim() === '') {
+        alert("クラウド保存先のURLが設定されていません。");
+        return;
     }
+    syncCurrentUserToAllUsers();
+    const success = await saveToCloud(false, currentUser);
+    if (success) {
+        alert(`ユーザー [${currentUser}] の記録をクラウドに保存しました！`);
+    }
+}
 
-    // 「2: 楽曲リスト ＋ 全ユーザーの記録」の場合
-    if (mode === "2") {
-        if (!checkAdminAuth()) return;
+// 「全体保存」ボタン（PC版のみ）：楽曲リスト ＋ 全ユーザーの記録を保存（管理者パスワード必須）
+async function saveAllToCloud() {
+    if (!GAS_URL || GAS_URL.trim() === '') {
+        alert("クラウド保存先のURLが設定されていません。");
+        return;
+    }
+    if (!confirm("楽曲リスト ＋ 全ユーザーの記録をクラウドに保存します。\n（※管理者パスワード必須）\n\nよろしいですか？")) return;
 
-        // ① まず楽曲リスト全体を保存
-        success = await saveToCloud(true);
-        if (!success) return; // 楽曲の保存に失敗した場合は安全のため中断
+    syncCurrentUserToAllUsers();
+    if (!checkAdminAuth()) return;
 
-        // ② 続いて、登録されている全ユーザーを順番にクラウドへ保存
-        const users = Object.keys(allUsersData);
-        for (let i = 0; i < users.length; i++) {
-            const targetU = users[i];
-            const progressText = `全ユーザーを保存中 (${i + 1}/${users.length}): [${targetU}]`;
-            const res = await saveToCloud(false, targetU, progressText);
-            if (!res) {
-                success = false;
-                alert(`ユーザー [${targetU}] の保存中に通信エラーが発生しました。`);
-                break;
-            }
+    // ① まず楽曲リスト全体を保存
+    let success = await saveToCloud(true);
+    if (!success) return; // 楽曲の保存に失敗した場合は安全のため中断
+
+    // ② 続いて、登録されている全ユーザーを順番にクラウドへ保存
+    const users = Object.keys(allUsersData);
+    for (let i = 0; i < users.length; i++) {
+        const targetU = users[i];
+        const progressText = `全ユーザーを保存中 (${i + 1}/${users.length}): [${targetU}]`;
+        const res = await saveToCloud(false, targetU, progressText);
+        if (!res) {
+            success = false;
+            alert(`ユーザー [${targetU}] の保存中に通信エラーが発生しました。`);
+            break;
         }
     }
 

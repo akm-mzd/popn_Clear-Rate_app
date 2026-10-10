@@ -13,18 +13,9 @@
         <div id="loading-text">クラウドと通信中...</div>
     </div>
 
-    <div class="user-selector-area">
-        <div>
-            <span class="user-label">👤 ユーザー:</span>
-            <select id="current-user-select" onchange="switchUser()"></select>
-            <button onclick="addNewUser()" style="padding: 6px 12px; margin-left: 10px; font-size: 0.9em; background: #4caf50; color: white; border: none; border-radius: 4px;">+ 新規追加</button>
-            <button onclick="manualSaveToCloud()" style="padding: 6px 12px; margin-left: 10px; font-size: 0.9em; background: #2196F3; color: white; border: none; border-radius: 4px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2); cursor: pointer;">☁️ 変更をクラウドに保存</button>
-        </div>
-        <div id="user-display-name" style="font-weight: bold; color: #ffd700; display:none;">未ログイン</div>
-    </div>
-
     <div style="padding: 20px;">
         <h1>Pop’n Clear Rate app</h1>
+        <div id="current-user-label" class="current-user-label">👤 ユーザー: -</div>
 
         <details id="admin-controls" class="controls" style="cursor: pointer;">
             <summary style="font-weight: bold; font-size: 1.1em; color: #333; user-select: none; outline: none; padding-bottom: 5px; border-bottom: 1px dashed #ccc;">
@@ -127,7 +118,13 @@
         <div id="menu-backdrop" onclick="toggleMenu(false)"></div>
         <div class="view-header" id="menu-panel">
             <div class="menu-title">メニュー</div>
-            <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+            <div class="menu-user-section">
+                <span class="user-label">👤 ユーザー:</span>
+                <select id="current-user-select" onchange="switchUser()"></select>
+                <button onclick="addNewUser()" class="menu-add-user-btn">+ 新規追加</button>
+                <button onclick="saveAllToCloud()" class="menu-save-all-btn pc-only">☁️ 全体保存 (楽曲リスト＋全ユーザー)</button>
+            </div>
+            <div class="menu-main-row" style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
                 <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                     <span style="font-weight: bold; font-size: 1.1em;">表示レベル:</span>
                     <div id="view-level-buttons" style="display: flex; flex-wrap: wrap; gap: 6px;">
@@ -443,6 +440,7 @@
 
     
 
+    <button id="save-btn" onclick="saveCurrentUserToCloud()" title="開いているユーザーの変更をクラウドに保存">保存</button>
     <button id="back-to-top" onclick="scrollToTop()" title="トップに戻る">↑</button>
 
     <script src="main.js"></script>
