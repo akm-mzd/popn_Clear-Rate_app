@@ -495,3 +495,17 @@ body.exporting-image #back-to-top { display: none !important; }
     margin-top: 2px;
     text-align: center; font-size: 0.8em; color: #9e9e9e; letter-spacing: 0.5px;
 }
+
+/* =========================================
+    🔍 絞り込み（チェックリスト）
+    ========================================= */
+.filter-groups {
+    display: flex; flex-direction: column; gap: 10px;
+    margin-top: 8px; padding-top: 8px; border-top: 1px dashed #eee; font-size: 0.9em;
+}
+.filter-group-title { font-size: 0.85em; font-weight: bold; color: #666; margin-bottom: 4px; }
+.filter-checks { display: flex; flex-wrap: wrap; gap: 6px; }
+.filter-checks .check-label { margin: 0; }
+.filter-group-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.filter-hint { font-size: 0.8em; color: #888; }
+#filter-summary-count { color: #d32f2f; }

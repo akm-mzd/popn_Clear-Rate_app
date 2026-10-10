@@ -4,44 +4,74 @@
 // 絞り込み・並び替え・統計の計算・表の描画・表示レベルボタン。
 // ==========================================
 
-function initFilters() {
-    const medalSelect = document.getElementById('filter-medal');
-    medalSelect.innerHTML = '<option value="ALL">すべて</option>';
-    
-    const sortedMedalKeys = Object.keys(MEDAL_TYPES)
-        .filter(k => k !== '')
-        .sort((a, b) => MEDAL_TYPES[b].rank - MEDAL_TYPES[a].rank);
-        
-    sortedMedalKeys.forEach(k => {
-        const option = document.createElement('option');
-        option.value = k;
-        option.text = MEDAL_TYPES[k].label;
-        medalSelect.appendChild(option);
+// ==========================================
+// ★ 絞り込み（チェックリスト）
+//   何もチェックしていない項目は「すべて」。
+//   同じ項目の中は「どれか」（OR）、違う項目どうしは「すべて」（AND）で絞り込む。
+// ==========================================
+const FILTER_IDS = ['filter-medal', 'filter-version', 'filter-diff', 'filter-affinity'];
+
+// チェックされている値の一覧
+function getFilterValues(id) {
+    const box = document.getElementById(id);
+    if (!box) return [];
+    return Array.from(box.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+}
+
+// 指定した値だけにチェックを付ける（空配列なら全部外す）
+function setFilterValues(id, values) {
+    const box = document.getElementById(id);
+    if (!box) return;
+    box.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = values.includes(cb.value); });
+}
+
+// チェックリストの中身を作る（items: [{ value, label }]）。すでにチェックされていた値は残す
+function buildFilterChecks(id, items) {
+    const box = document.getElementById(id);
+    if (!box) return;
+    const checked = getFilterValues(id);
+    box.innerHTML = '';
+    items.forEach(({ value, label }) => {
+        const lbl = document.createElement('label');
+        lbl.className = 'check-label';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.value = value;
+        cb.checked = checked.includes(value);
+        cb.onchange = () => renderTable();
+        lbl.appendChild(cb);
+        lbl.appendChild(document.createTextNode(' ' + label));
+        box.appendChild(lbl);
     });
-    const optionUnplayed = document.createElement('option');
-    optionUnplayed.value = 'unplayed';
-    optionUnplayed.text = '未プレイ';
-    medalSelect.appendChild(optionUnplayed);
-    
+}
+
+function countActiveFilters() {
+    return FILTER_IDS.reduce((n, id) => n + getFilterValues(id).length, 0);
+}
+
+// 「さらに条件で絞り込む」の見出しに、選んでいる数を出す
+function updateFilterSummaryCount() {
+    const el = document.getElementById('filter-summary-count');
+    if (!el) return;
+    const n = countActiveFilters();
+    el.textContent = n > 0 ? `（${n}）` : '';
+}
+
+function initFilters() {
+    const medalItems = Object.keys(MEDAL_TYPES)
+        .filter(k => k !== '')
+        .sort((a, b) => MEDAL_TYPES[b].rank - MEDAL_TYPES[a].rank)
+        .map(k => ({ value: k, label: MEDAL_TYPES[k].label }));
+    medalItems.push({ value: 'unplayed', label: '未プレイ' });
+    buildFilterChecks('filter-medal', medalItems);
+
     updateDynamicFilters();
 }
 
 function updateDynamicFilters() {
-    const versionSelect = document.getElementById('filter-version');
-    if (versionSelect) {
-        const currentVer = versionSelect.value;
-        versionSelect.innerHTML = '<option value="ALL">すべて</option>';
-        const versions = [...new Set(songs.map(s => s.version))].filter(v => v).sort((a, b) => getVersionSortValue(a) - getVersionSortValue(b));
-        versions.forEach(v => {
-            const option = document.createElement('option');
-            option.value = v;
-            option.text = v;
-            versionSelect.appendChild(option);
-        });
-        if (versions.includes(currentVer)) {
-            versionSelect.value = currentVer;
-        }
-    }
+    const versions = [...new Set(songs.map(s => s.version))].filter(v => v)
+        .sort((a, b) => getVersionSortValue(a) - getVersionSortValue(b));
+    buildFilterChecks('filter-version', versions.map(v => ({ value: v, label: v })));
 
     const viewLevelContainer = document.getElementById('view-level-buttons');
     if (viewLevelContainer) {
@@ -73,21 +103,18 @@ function updateDynamicFilters() {
 }
 
 function resetFilters() {
-    document.getElementById('filter-clear').value = 'ALL';
-    document.getElementById('filter-medal').value = 'ALL';
-    document.getElementById('filter-version').value = 'ALL';
-    document.getElementById('filter-diff').value = 'ALL';
-    document.getElementById('filter-affinity').value = 'ALL';
+    FILTER_IDS.forEach(id => setFilterValues(id, []));
     renderTable();
 }
 
+// メダル内訳のタイルから呼ばれる：そのメダルだけで絞り込む（'ALL' で解除）
 function setMedalFilter(filterVal) {
-    const medalSelect = document.getElementById('filter-medal');
-    if (medalSelect) {
-        medalSelect.value = filterVal;
+    const medalBox = document.getElementById('filter-medal');
+    if (medalBox) {
+        setFilterValues('filter-medal', filterVal === 'ALL' ? [] : [filterVal]);
         
         // 「さらに条件で絞り込む」メニューが閉じていたら自動で開く
-        const details = medalSelect.closest('details');
+        const details = medalBox.closest('details');
         if (details && !details.open) {
             details.open = true;
         }
@@ -228,11 +255,13 @@ function renderTable() {
     const searchInput = document.getElementById('search-input');
     const searchQuery = searchInput ? searchInput.value.trim().toLowerCase() : "";
 
-    const filterClear = document.getElementById('filter-clear') ? document.getElementById('filter-clear').value : 'ALL';
-    const filterMedal = document.getElementById('filter-medal') ? document.getElementById('filter-medal').value : 'ALL';
-    const filterVersion = document.getElementById('filter-version') ? document.getElementById('filter-version').value : 'ALL';
-    const filterDiff = document.getElementById('filter-diff') ? document.getElementById('filter-diff').value : 'ALL';
-    const filterAffinity = document.getElementById('filter-affinity') ? document.getElementById('filter-affinity').value : 'ALL';
+    // 絞り込み条件（空配列 = すべて）
+    const filterMedals = getFilterValues('filter-medal');
+    const filterVersions = getFilterValues('filter-version');
+    const filterDiffs = getFilterValues('filter-diff');
+    const filterAffinities = getFilterValues('filter-affinity');
+    const isFiltered = filterMedals.length + filterVersions.length + filterDiffs.length + filterAffinities.length > 0;
+    updateFilterSummaryCount();
 
     const showUnreleased = document.getElementById('show-unreleased') ? document.getElementById('show-unreleased').checked : false;
     
@@ -251,7 +280,7 @@ function renderTable() {
     if (showScore) table.classList.add('has-score'); else table.classList.remove('has-score');
     if (showCompare) table.classList.add('has-compare'); else table.classList.remove('has-compare');
 
-    // 1. 統計の計算に使うベース楽曲（レベル・検索キーワードのみ適用）
+    // 1. 表示レベル・検索キーワードだけを当てた楽曲（絞り込みがないときの統計にも使う）
     let baseSongs = songs.filter(s => {
         if (currentViewLevel !== 'ALL' && s.level !== currentViewLevel) return false;
         if (searchQuery && !(s.genre.toLowerCase().includes(searchQuery) || s.title.toLowerCase().includes(searchQuery))) return false;
@@ -260,41 +289,25 @@ function renderTable() {
 
     // 2. 実際にテーブルに表示する楽曲（すべての絞り込みを適用）
     let displaySongs = baseSongs.filter(s => {
-        const medalKey = clearRecords[s.id] || '';
-        const medalInfo = MEDAL_TYPES[medalKey];
-
-        if (filterClear === 'uncleared' && medalInfo && medalInfo.isEasyClear) return false;
-        if (filterClear === 'kurohishi_cleared' && (!medalInfo || !medalInfo.isKuroHishiClear)) return false;
-        if (filterClear === 'kuroboshi_cleared' && (!medalInfo || !medalInfo.isKuroBoshiClear)) return false;
-        if (filterClear === 'cleared' && (!medalInfo || !medalInfo.isEasyClear)) return false;
-        if (filterClear === 'normal_cleared' && (!medalInfo || !medalInfo.isNormalClear)) return false;
-
-        if (filterMedal !== 'ALL') {
-            if (filterMedal === 'unplayed' && medalKey !== '') return false;
-            if (filterMedal !== 'unplayed' && medalKey !== filterMedal) return false;
+        if (filterMedals.length > 0) {
+            const medalKey = clearRecords[s.id] || '';
+            const medalValue = medalKey === '' ? 'unplayed' : medalKey;
+            if (!filterMedals.includes(medalValue)) return false;
         }
-        if (filterVersion !== 'ALL' && s.version !== filterVersion) return false;
+        if (filterVersions.length > 0 && !filterVersions.includes(s.version)) return false;
 
-        if (filterDiff !== 'ALL') {
+        if (filterDiffs.length > 0) {
             let dClass = s.diffClass || '未分類';
             if (dClass === '中') {
                 dClass = (s.diffIndex !== null && s.diffIndex < 0) ? '中(-)' : '中(+)';
             }
-            if (filterDiff === '中(全体)') {
-                if (!dClass.startsWith('中')) return false;
-            } else {
-                if (dClass !== filterDiff) return false;
-            }
+            if (!filterDiffs.includes(dClass)) return false;
         }
 
-        if (filterAffinity !== 'ALL') {
+        if (filterAffinities.length > 0) {
             const memo = memoRecords[s.id] || {};
-            const aff = memo.affinity || '';
-            if (filterAffinity === '未設定') {
-                if (aff !== '') return false;
-            } else {
-                if (aff !== filterAffinity) return false;
-            }
+            const aff = memo.affinity || '未設定';
+            if (!filterAffinities.includes(aff)) return false;
         }
         return true;
     });
@@ -406,8 +419,9 @@ function renderTable() {
 
     const isMobile = isNarrowScreen();
 
-    // ★ 統計の計算は「絞り込み前」の baseSongs で行う
-    baseSongs.forEach(song => {
+    // ★ 絞り込み中は絞り込んだ曲だけで、そうでなければ表示レベル・検索の全曲で統計を出す
+    const statsSongs = isFiltered ? displaySongs : baseSongs;
+    statsSongs.forEach(song => {
         const medalKey = clearRecords[song.id] || '';
         const medalInfo = MEDAL_TYPES[medalKey];
         
@@ -605,7 +619,7 @@ function renderTable() {
 
     let levelLabel = currentViewLevel === 'ALL' ? '全体' : `Lv${currentViewLevel}`;
     if (searchQuery) levelLabel = `検索結果 ("${searchQuery}")`;
-    if (filterClear !== 'ALL' || filterMedal !== 'ALL' || filterVersion !== 'ALL' || filterDiff !== 'ALL' || filterAffinity !== 'ALL') {
+    if (isFiltered) {
         levelLabel += ' (絞り込み中)';
     }
     
@@ -693,7 +707,7 @@ function renderTable() {
             extendedStatsHtml += `
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                     <div style="font-weight: bold; color: #555; font-size: 0.9em;">🏅 メダル別内訳</div>
-                    ${filterMedal !== 'ALL' ? `<button onclick="setMedalFilter('ALL')" style="padding: 4px 10px; font-size: 0.85em; cursor: pointer; border: 1px solid #ffcdd2; background: #ffebee; color: #d32f2f; border-radius: 4px; font-weight: bold; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">✖ メダル絞り込み解除</button>` : ''}
+                    ${filterMedals.length > 0 ? `<button onclick="setMedalFilter('ALL')" style="padding: 4px 10px; font-size: 0.85em; cursor: pointer; border: 1px solid #ffcdd2; background: #ffebee; color: #d32f2f; border-radius: 4px; font-weight: bold; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">✖ メダル絞り込み解除</button>` : ''}
                 </div>
                 
                 <div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: center; margin-bottom: 15px; padding: 15px; background: #fff; border-radius: 6px; border: 1px solid #e0e0e0; box-shadow: 0 1px 2px rgba(0,0,0,0.05); flex-shrink: 0;" alt="円グラフ">

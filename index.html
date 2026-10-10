@@ -152,62 +152,45 @@
                     <button onclick="openRandomModal()" class="random-ready-btn">Are You Ready?</button>
                 </div>
                 <details class="menu-filter-details">
-                    <summary style="cursor: pointer; font-weight: bold; color: #555; user-select: none;">🔍 さらに条件で絞り込む</summary>
-                    <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 10px; font-size: 0.9em; border-top: 1px dashed #eee; padding-top: 10px;">
-                        <div style="display: flex; flex-direction: column;">
-                            <label style="font-size: 0.8em; font-weight: bold; color: #666; margin-bottom: 2px;">クリア状態</label>
-                            <select id="filter-clear" onchange="renderTable()" style="padding: 4px;">
-                                <option value="ALL">すべて</option>
-                                <option value="uncleared">未クリアのみ</option>
-                                <option value="kurohishi_cleared">黒菱以上</option>
-                                <option value="kuroboshi_cleared">黒星以上</option>
-                                <option value="cleared">イージー以上</option>
-                                <option value="normal_cleared">ノーマル以上</option>
-                            </select>
+                    <summary style="cursor: pointer; font-weight: bold; color: #555; user-select: none;">🔍 さらに条件で絞り込む<span id="filter-summary-count"></span></summary>
+                    <div class="filter-groups">
+                        <div class="filter-group">
+                            <div class="filter-group-title">メダル</div>
+                            <div class="filter-checks" id="filter-medal"></div>
                         </div>
-                        <div style="display: flex; flex-direction: column;">
-                            <label style="font-size: 0.8em; font-weight: bold; color: #666; margin-bottom: 2px;">メダル別</label>
-                            <select id="filter-medal" onchange="renderTable()" style="padding: 4px;">
-                                <option value="ALL">すべて</option>
-                            </select>
+                        <div class="filter-group">
+                            <div class="filter-group-title">バージョン</div>
+                            <div class="filter-checks" id="filter-version"></div>
                         </div>
-                        <div style="display: flex; flex-direction: column;">
-                            <label style="font-size: 0.8em; font-weight: bold; color: #666; margin-bottom: 2px;">バージョン</label>
-                            <select id="filter-version" onchange="renderTable()" style="padding: 4px;">
-                                <option value="ALL">すべて</option>
-                            </select>
+                        <div class="filter-group">
+                            <div class="filter-group-title">難易度</div>
+                            <div class="filter-checks" id="filter-diff">
+                                <label class="check-label"><input type="checkbox" value="危険" onchange="renderTable()"> 危険</label>
+                                <label class="check-label"><input type="checkbox" value="別格" onchange="renderTable()"> 別格</label>
+                                <label class="check-label"><input type="checkbox" value="詐称" onchange="renderTable()"> 詐称</label>
+                                <label class="check-label"><input type="checkbox" value="強" onchange="renderTable()"> 強</label>
+                                <label class="check-label"><input type="checkbox" value="中(+)" onchange="renderTable()"> 中(+)</label>
+                                <label class="check-label"><input type="checkbox" value="中(-)" onchange="renderTable()"> 中(-)</label>
+                                <label class="check-label"><input type="checkbox" value="弱" onchange="renderTable()"> 弱</label>
+                                <label class="check-label"><input type="checkbox" value="逆詐称" onchange="renderTable()"> 逆詐称</label>
+                                <label class="check-label"><input type="checkbox" value="入門" onchange="renderTable()"> 入門</label>
+                                <label class="check-label"><input type="checkbox" value="未分類" onchange="renderTable()"> 未分類</label>
+                            </div>
                         </div>
-                        <div style="display: flex; flex-direction: column;">
-                            <label style="font-size: 0.8em; font-weight: bold; color: #666; margin-bottom: 2px;">難易度</label>
-                            <select id="filter-diff" onchange="renderTable()" style="padding: 4px;">
-                                <option value="ALL">すべて</option>
-                                <option value="危険">危険</option>
-                                <option value="別格">別格</option>
-                                <option value="詐称">詐称</option>
-                                <option value="強">強</option>
-                                <option value="中(全体)">中 (すべて)</option>
-                                <option value="中(+)">中(+)</option>
-                                <option value="中(-)">中(-)</option>
-                                <option value="弱">弱</option>
-                                <option value="逆詐称">逆詐称</option>
-                                <option value="入門">入門</option>
-                                <option value="未分類">未分類</option>
-                            </select>
+                        <div class="filter-group">
+                            <div class="filter-group-title">相性 (メモ)</div>
+                            <div class="filter-checks" id="filter-affinity">
+                                <label class="check-label"><input type="checkbox" value="得意" onchange="renderTable()"> 得意</label>
+                                <label class="check-label"><input type="checkbox" value="苦手" onchange="renderTable()"> 苦手</label>
+                                <label class="check-label"><input type="checkbox" value="噛み合い待ち" onchange="renderTable()"> 噛み合い待ち</label>
+                                <label class="check-label"><input type="checkbox" value="敵" onchange="renderTable()"> 敵</label>
+                                <label class="check-label"><input type="checkbox" value="💩" onchange="renderTable()"> 💩</label>
+                                <label class="check-label"><input type="checkbox" value="未設定" onchange="renderTable()"> 未設定(メモ無含む)</label>
+                            </div>
                         </div>
-                        <div style="display: flex; flex-direction: column;">
-                            <label style="font-size: 0.8em; font-weight: bold; color: #666; margin-bottom: 2px;">相性 (メモ)</label>
-                            <select id="filter-affinity" onchange="renderTable()" style="padding: 4px;">
-                                <option value="ALL">すべて</option>
-                                <option value="得意">得意</option>
-                                <option value="苦手">苦手</option>
-                                <option value="噛み合い待ち">噛み合い待ち</option>
-                                <option value="敵">敵</option>
-                                <option value="💩">💩</option>
-                                <option value="未設定">未設定(メモ無含む)</option>
-                            </select>
-                        </div>
-                        <div style="display: flex; align-items: flex-end;">
-                            <button onclick="resetFilters()" style="padding: 4px 12px; height: 28px; background: #eee; border: 1px solid #ccc;">リセット</button>
+                        <div class="filter-group-footer">
+                            <span class="filter-hint">何も選ばない項目は「すべて」になります</span>
+                            <button onclick="resetFilters()" style="padding: 4px 12px; background: #eee; border: 1px solid #ccc;">リセット</button>
                         </div>
                     </div>
                 </details>
