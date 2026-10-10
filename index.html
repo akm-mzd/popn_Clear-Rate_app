@@ -452,7 +452,17 @@
     <button id="save-btn" onclick="saveCurrentUserToCloud()" title="開いているユーザーの変更をクラウドに保存">保存</button>
     <button id="back-to-top" onclick="scrollToTop()" title="トップに戻る">↑</button>
 
-    <script src="main.js"></script>
+    <!-- 読み込み順に意味があります（config が最初、app が最後） -->
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/cloud.js"></script>
+    <script src="js/users.js"></script>
+    <script src="js/table.js"></script>
+    <script src="js/modals.js"></script>
+    <script src="js/admin.js"></script>
+    <script src="js/image-export.js"></script>
+    <script src="js/menu.js"></script>
+    <script src="js/app.js"></script>
 
 </body>
 </html>
