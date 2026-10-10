@@ -264,7 +264,7 @@ if (dropZone) {
 
         // 結果のフィードバック
         if (updatedCount > 0) {
-            alert(`${updatedCount}件のバナー画像を更新しました！\n（※クラウドに保存するには、上部の「☁️ 変更をクラウドに保存」から楽曲データを保存してください）`);
+            alert(`${updatedCount}件のバナー画像を更新しました！\n（※クラウドに保存するには、メニューの「☁️ 全体保存」から楽曲データを保存してください）`);
         }
         if (notFoundFiles.length > 0) {
             alert(`以下のファイル名に一致する楽曲が見つかりませんでした:\n${notFoundFiles.join('\n')}`);
@@ -451,6 +451,11 @@ async function restoreFromJson(event) {
             songs = fileSongs.map((s, i) => {
                 const p = parseDifficulty(s.diffRaw);
                 return Object.assign({}, s, {
+                    // 文字列であるべき項目は文字列にそろえ、危険なURLは取り込まない
+                    genre: String(s.genre ?? ''),
+                    title: String(s.title ?? ''),
+                    bannerUrl: safeUrl(s.bannerUrl, true),
+                    wikiUrl: safeUrl(s.wikiUrl),
                     id: s.id || (s.genre + '_' + s.title + '_' + s.notes),
                     level: s.level || '48',
                     diffRaw: s.diffRaw || '',
@@ -505,7 +510,7 @@ async function restoreFromJson(event) {
         if (restoreSongs) {
             done += songsSaved
                 ? '\n・楽曲リスト：クラウドに保存しました'
-                : '\n・楽曲リスト：クラウド保存に失敗しました。「☁️ 変更をクラウドに保存」からやり直してください';
+                : '\n・楽曲リスト：クラウド保存に失敗しました。メニューの「☁️ 全体保存」からやり直してください';
         }
         alert(done);
 

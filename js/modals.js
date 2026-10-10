@@ -148,7 +148,7 @@ function openRandomModal() {
     const levels = [...new Set(songs.map(s => s.level))].filter(l => l).sort((a,b)=>b-a);
     let levelHtml = '';
     levels.forEach(l => {
-        levelHtml += `<label class="check-label"><input type="checkbox" class="rand-level" value="${l}"> Lv${l}</label>`;
+        levelHtml += `<label class="check-label"><input type="checkbox" class="rand-level" value="${escapeHtml(l)}"> Lv${escapeHtml(l)}</label>`;
     });
     document.getElementById('random-level-checkboxes').innerHTML = levelHtml;
 
@@ -212,8 +212,9 @@ function executeRandomSelect() {
     const medalKey = clearRecords[song.id] || '';
     const medalInfo = MEDAL_TYPES[medalKey] || MEDAL_TYPES[''];
     
-    const bannerHtml = song.bannerUrl && song.bannerUrl.trim() !== ''
-        ? `<img src="${song.bannerUrl}" style="max-width: 100%; height: auto; max-height: 60px; border-radius: 4px; margin-bottom: 10px;" />`
+    const bannerSrc = safeUrl(song.bannerUrl, true);
+    const bannerHtml = bannerSrc
+        ? `<img src="${escapeHtml(bannerSrc)}" style="max-width: 100%; height: auto; max-height: 60px; border-radius: 4px; margin-bottom: 10px;" />`
         : ``;
 
     let dClassStr = song.diffClass || '';
@@ -228,12 +229,12 @@ function executeRandomSelect() {
     resultArea.innerHTML = `
         <div style="font-size: 0.9em; color: #666; margin-bottom: 10px;">🎵 抽選結果 (${filtered.length}曲中から)</div>
         ${bannerHtml}
-        <div style="font-size: 0.85em; color: #666;">${song.genre}</div>
-        <div style="font-size: 1.3em; font-weight: bold; margin: 8px 0; color: #333;">${song.title}</div>
+        <div style="font-size: 0.85em; color: #666;">${escapeHtml(song.genre)}</div>
+        <div style="font-size: 1.3em; font-weight: bold; margin: 8px 0; color: #333;">${escapeHtml(song.title)}</div>
         <div style="display: flex; justify-content: center; gap: 12px; margin-top: 10px; align-items: center;">
-            <span class="level-badge" style="font-size: 1.1em; padding: 4px 10px;">Lv ${song.level}</span>
+            <span class="level-badge" style="font-size: 1.1em; padding: 4px 10px;">Lv ${escapeHtml(song.level)}</span>
             <div style="color: ${styleObj.color}; text-shadow: ${styleObj.shadow}; font-weight: bold; font-size: 1.2em;">
-                ${dClassStr}<span style="font-size: 0.6em; margin-left: 2px;">${dIndexStr}</span>
+                ${escapeHtml(dClassStr)}<span style="font-size: 0.6em; margin-left: 2px;">${escapeHtml(dIndexStr)}</span>
             </div>
             <div style="display: flex; align-items: center; gap: 4px; font-weight: bold;">
                 ${medalDisplay}

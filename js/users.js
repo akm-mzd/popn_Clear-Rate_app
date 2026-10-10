@@ -42,7 +42,7 @@ function updateCompareUserSelect() {
 
 function switchUser() {
     currentUser = document.getElementById('current-user-select').value;
-    localStorage.setItem('popn_current_user', currentUser);
+    storageSet('popn_current_user', currentUser);
     updateCurrentUserLabel();
     clearRecords = allUsersData[currentUser]?.clearRecords || {};
     scoreRecords = allUsersData[currentUser]?.scoreRecords || {};
@@ -60,7 +60,7 @@ function addNewUser() {
     }
     currentUser = name;
     allUsersData[name] = { clearRecords: {}, scoreRecords: {}, memoRecords: {} };
-    localStorage.setItem('popn_current_user', name);
+    storageSet('popn_current_user', name);
     initUserSelector();
     updateCompareUserSelect();
     switchUser();

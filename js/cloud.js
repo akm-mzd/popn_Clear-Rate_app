@@ -53,11 +53,10 @@ async function fetchCloudData(retries = 2, timeoutMs = 20000) {
 }
 
 function loadCache() {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY_CACHE)); } catch (e) { return null; }
+    try { return JSON.parse(storageGet(STORAGE_KEY_CACHE)); } catch (e) { return null; }
 }
 function saveCache(data) {
-    try { localStorage.setItem(STORAGE_KEY_CACHE, JSON.stringify(data)); }
-    catch (e) { localStorage.removeItem(STORAGE_KEY_CACHE); } // 容量オーバー時
+    if (!storageSet(STORAGE_KEY_CACHE, JSON.stringify(data))) storageRemove(STORAGE_KEY_CACHE); // 容量オーバー時
 }
 
 // ==========================================

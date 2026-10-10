@@ -20,6 +20,20 @@ function isMobileDevice() {
 }
 
 // ==========================================
+// ★ ブラウザの保存領域（localStorage）
+//   プライベートモードなどで使えないと例外になるため、必ずこの関数を通す
+// ==========================================
+function storageGet(key) {
+    try { return localStorage.getItem(key); } catch (e) { return null; }
+}
+function storageSet(key, value) {
+    try { localStorage.setItem(key, value); return true; } catch (e) { return false; }
+}
+function storageRemove(key) {
+    try { localStorage.removeItem(key); } catch (e) { /* 何もしない */ }
+}
+
+// ==========================================
 // ★クラウド同期設定（GAS）と管理者パスワード
 // ==========================================
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbz7aEE4z7w7KLxSVRU5Mm8xPiotV5hAdxu1BUYQ1---NtTSr2kUpCisX6g0x-0TXO0kqw/exec';
@@ -30,7 +44,7 @@ const ADMIN_PASSWORD = "1005";
 
 let songs = [];
 let allUsersData = {}; 
-let currentUser = localStorage.getItem('popn_current_user') || "Guest";
+let currentUser = storageGet('popn_current_user') || "Guest";
 let clearRecords = {}; 
 let scoreRecords = {}; 
 let memoRecords = {}; 

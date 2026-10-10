@@ -9,7 +9,7 @@
 //   'sig2'   : 有効数字2桁 (例: 99)
 // ==========================================
 let rateFormatMode = 'fixed1';
-try { if (localStorage.getItem('popn_rate_format') === 'sig2') rateFormatMode = 'sig2'; } catch (e) {}
+if (storageGet('popn_rate_format') === 'sig2') rateFormatMode = 'sig2';
 
 function formatRate(count, total) {
     if (!total) return '0';
@@ -23,7 +23,7 @@ function formatRate(count, total) {
 
 function toggleRateFormat() {
     rateFormatMode = rateFormatMode === 'sig2' ? 'fixed1' : 'sig2';
-    try { localStorage.setItem('popn_rate_format', rateFormatMode); } catch (e) {}
+    storageSet('popn_rate_format', rateFormatMode);
     renderTable();
 }
 
@@ -140,6 +140,24 @@ function toImageProxyUrl(url) {
 // HTML に埋め込む文字をエスケープする（曲名・メモなど、外から入ってくる文字は必ず通す）
 function escapeHtml(str) {
     return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// onclick="func('…')" のように、HTML属性の中の JavaScript 文字列として埋め込む値を安全にする
+function jsStringAttr(str) {
+    const jsEscaped = String(str ?? '')
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/\r?\n/g, '\\n');
+    return escapeHtml(jsEscaped);
+}
+
+// リンクや画像に使ってよいURLだけを通す（javascript: などは空文字にする）
+//   allowDataImage: true のときは data:image/... も許可（バナー画像用）
+function safeUrl(url, allowDataImage = false) {
+    const u = String(url ?? '').trim();
+    if (/^https?:\/\//i.test(u)) return u;
+    if (allowDataImage && /^data:image\/(png|jpe?g|gif|webp);/i.test(u)) return u;
+    return '';
 }
 
 function getDifficultyColor(diffClass, index) {

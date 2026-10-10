@@ -87,8 +87,9 @@ function buildMedalBoxHtml(medalKey) {
 
 function buildBannerBoxHtml(song, width, height) {
     const style = `width: ${width}px; height: ${height}px; flex-shrink: 0; border-radius: 3px; box-sizing: border-box;`;
-    if (song.bannerUrl && song.bannerUrl.trim() !== '') {
-        return `<img src="${toImageProxyUrl(song.bannerUrl)}" crossorigin="anonymous" style="${style} object-fit: cover; display: block; background: #eee;">`;
+    const bannerSrc = safeUrl(song.bannerUrl, true);
+    if (bannerSrc) {
+        return `<img src="${escapeHtml(toImageProxyUrl(bannerSrc))}" crossorigin="anonymous" style="${style} object-fit: cover; display: block; background: #eee;">`;
     }
     return `<div style="${style} ${EXPORT_CENTER} background: #37474f; color: #fff; padding: 2px 6px; overflow: hidden;"><span style="font-size: 11px; line-height: 1.2; font-weight: bold;">${escapeHtml(song.title)}</span></div>`;
 }

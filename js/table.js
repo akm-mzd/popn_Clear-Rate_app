@@ -453,11 +453,11 @@ function renderTable() {
         
         const diffHtml = `
             <div class="diff-wrapper" style="color: ${styleObj.color}; text-shadow: ${styleObj.shadow}; font-weight: bold;">
-                <span class="diff-main">${dClassStr}</span><span class="diff-sub">${dIndexStr}</span>
+                <span class="diff-main">${escapeHtml(dClassStr)}</span><span class="diff-sub">${escapeHtml(dIndexStr)}</span>
             </div>
         `;
         
-        const safeId = song.id.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;");
+        const safeId = jsStringAttr(song.id); // onclick の引数に埋め込む用
 
         const isValidMedalUrl = medalInfo.imgUrl.startsWith('http') || medalInfo.imgUrl.startsWith('data:');
         const medalDisplayHtml = isValidMedalUrl
@@ -470,8 +470,9 @@ function renderTable() {
         const noImageTitle = isMobile ? '' : 'title="クリックしてコピーしたURLを自動ペースト"';
         const noImageDeco = isMobile ? 'none' : 'underline';
 
-        const bannerHtml = song.bannerUrl && song.bannerUrl.trim() !== ''
-            ? `<img src="${song.bannerUrl}" style="max-width: 100%; height: auto; max-height: 50px; border-radius: 4px; cursor: ${cursorStyle};" ${bannerAction} ${bannerTitle} onerror="this.style.display='none'" />`
+        const bannerSrc = safeUrl(song.bannerUrl, true);
+        const bannerHtml = bannerSrc
+            ? `<img src="${escapeHtml(bannerSrc)}" style="max-width: 100%; height: auto; max-height: 50px; border-radius: 4px; cursor: ${cursorStyle};" ${bannerAction} ${bannerTitle} onerror="this.style.display='none'" />`
             : `<span style="color: #aaa; font-size: 0.85em; font-weight: bold; text-decoration: ${noImageDeco}; cursor: ${cursorStyle};" ${bannerAction} ${noImageTitle}>No Image</span>`;
 
         const myScore = scoreRecords[song.id];
@@ -485,7 +486,7 @@ function renderTable() {
                 : `<div style="font-weight: bold; font-size: 0.9em; color: ${rankInfo.color};">${rankInfo.rank}</div>`;
             
             scoreDisplayHtml = `
-                <div style="font-weight: bold; font-size: 1.1em; color: #333;">${myScore}</div>
+                <div style="font-weight: bold; font-size: 1.1em; color: #333;">${escapeHtml(myScore)}</div>
                 ${rankMark}
             `;
         }
@@ -520,7 +521,7 @@ function renderTable() {
                 }
                 
                 compareHtml = `
-                    <div style="font-size: 0.95em; color: #555; font-weight: bold;">${targetScore}</div>
+                    <div style="font-size: 0.95em; color: #555; font-weight: bold;">${escapeHtml(targetScore)}</div>
                     ${tRankMark}
                     <div style="margin-top: 2px;">${diff}</div>
                 `;
@@ -532,7 +533,7 @@ function renderTable() {
 
         const searchKey = (song.genre && song.genre.trim() !== '') ? song.genre : song.title;
         const autoWikiUrl = `https://popn.wiki/search?q=${encodeURIComponent(searchKey)}`;
-        const finalWikiUrl = (song.wikiUrl && song.wikiUrl !== '') ? song.wikiUrl : autoWikiUrl;
+        const finalWikiUrl = safeUrl(song.wikiUrl) || autoWikiUrl; // http(s) 以外のURLは使わない
 
         const memo = memoRecords[song.id] || {};
         const hasMemo = memo.comment || memo.sudden || memo.affinity;
@@ -544,33 +545,35 @@ function renderTable() {
 
         let affinityBadge = '';
         if (memo.affinity) {
-            affinityBadge = `<span class="memo-badge-${memo.affinity}" style="font-size: 0.8em; margin-left: 2px;">[${memo.affinity.substring(0, 2)}]</span>`;
+            const affinity = String(memo.affinity);
+            const badgeClass = ['得意', '苦手', '噛み合い待ち', '敵', '💩'].includes(affinity) ? `memo-badge-${affinity}` : '';
+            affinityBadge = `<span class="${badgeClass}" style="font-size: 0.8em; margin-left: 2px;">[${escapeHtml(affinity.substring(0, 2))}]</span>`;
         }
 
         tr.innerHTML = `
             <td class="col-medal" style="text-align: center; vertical-align: middle;">${medalDisplayHtml}</td>
             <td class="col-score" style="text-align: center; cursor: pointer; background-color: #fafafa; ${scoreDisplay}" onclick="openScoreModal('${safeId}')" title="クリックしてスコア入力">${scoreDisplayHtml}</td>
             <td class="col-compare" style="text-align: center; background-color: #f0f8ff; ${compareDisplay}">${compareHtml}</td>
-            <td class="col-level" style="text-align: center;"><span class="level-badge">${song.level || '-'}</span></td>
-            <td class="col-version" style="text-align: center;"><span class="ver-badge">${song.version || '-'}</span></td>
+            <td class="col-level" style="text-align: center;"><span class="level-badge">${escapeHtml(song.level || '-')}</span></td>
+            <td class="col-version" style="text-align: center;"><span class="ver-badge">${escapeHtml(song.version || '-')}</span></td>
             <td class="col-banner" style="text-align: center; transition: background-color 0.2s;" ondragover="event.preventDefault(); this.style.backgroundColor='#e3f2fd';" ondragleave="event.preventDefault(); this.style.backgroundColor='';" ondrop="handleSingleBannerDrop(event, '${safeId}', this)">${bannerHtml}</td>
             <td class="col-title">
                 <div style="flex: 1; min-width: 0;">
                     <div style="font-size: 0.85em; color: #666; display: flex; align-items: center; flex-wrap: wrap;">
-                        <span>${song.genre}</span>
-                        <span onclick="openMemoModal('${safeId}')" style="cursor: pointer; font-size: 1.2em; margin-left: 4px; padding: 2px; ${hasMemo ? '' : 'opacity: 0.4;'}" title="${memoTooltip}">
+                        <span>${escapeHtml(song.genre)}</span>
+                        <span onclick="openMemoModal('${safeId}')" style="cursor: pointer; font-size: 1.2em; margin-left: 4px; padding: 2px; ${hasMemo ? '' : 'opacity: 0.4;'}" title="${escapeHtml(memoTooltip)}">
                             📝${affinityBadge}
                         </span>
                     </div>
                     <div style="font-weight: bold; word-break: break-all; margin-top: 2px;">
-                        <a href="${finalWikiUrl}" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none;">
-                            ${song.title} <span style="font-size: 0.8em; color: #2196F3;">🔗</span>
+                        <a href="${escapeHtml(finalWikiUrl)}" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none;">
+                            ${escapeHtml(song.title)} <span style="font-size: 0.8em; color: #2196F3;">🔗</span>
                         </a>
                     </div>
                 </div>
             </td>
-            <td class="col-bpm" style="text-align: right;"><span>${song.bpm || '-'}</span></td>
-            <td class="col-notes" style="text-align: right;"><span>${song.notes}</span></td>
+            <td class="col-bpm" style="text-align: right;"><span>${escapeHtml(song.bpm || '-')}</span></td>
+            <td class="col-notes" style="text-align: right;"><span>${escapeHtml(song.notes)}</span></td>
             <td class="col-diff" style="text-align: center;">${diffHtml}</td>
             <td class="col-action no-export" style="text-align: center;">
                 <button class="edit-btn" onclick="openEditModal('${safeId}')">✏️編集</button>
@@ -606,7 +609,7 @@ function renderTable() {
     const showDiffStats = document.getElementById('show-diff-stats') ? document.getElementById('show-diff-stats').checked : false;
 
     let statsHtml = `<div style="display: flex; flex-wrap: wrap; gap: 15px; width: 100%; justify-content: flex-end; align-items: baseline;">
-        <div class="stats-level">【${levelLabel}】</div>`;
+        <div class="stats-level">【${escapeHtml(levelLabel)}】</div>`;
 
     if (showKuroHishiRate) {
         statsHtml += `
@@ -783,12 +786,12 @@ function applyLevelButtonPlacement(onMain) {
 }
 
 function setLevelButtonPlacement(onMain) {
-    try { localStorage.setItem('popn_level_btn_main', onMain ? '1' : '0'); } catch (e) {}
+    storageSet('popn_level_btn_main', onMain ? '1' : '0');
     applyLevelButtonPlacement(onMain);
 }
 
 (function initLevelButtonPlacement() {
     let onMain = true;
-    try { onMain = localStorage.getItem('popn_level_btn_main') !== '0'; } catch (e) {}
+    onMain = storageGet('popn_level_btn_main') !== '0';
     applyLevelButtonPlacement(onMain);
 })();
