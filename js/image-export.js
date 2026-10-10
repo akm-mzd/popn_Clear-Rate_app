@@ -11,7 +11,17 @@
 // ==========================================
 const EXPORT_BG = '#f5f1e6';
 const EXPORT_ACCENT = '#3949ab';
-const EXPORT_MAX_PIXELS = 16000000; // iOS のキャンバス上限（約1677万px）より少し小さく
+const EXPORT_MAX_PIXELS_PC = 16000000;     // iOS のキャンバス上限（約1677万px）より少し小さく
+const EXPORT_MAX_PIXELS_MOBILE = 8000000;  // スマホはメモリが少ないので、さらに小さく抑える
+
+// 画像を作るとき html2canvas が複製しなくてよい（画像に関係ない・重い）部分
+const EXPORT_IGNORE_IDS = ['capture-area', 'menu-panel', 'loading', 'admin-controls'];
+function shouldIgnoreForExport(el) {
+    return EXPORT_IGNORE_IDS.includes(el.id) || (el.classList && el.classList.contains('modal-overlay'));
+}
+
+// スマホの結果表示で使っている画像URL（閉じるときに解放する）
+let previewObjectUrl = null;
 
 
 // 画像出力の開始：メニューを閉じ、保存・トップに戻るボタンを隠す
@@ -26,6 +36,12 @@ function endImageExport() {
 
 function closeImageResultModal() {
     document.getElementById('image-result-modal').style.display = 'none';
+    // 大きな画像をメモリに残さないよう、表示を外してから URL を解放する
+    document.getElementById('generated-image-preview').removeAttribute('src');
+    if (previewObjectUrl) {
+        URL.revokeObjectURL(previewObjectUrl);
+        previewObjectUrl = null;
+    }
     endImageExport();
 }
 
@@ -130,25 +146,39 @@ async function prepareExport(btn) {
     return originalText;
 }
 
-// 組み立てた画像の要素を PNG(dataURL) にする。終わったら要素は取り除く
-async function renderExportToDataUrl(root) {
+// 組み立てた画像の要素を PNG にして、オブジェクトURL を返す。終わったら要素は取り除く
+//   （長い dataURL 文字列を作らないので軽い。使い終わったら URL.revokeObjectURL で解放すること）
+async function renderExportToBlobUrl(root) {
     try {
         await waitExportImages(root);
         const w = root.scrollWidth, h = root.scrollHeight;
-        // iOS のキャンバス上限を超えないよう、大きい画像は倍率を下げる
-        const scale = Math.max(0.5, Math.min(2, Math.sqrt(EXPORT_MAX_PIXELS / Math.max(1, w * h))));
-        const canvas = await html2canvas(root, { backgroundColor: EXPORT_BG, scale, useCORS: true, width: w, height: h, windowWidth: Math.max(w + 100, 1200) });
-        return canvas.toDataURL("image/png");
+        // キャンバスの上限を超えないよう、大きい画像は倍率を下げる
+        const maxPixels = isMobileDevice() ? EXPORT_MAX_PIXELS_MOBILE : EXPORT_MAX_PIXELS_PC;
+        const scale = Math.max(0.5, Math.min(2, Math.sqrt(maxPixels / Math.max(1, w * h))));
+        const canvas = await html2canvas(root, {
+            backgroundColor: EXPORT_BG, scale, useCORS: true, logging: false,
+            width: w, height: h, windowWidth: Math.max(w + 100, 1200),
+            ignoreElements: shouldIgnoreForExport, // 曲の表やメニューまで複製すると重いので外す
+        });
+        const blob = await new Promise((resolve, reject) => {
+            canvas.toBlob(b => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/png');
+        });
+        // キャンバスのメモリをすぐに返す
+        canvas.width = 0;
+        canvas.height = 0;
+        return URL.createObjectURL(blob);
     } finally {
         root.remove();
     }
 }
 
-function downloadDataUrl(dataUrl, filename) {
+// ダウンロードさせて、少し待ってから URL を解放する
+function downloadBlobUrl(blobUrl, filename) {
     const link = document.createElement('a');
     link.download = filename;
-    link.href = dataUrl;
+    link.href = blobUrl;
     link.click();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
 }
 
 // 1枚の画像を出力する（スマホ：画面に表示して長押し保存 / PC：ダウンロード）
@@ -156,13 +186,15 @@ async function outputExportImage(root, filename, btn, originalText) {
     btn.textContent = "生成中... (描画中)";
     let showedModal = false;
     try {
-        const dataUrl = await renderExportToDataUrl(root);
+        const blobUrl = await renderExportToBlobUrl(root);
         if (isMobileDevice()) {
-            document.getElementById('generated-image-preview').src = dataUrl;
+            if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
+            previewObjectUrl = blobUrl;
+            document.getElementById('generated-image-preview').src = blobUrl;
             document.getElementById('image-result-modal').style.display = 'flex';
             showedModal = true;
         } else {
-            downloadDataUrl(dataUrl, filename);
+            downloadBlobUrl(blobUrl, filename);
         }
     } catch (e) {
         alert("画像の生成に失敗しました。");
@@ -446,8 +478,8 @@ async function generateDiffTableImagesForSelectedLevels() {
             const lvSongs = songs.filter(s => s.level === lv);
             if (lvSongs.length === 0) continue;
             showLoading(true, `難易度順画像を作成中... (${i + 1}/${levels.length}) Lv${lv}`);
-            const dataUrl = await renderExportToDataUrl(buildDiffTableRoot(lvSongs, lv));
-            downloadDataUrl(dataUrl, `popn_difftable_${currentUser}_Lv${lv}_${exportDateStr()}.png`);
+            const blobUrl = await renderExportToBlobUrl(buildDiffTableRoot(lvSongs, lv));
+            downloadBlobUrl(blobUrl, `popn_difftable_${currentUser}_Lv${lv}_${exportDateStr()}.png`);
             savedCount++;
             // 連続ダウンロードがブラウザに止められにくいよう、少し間を空ける
             if (i < levels.length - 1) await new Promise(res => setTimeout(res, 400));
