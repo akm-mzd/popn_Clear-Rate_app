@@ -142,8 +142,10 @@ details > summary::-webkit-details-marker { display: none; }
     /* スマホで管理メニューを非表示にする */
     #admin-controls { display: none !important; }
 
-    /* スマホで画像出力を非表示にする */
-    #image-export-area { display: none !important; }
+    /* スマホでも画像出力を使えるようにする（メニュー内で縦に並べる） */
+    #image-export-area { flex-wrap: wrap; gap: 8px; justify-content: flex-start !important; }
+    #image-export-area > details { width: 100%; }
+    #image-export-area > details > div { position: static !important; width: auto !important; margin-top: 8px !important; }
 
     .flex-row { flex-direction: column; align-items: stretch; gap: 6px; }
     
@@ -238,6 +240,28 @@ details > summary::-webkit-details-marker { display: none; }
     border-color: #2196F3;
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
+
+/* 表示レベルボタン：横一列・正方形（「すべて」は右端） */
+#view-level-buttons {
+    display: flex; flex-wrap: nowrap; gap: 6px;
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    padding: 2px 2px 4px; box-sizing: border-box; width: 100%;
+}
+#view-level-buttons .level-btn {
+    flex: 1 1 0; min-width: 36px; max-width: 52px; aspect-ratio: 1 / 1;
+    width: auto; height: auto; padding: 0 !important; margin: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; line-height: 1; box-sizing: border-box; white-space: nowrap;
+}
+/* 「すべて」は右端に固定（横スクロールしても常に見える） */
+#view-level-buttons .level-btn-all {
+    margin-left: auto; font-size: 11px;
+    position: sticky; right: 0; z-index: 1;
+    box-shadow: -6px 0 6px -2px rgba(0,0,0,0.15);
+}
+#view-level-buttons .level-btn-text { font-size: 11px; }
+#main-level-slot { margin-bottom: 10px; }
+#main-level-slot:empty { display: none; }
 
 /* トップに戻るボタン用スタイル */
 #back-to-top {

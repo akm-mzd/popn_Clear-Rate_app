@@ -125,10 +125,14 @@
                 <button onclick="saveAllToCloud()" class="menu-save-all-btn pc-only">☁️ 全体保存 (楽曲リスト＋全ユーザー)</button>
             </div>
             <div class="menu-main-row" style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
-                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                    <span style="font-weight: bold; font-size: 1.1em;">表示レベル:</span>
-                    <div id="view-level-buttons" style="display: flex; flex-wrap: wrap; gap: 6px;">
-                        </div>
+                <div class="menu-level-row">
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <span style="font-weight: bold; font-size: 1.1em;">表示レベル:</span>
+                        <label class="check-label" style="font-size: 0.9em; cursor: pointer;"><input type="checkbox" id="level-btn-on-main" onchange="setLevelButtonPlacement(this.checked)" checked> メイン画面に表示</label>
+                    </div>
+                    <div id="menu-level-slot">
+                        <div id="view-level-buttons"></div>
+                    </div>
                 </div>
                 
                 <div style="display: flex; align-items: center; gap: 5px; flex-wrap: wrap;">
@@ -139,7 +143,8 @@
 
                 <div id="image-export-area" class="controls" style="margin: 0; padding: 0; box-shadow: none; background: transparent; display: flex; align-items: center; justify-content: flex-end; flex-grow: 1;">
                     <button id="btn-overview-image" onclick="generateOverviewImage()" class="btn-image" ...>全体統計画像</button>
-                    <button onclick="exportAsImage(event)" class="btn-image" ...>画像として保存</button>
+                    <button id="btn-diff-image" onclick="generateDiffTableImage()" class="btn-image" ...>難易度順画像</button>
+                    <button onclick="exportAsImage(event)" class="btn-image" ...>表示曲画像</button>
 
                     <details style="position: relative;">
                         <summary style="padding: 6px 12px; border: 1px solid #ccc; background-color: #fff; border-radius: 4px; cursor: pointer; font-size: 0.9em; font-weight: bold; color: #555;">⚙️ 画像の列設定</summary>
@@ -241,6 +246,7 @@
             </div>
         </div>
 
+        <div id="main-level-slot"></div>
         <div class="stats-container" id="stats-display"></div>
         <div id="extended-stats-display"></div>
 

@@ -141,6 +141,7 @@ let currentMedalEditId = null;
 let currentSort = window.innerWidth <= 768 ? 'diff' : 'version';
 let sortDesc = window.innerWidth <= 768 ? true : false;
 let currentViewLevel = '48';
+let lastDisplaySongs = []; // 現在テーブルに表示中の楽曲（難易度順画像で使用）
 
 function showLoading(show, text = '通信中...') {
     document.getElementById('loading-text').innerText = text;
@@ -725,11 +726,11 @@ function updateDynamicFilters() {
     if (viewLevelContainer) {
         viewLevelContainer.innerHTML = '';
         
+        // 「すべて」は一番右端に配置する
         const allBtn = document.createElement('button');
-        allBtn.className = `level-btn ${currentViewLevel === 'ALL' ? 'active' : ''}`;
+        allBtn.className = `level-btn level-btn-all ${currentViewLevel === 'ALL' ? 'active' : ''}`;
         allBtn.innerText = 'すべて';
         allBtn.onclick = () => changeViewLevel('ALL');
-        viewLevelContainer.appendChild(allBtn);
         
         const levels = [...new Set(songs.map(s => s.level))].filter(l => l);
         levels.sort((a, b) => {
@@ -748,11 +749,13 @@ function updateDynamicFilters() {
         
         levels.forEach(l => {
             const btn = document.createElement('button');
-            btn.className = `level-btn ${currentViewLevel === l ? 'active' : ''}`;
-            btn.innerText = isNaN(parseInt(l, 10)) ? l : `Lv${l}`;
+            btn.className = `level-btn ${isNaN(parseInt(l, 10)) ? 'level-btn-text' : ''} ${currentViewLevel === l ? 'active' : ''}`;
+            btn.innerText = l;
+            btn.title = isNaN(parseInt(l, 10)) ? l : `Lv${l}`;
             btn.onclick = () => changeViewLevel(l);
             viewLevelContainer.appendChild(btn);
         });
+        viewLevelContainer.appendChild(allBtn);
     }
 }
 
@@ -1417,6 +1420,218 @@ async function generateOverviewImage() {
             const link = document.createElement('a');
             const date = new Date().toISOString().slice(0, 10);
             link.download = `popn_overview_${currentUser}_${date}.png`;
+            link.href = dataUrl;
+            link.click();
+        }
+    } catch (e) {
+        alert("画像の生成に失敗しました。");
+        console.error(e);
+    } finally {
+        document.body.removeChild(exportContainer);
+        btn.innerText = originalText;
+    }
+}
+
+// ==========================================
+// ★ 難易度順画像（指数ごとにバナーとクリアメダルを並べた画像）
+// ==========================================
+function toImageProxyUrl(url) {
+    if (url && url.startsWith('http') && !url.includes('wsrv.nl')) {
+        return `https://wsrv.nl/?url=${encodeURIComponent(url)}`;
+    }
+    return url;
+}
+
+function escapeHtmlText(str) {
+    return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+const DIFF_TABLE_COLORS = {
+    '危険': '#212121',
+    '別格': '#e53935',
+    '詐称': '#f4511e',
+    '強': '#fb8c00',
+    '中': '#7cb342',
+    '弱': '#42a5f5',
+    '逆詐称': '#1e88e5',
+    '入門': '#26a69a',
+    '未定': '#9e9e9e'
+};
+
+// 楽曲を「難易度の種類＋指数(小数第1位)」ごとにまとめ、指数の大きい順に並べる
+function buildDiffTableGroups(targetSongs) {
+    const groupMap = {};
+    targetSongs.forEach(song => {
+        let cls = song.diffClass || '未分類';
+        const idx = song.diffIndex;
+        let key, label, sortVal;
+        if (cls === '未分類' || idx === null || idx === undefined || isNaN(idx)) {
+            cls = '未定';
+            key = '未定';
+            label = '';
+            sortVal = -Infinity;
+        } else {
+            const r = Math.round(idx * 10) / 10;
+            if (r === 0) {
+                label = idx < 0 ? '-0' : '+0';
+                sortVal = idx < 0 ? -0.0001 : 0;
+            } else {
+                label = (r > 0 ? '+' : '') + r.toFixed(1);
+                sortVal = r;
+            }
+            key = `${cls}|${label}`;
+        }
+        if (!groupMap[key]) groupMap[key] = { cls, label, sortVal, songs: [] };
+        groupMap[key].songs.push(song);
+    });
+    const groups = Object.values(groupMap);
+    groups.sort((a, b) => b.sortVal - a.sortVal);
+    groups.forEach(g => g.songs.sort((a, b) => a.title.localeCompare(b.title, 'ja')));
+    return groups;
+}
+
+function buildDiffTableMedalHtml(medalKey) {
+    const m = MEDAL_TYPES[medalKey];
+    const boxStyle = 'width: 34px; height: 34px; flex-shrink: 0; border-radius: 6px; display: flex; align-items: center; justify-content: center; box-sizing: border-box;';
+    if (m && m.imgUrl && (m.imgUrl.startsWith('http') || m.imgUrl.startsWith('data:'))) {
+        return `<div style="${boxStyle} background: #fff; border: 2px solid #90a4ae;"><img src="${toImageProxyUrl(m.imgUrl)}" crossorigin="anonymous" style="width: 28px; height: 28px; object-fit: contain;"></div>`;
+    }
+    if (medalKey === '未解禁') {
+        return `<div style="${boxStyle} background: #424242; border: 2px solid #212121; color: #fff; font-size: 14px;">🔒</div>`;
+    }
+    return `<div style="${boxStyle} background: #fff; border: 2px solid #90a4ae;"></div>`;
+}
+
+function buildDiffTableBannerHtml(song) {
+    const bannerStyle = 'width: 168px; height: 42px; flex-shrink: 0; border-radius: 3px; box-sizing: border-box;';
+    if (song.bannerUrl && song.bannerUrl.trim() !== '') {
+        return `<img src="${toImageProxyUrl(song.bannerUrl)}" crossorigin="anonymous" style="${bannerStyle} object-fit: cover; display: block; background: #eee;">`;
+    }
+    return `<div style="${bannerStyle} background: #37474f; color: #fff; font-size: 11px; font-weight: bold; padding: 2px 6px; display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1.15; overflow: hidden;">${escapeHtmlText(song.title)}</div>`;
+}
+
+async function generateDiffTableImage() {
+    const btn = document.getElementById('btn-diff-image');
+    const originalText = btn.innerText;
+
+    const targetSongs = lastDisplaySongs.slice();
+    if (targetSongs.length === 0) {
+        alert("表示中の楽曲がありません。");
+        return;
+    }
+
+    btn.innerText = "準備中... (ライブラリ読込)";
+    try {
+        await ensureHtml2Canvas();
+    } catch (e) {
+        alert("画像生成ライブラリの読み込みに失敗しました。");
+        btn.innerText = originalText;
+        return;
+    }
+    btn.innerText = "生成中... (画像読込待機)";
+
+    const COLS = 5;
+    const exportContainer = document.createElement('div');
+    exportContainer.style.position = 'absolute';
+    exportContainer.style.left = '-9999px';
+    exportContainer.style.top = '0';
+    exportContainer.style.backgroundColor = '#f5f1e6';
+    exportContainer.style.padding = '16px 20px 20px';
+    exportContainer.style.width = 'max-content';
+    exportContainer.style.fontFamily = 'sans-serif';
+    document.body.appendChild(exportContainer);
+
+    // ヘッダー
+    const searchInput = document.getElementById('search-input');
+    const isSearching = searchInput && searchInput.value.trim() !== '';
+    let levelText = currentViewLevel === 'ALL' ? 'ALL' : currentViewLevel;
+    if (isSearching) levelText = '検索';
+    const now = new Date();
+    const dateText = `${now.getFullYear()}.${now.getMonth() + 1}.${now.getDate()}`;
+
+    let html = `
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 12px;">
+            <div style="background: #fff; border: 3px solid #3949ab; border-radius: 12px; padding: 6px 18px; text-align: center; min-width: 90px;">
+                <div style="font-size: 16px; font-weight: bold; color: #3949ab; letter-spacing: 1px;">LEVEL</div>
+                <div style="font-size: ${levelText.length > 2 ? 26 : 44}px; font-weight: bold; color: #3949ab; line-height: 1.1;">${escapeHtmlText(levelText)}</div>
+            </div>
+            <div style="flex: 1; text-align: center; font-size: 28px; font-weight: bold; color: #3949ab;">pop'n music 難易度表</div>
+            <div style="text-align: right; color: #555; font-size: 14px; line-height: 1.5;">
+                <div>作成日 ${dateText}</div>
+                <div style="font-weight: bold;">User: ${escapeHtmlText(currentUser)}</div>
+            </div>
+        </div>`;
+
+    // メダル集計の帯
+    const counts = {};
+    targetSongs.forEach(s => {
+        const k = clearRecords[s.id] || '';
+        counts[k] = (counts[k] || 0) + 1;
+    });
+    const summaryKeys = Object.keys(MEDAL_TYPES)
+        .filter(k => k !== '' && (k !== '未解禁' || counts[k]))
+        .sort((a, b) => MEDAL_TYPES[b].rank - MEDAL_TYPES[a].rank);
+    html += `<div style="display: flex; justify-content: flex-end; margin-bottom: 14px;">
+        <div style="display: flex; align-items: center; gap: 4px; background: #fff; border: 2px solid #90a4ae; border-radius: 8px; padding: 4px 10px;">`;
+    summaryKeys.forEach(k => {
+        const m = MEDAL_TYPES[k];
+        const icon = m.imgUrl && m.imgUrl.startsWith('http')
+            ? `<img src="${toImageProxyUrl(m.imgUrl)}" crossorigin="anonymous" style="width: 24px; height: 24px; object-fit: contain;">`
+            : `<span style="font-size: 11px; color: #555;">${escapeHtmlText(m.label)}</span>`;
+        html += `<div style="display: flex; align-items: center; gap: 4px; padding: 0 6px; border-right: 1px solid #ddd;">
+            ${icon}<span style="font-size: 15px; font-weight: bold; color: #333; min-width: 18px; text-align: right;">${counts[k] || 0}</span>
+        </div>`;
+    });
+    html += `<div style="font-size: 15px; font-weight: bold; color: #333; padding-left: 6px;">/ ${targetSongs.length}</div></div></div>`;
+
+    // 難易度ごとの行
+    const groups = buildDiffTableGroups(targetSongs);
+    html += `<div style="display: flex; flex-direction: column; gap: 8px;">`;
+    groups.forEach(g => {
+        const color = DIFF_TABLE_COLORS[g.cls] || DIFF_TABLE_COLORS['未定'];
+        const labelHtml = g.cls === '未定'
+            ? `<div style="font-size: 13px;">未定</div>`
+            : `<div style="font-size: 12px;">${escapeHtmlText(g.cls)}</div><div style="font-size: 17px;">${escapeHtmlText(g.label)}</div>`;
+        html += `<div style="display: flex; gap: 10px; align-items: stretch;">
+            <div style="width: 58px; flex-shrink: 0; background: ${color}; color: #fff; font-weight: bold; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; line-height: 1.2; padding: 4px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.25);">${labelHtml}</div>
+            <div style="display: grid; grid-template-columns: repeat(${COLS}, 220px); gap: 8px 12px; align-content: center;">`;
+        g.songs.forEach(song => {
+            const medalKey = clearRecords[song.id] || '';
+            html += `<div style="display: flex; align-items: center; gap: 6px;">
+                ${buildDiffTableMedalHtml(medalKey)}${buildDiffTableBannerHtml(song)}
+            </div>`;
+        });
+        html += `</div></div>`;
+    });
+    html += `</div>`;
+
+    exportContainer.innerHTML = html;
+
+    // 画像の読み込み完了を待機
+    const images = Array.from(exportContainer.querySelectorAll('img'));
+    await Promise.all(images.map(img => new Promise(res => {
+        if (img.complete) {
+            res();
+        } else {
+            img.onload = res;
+            img.onerror = () => { console.warn("Image proxy failed:", img.src); res(); };
+        }
+    })));
+
+    btn.innerText = "生成中... (描画中)";
+
+    try {
+        const canvas = await html2canvas(exportContainer, { backgroundColor: '#f5f1e6', scale: 2, useCORS: true });
+        const dataUrl = canvas.toDataURL("image/png");
+
+        const isMobile = window.innerWidth <= 768 || /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        if (isMobile) {
+            document.getElementById('generated-image-preview').src = dataUrl;
+            document.getElementById('image-result-modal').style.display = 'flex';
+        } else {
+            const link = document.createElement('a');
+            const date = new Date().toISOString().slice(0, 10);
+            link.download = `popn_difftable_${currentUser}_Lv${isSearching ? 'Search' : currentViewLevel}_${date}.png`;
             link.href = dataUrl;
             link.click();
         }
@@ -2407,6 +2622,7 @@ function renderTable() {
         tbody.appendChild(tr);
     });
 
+    lastDisplaySongs = displaySongs;
     updateSortHeaders();
 
     const kuroHishiPerc = formatRate(kuroHishiClearCount, rateTotal);
@@ -3305,3 +3521,25 @@ async function applyBulkDiff() {
         if (ok) alert('楽曲リストをクラウドに保存しました！');
     }
 }
+
+// ==========================================
+// ★ 表示レベルボタンの配置（メイン画面 / メニュー内）
+// ==========================================
+function applyLevelButtonPlacement(onMain) {
+    const buttons = document.getElementById('view-level-buttons');
+    const slot = document.getElementById(onMain ? 'main-level-slot' : 'menu-level-slot');
+    if (buttons && slot && buttons.parentElement !== slot) slot.appendChild(buttons);
+    const checkbox = document.getElementById('level-btn-on-main');
+    if (checkbox) checkbox.checked = onMain;
+}
+
+function setLevelButtonPlacement(onMain) {
+    try { localStorage.setItem('popn_level_btn_main', onMain ? '1' : '0'); } catch (e) {}
+    applyLevelButtonPlacement(onMain);
+}
+
+(function initLevelButtonPlacement() {
+    let onMain = true;
+    try { onMain = localStorage.getItem('popn_level_btn_main') !== '0'; } catch (e) {}
+    applyLevelButtonPlacement(onMain);
+})();
