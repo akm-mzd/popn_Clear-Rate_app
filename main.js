@@ -1218,223 +1218,14 @@ function handleSearch() { renderTable(); }
 function clearSearch() { document.getElementById('search-input').value = ''; renderTable(); }
 
 // ==========================================
-// 全体統計（一覧）画像出力機能
+// ★ 画像出力の共通処理
+//   ページのCSS（スマホ用の非表示指定など）に影響されないよう、
+//   画像の中身はすべてインラインスタイルで組み立てる
 // ==========================================
-async function generateOverviewImage() {
-    const btn = document.getElementById('btn-overview-image');
-    const originalText = btn.innerText;
-    btn.innerText = "準備中... (ライブラリ読込)";
-    await ensureHtml2Canvas();
-    btn.innerText = "生成中... (画像読込待機)";
+const EXPORT_BG = '#f5f1e6';
+const EXPORT_ACCENT = '#3949ab';
+const EXPORT_MAX_PIXELS = 16000000; // iOS のキャンバス上限（約1677万px）より少し小さく
 
-    const exportContainer = document.createElement('div');
-    exportContainer.style.position = 'absolute';
-    exportContainer.style.left = '-9999px';
-    exportContainer.style.top = '0';
-    exportContainer.style.backgroundColor = '#fff';
-    exportContainer.style.padding = '20px';
-    exportContainer.style.width = 'max-content';
-    exportContainer.style.fontFamily = 'sans-serif';
-    document.body.appendChild(exportContainer);
-
-    const sortedMedalKeys = Object.keys(MEDAL_TYPES)
-        .sort((a, b) => MEDAL_TYPES[b].rank - MEDAL_TYPES[a].rank);
-
-    const headerFlex = document.createElement('div');
-    headerFlex.style.display = 'flex';
-    headerFlex.style.justifyContent = 'space-between';
-    headerFlex.style.alignItems = 'flex-start';
-    headerFlex.style.marginBottom = '15px';
-
-    const title = document.createElement('h2');
-    title.innerText = `全体クリア・メダル状況 (User: ${currentUser})`;
-    title.style.margin = '0';
-    title.style.color = '#333';
-    headerFlex.appendChild(title);
-
-    // 凡例エリア (2行対応)
-    const legendContainer = document.createElement('div');
-    legendContainer.style.display = 'flex';
-    legendContainer.style.flexDirection = 'column';
-    legendContainer.style.alignItems = 'flex-end';
-    legendContainer.style.gap = '4px';
-    legendContainer.style.fontSize = '12px';
-
-    const row1 = document.createElement('div');
-    row1.style.display = 'flex';
-    row1.style.gap = '8px';
-
-    const row2 = document.createElement('div');
-    row2.style.display = 'flex';
-    row2.style.gap = '8px';
-
-    let currentRow = row1;
-
-    sortedMedalKeys.forEach(k => {
-        const color = MEDAL_COLORS[k] || '#ccc';
-        const label = MEDAL_TYPES[k].label;
-        
-        if (label === '黒星') {
-            currentRow = row2;
-        }
-        
-        const legendItem = document.createElement('div');
-        legendItem.style.display = 'flex';
-        legendItem.style.alignItems = 'center';
-        
-        const colorBox = document.createElement('span');
-        colorBox.style.display = 'inline-block';
-        colorBox.style.width = '12px';
-        colorBox.style.height = '12px';
-        colorBox.style.backgroundColor = color;
-        colorBox.style.border = '1px solid #aaa';
-        colorBox.style.marginRight = '4px';
-        
-        const textSpan = document.createElement('span');
-        textSpan.innerText = label;
-        
-        legendItem.appendChild(colorBox);
-        legendItem.appendChild(textSpan);
-        currentRow.appendChild(legendItem);
-    });
-
-    legendContainer.appendChild(row1);
-    legendContainer.appendChild(row2);
-    headerFlex.appendChild(legendContainer);
-    exportContainer.appendChild(headerFlex);
-
-    const targetLevels = ['50', '49', '48', '47', '46'];
-
-    const table = document.createElement('table');
-    table.style.borderCollapse = 'collapse';
-    table.style.width = '100%';
-    table.style.border = '2px solid #333';
-
-    // ★ ここでヘッダーを「クリア数/曲数」に設定 ★
-    let theadHtml = `<tr style="background-color: #f2f2f2;">
-        <th style="border: 1px solid #ccc; padding: 8px; width: 60px;">Lv</th>
-        <th style="border: 1px solid #ccc; padding: 8px; width: 100px; font-size: 0.9em;">クリア数<br>/ 曲数</th>`;
-    
-    sortedMedalKeys.forEach(k => {
-        const m = MEDAL_TYPES[k];
-        const isValidUrl = m.imgUrl.startsWith('http') || m.imgUrl.startsWith('data:');
-        let iconHtml = `<span style="font-size:12px;">${m.label}</span>`;
-        
-        if (isValidUrl) {
-            let proxyUrl = m.imgUrl;
-            if (proxyUrl.startsWith('http') && !proxyUrl.includes('wsrv.nl')) {
-                proxyUrl = `https://wsrv.nl/?url=${encodeURIComponent(proxyUrl)}`;
-            }
-            iconHtml = `<img src="${proxyUrl}" crossorigin="anonymous" style="height:32px; width:auto; vertical-align:middle;">`;
-        }
-        theadHtml += `<th style="border: 1px solid #ccc; padding: 8px; min-width: 50px; text-align: center;">${iconHtml}</th>`;
-    });
-    theadHtml += `</tr>`;
-    table.innerHTML = `<thead>${theadHtml}</thead>`;
-
-    const tbody = document.createElement('tbody');
-
-    targetLevels.forEach(lv => {
-        const lvSongs = songs.filter(s => s.level === lv);
-        if (lvSongs.length === 0) return;
-
-        let counts = {};
-        sortedMedalKeys.forEach(k => counts[k] = 0);
-        
-        // ★ クリア数をカウントする処理（イージークリアは含まない：ノーマル以上のみ） ★
-        let clearedCount = 0;
-
-        lvSongs.forEach(s => {
-            const medalKey = clearRecords[s.id] || '';
-            if (counts[medalKey] !== undefined) {
-                counts[medalKey]++;
-            }
-            if (MEDAL_TYPES[medalKey] && MEDAL_TYPES[medalKey].isNormalClear) {
-                clearedCount++;
-            }
-        });
-
-        const absTotal = lvSongs.length;
-
-        // ★ 統計行 (縦軸：レベル) の出力処理を変更 ★
-        let trStats = `<tr>
-            <td style="border: 1px solid #ccc; padding: 8px; font-weight: bold; font-size: 1.4em; text-align: center; background-color: #e3f2fd; color: #0056b3;">${lv}</td>
-            <td style="border: 1px solid #ccc; padding: 8px; font-weight: bold; text-align: center; line-height: 1.2;">
-                <span style="font-size: 1.2em; color: #d32f2f;">${clearedCount}</span><br>
-                <span style="font-size: 0.85em; color: #666;">/ ${absTotal}</span>
-            </td>`;
-        
-        sortedMedalKeys.forEach(k => {
-            const count = counts[k];
-            const perc = absTotal > 0 ? ((count / absTotal) * 100).toFixed(1) : 0;
-            const opacity = count === 0 ? 'opacity: 0.2;' : '';
-            trStats += `<td style="border: 1px solid #ccc; padding: 6px; text-align: center; ${opacity}">
-                <div style="font-weight: bold; font-size: 1.2em; color: #333;">${count}</div>
-                <div style="font-size: 0.85em; color: #666;">${perc}%</div>
-            </td>`;
-        });
-        trStats += `</tr>`;
-
-        // バーグラフ行
-        let trBar = `<tr><td colspan="${2 + sortedMedalKeys.length}" style="border: 1px solid #ccc; padding: 6px 10px; background-color: #fafafa;">
-            <div style="display: flex; width: 100%; height: 20px; border-radius: 4px; overflow: hidden; background: #eee; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">`;
-        
-        sortedMedalKeys.forEach(k => {
-            if (counts[k] > 0) {
-                const w = (counts[k] / absTotal) * 100;
-                trBar += `<div style="width: ${w}%; background-color: ${MEDAL_COLORS[k] || '#ccc'};" title="${MEDAL_TYPES[k].label}: ${counts[k]}"></div>`;
-            }
-        });
-        trBar += `</div></td></tr>`;
-
-        tbody.innerHTML += trStats + trBar;
-    });
-
-    table.appendChild(tbody);
-    exportContainer.appendChild(table);
-
-    // 画像の読み込み完了を確実に待機
-    const images = Array.from(exportContainer.querySelectorAll('img'));
-    await Promise.all(images.map(img => {
-        return new Promise(res => {
-            if (img.complete) {
-                res();
-            } else {
-                img.onload = res;
-                img.onerror = () => { console.warn("Image proxy failed:", img.src); res(); };
-            }
-        });
-    }));
-
-    btn.innerText = "生成中... (描画中)";
-
-    try {
-        const canvas = await html2canvas(exportContainer, { backgroundColor: '#fff', scale: 2, useCORS: true });
-        const dataUrl = canvas.toDataURL("image/png");
-        
-        const isMobile = window.innerWidth <= 768 || /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-        if (isMobile) {
-            document.getElementById('generated-image-preview').src = dataUrl;
-            document.getElementById('image-result-modal').style.display = 'flex';
-        } else {
-            const link = document.createElement('a');
-            const date = new Date().toISOString().slice(0, 10);
-            link.download = `popn_overview_${currentUser}_${date}.png`;
-            link.href = dataUrl;
-            link.click();
-        }
-    } catch (e) {
-        alert("画像の生成に失敗しました。");
-        console.error(e);
-    } finally {
-        document.body.removeChild(exportContainer);
-        btn.innerText = originalText;
-    }
-}
-
-// ==========================================
-// ★ 難易度順画像（指数ごとにバナーとクリアメダルを並べた画像）
-// ==========================================
 function toImageProxyUrl(url) {
     if (url && url.startsWith('http') && !url.includes('wsrv.nl')) {
         return `https://wsrv.nl/?url=${encodeURIComponent(url)}`;
@@ -1446,15 +1237,240 @@ function escapeHtmlText(str) {
     return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+function isMobileExport() {
+    return window.innerWidth <= 768 || /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
+// 画像出力の開始：メニューを閉じ、保存・トップに戻るボタンを隠す
+function beginImageExport() {
+    if (typeof toggleMenu === 'function') toggleMenu(false);
+    document.body.classList.add('exporting-image');
+}
+
+function endImageExport() {
+    document.body.classList.remove('exporting-image');
+}
+
+function closeImageResultModal() {
+    document.getElementById('image-result-modal').style.display = 'none';
+    endImageExport();
+}
+
+function createExportRoot(width) {
+    const root = document.createElement('div');
+    root.style.cssText = `position: absolute; left: -99999px; top: 0; background: ${EXPORT_BG}; padding: 18px 22px 22px; width: ${width ? width + 'px' : 'max-content'}; font-family: sans-serif; color: #333; box-sizing: border-box; line-height: 1.2;`;
+    document.body.appendChild(root);
+    return root;
+}
+
+// 文字を枠の中央に置くための共通スタイル
+const EXPORT_CENTER = 'display: flex; align-items: center; justify-content: center; text-align: center;';
+
+function buildExportHeader(levelText, titleText) {
+    const now = new Date();
+    const dateText = `${now.getFullYear()}.${now.getMonth() + 1}.${now.getDate()}`;
+    const lvSize = String(levelText).length > 3 ? 22 : (String(levelText).length > 2 ? 30 : 44);
+    return `
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 14px;">
+            <div style="background: #fff; border: 3px solid ${EXPORT_ACCENT}; border-radius: 12px; width: 104px; height: 84px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0;">
+                <div style="font-size: 15px; line-height: 1; font-weight: bold; color: ${EXPORT_ACCENT}; letter-spacing: 1px;">LEVEL</div>
+                <div style="font-size: ${lvSize}px; line-height: 1; font-weight: bold; color: ${EXPORT_ACCENT}; margin-top: 6px;">${escapeHtmlText(levelText)}</div>
+            </div>
+            <div style="flex: 1; ${EXPORT_CENTER} font-size: 28px; line-height: 1.2; font-weight: bold; color: ${EXPORT_ACCENT};">${escapeHtmlText(titleText)}</div>
+            <div style="text-align: right; color: #555; font-size: 14px; line-height: 1.6; flex-shrink: 0;">
+                <div>作成日 ${dateText}</div>
+                <div style="font-weight: bold;">User: ${escapeHtmlText(currentUser)}</div>
+            </div>
+        </div>`;
+}
+
+function getExportLevelText() {
+    const searchInput = document.getElementById('search-input');
+    if (searchInput && searchInput.value.trim() !== '') return '検索';
+    return currentViewLevel === 'ALL' ? 'ALL' : currentViewLevel;
+}
+
+function buildMedalIconHtml(medalKey, size) {
+    const m = MEDAL_TYPES[medalKey];
+    if (m && m.imgUrl && (m.imgUrl.startsWith('http') || m.imgUrl.startsWith('data:'))) {
+        return `<img src="${toImageProxyUrl(m.imgUrl)}" crossorigin="anonymous" style="width: ${size}px; height: ${size}px; object-fit: contain; display: block;">`;
+    }
+    const label = m ? m.label : '';
+    return `<span style="font-size: 11px; line-height: 1; color: #555; white-space: nowrap;">${escapeHtmlText(label)}</span>`;
+}
+
+// メダル枠（未プレイは空枠、未解禁は鍵）
+function buildMedalBoxHtml(medalKey) {
+    const m = MEDAL_TYPES[medalKey];
+    const boxStyle = `width: 34px; height: 34px; flex-shrink: 0; border-radius: 6px; ${EXPORT_CENTER} box-sizing: border-box;`;
+    if (m && m.imgUrl && (m.imgUrl.startsWith('http') || m.imgUrl.startsWith('data:'))) {
+        return `<div style="${boxStyle} background: #fff; border: 2px solid #90a4ae;"><img src="${toImageProxyUrl(m.imgUrl)}" crossorigin="anonymous" style="width: 28px; height: 28px; object-fit: contain; display: block;"></div>`;
+    }
+    if (medalKey === '未解禁') {
+        return `<div style="${boxStyle} background: #424242; border: 2px solid #212121; color: #fff; font-size: 14px; line-height: 1;">🔒</div>`;
+    }
+    return `<div style="${boxStyle} background: #fff; border: 2px solid #90a4ae;"></div>`;
+}
+
+function buildBannerBoxHtml(song, width, height) {
+    const style = `width: ${width}px; height: ${height}px; flex-shrink: 0; border-radius: 3px; box-sizing: border-box;`;
+    if (song.bannerUrl && song.bannerUrl.trim() !== '') {
+        return `<img src="${toImageProxyUrl(song.bannerUrl)}" crossorigin="anonymous" style="${style} object-fit: cover; display: block; background: #eee;">`;
+    }
+    return `<div style="${style} ${EXPORT_CENTER} background: #37474f; color: #fff; padding: 2px 6px; overflow: hidden;"><span style="font-size: 11px; line-height: 1.2; font-weight: bold;">${escapeHtmlText(song.title)}</span></div>`;
+}
+
+function waitExportImages(root) {
+    const images = Array.from(root.querySelectorAll('img'));
+    return Promise.all(images.map(img => new Promise(res => {
+        if (img.complete) {
+            res();
+        } else {
+            img.onload = res;
+            img.onerror = () => { console.warn("Image proxy failed:", img.src); res(); };
+        }
+    })));
+}
+
+async function prepareExport(btn) {
+    beginImageExport();
+    const originalText = btn.innerText;
+    btn.innerText = "準備中... (ライブラリ読込)";
+    try {
+        await ensureHtml2Canvas();
+    } catch (e) {
+        alert("画像生成ライブラリの読み込みに失敗しました。通信環境を確認してください。");
+        btn.innerText = originalText;
+        endImageExport();
+        return null;
+    }
+    btn.innerText = "生成中... (画像読込待機)";
+    return originalText;
+}
+
+async function outputExportImage(root, filename, btn, originalText) {
+    await waitExportImages(root);
+    btn.innerText = "生成中... (描画中)";
+    let showedModal = false;
+    try {
+        const w = root.scrollWidth, h = root.scrollHeight;
+        const scale = Math.max(0.5, Math.min(2, Math.sqrt(EXPORT_MAX_PIXELS / Math.max(1, w * h))));
+        const canvas = await html2canvas(root, { backgroundColor: EXPORT_BG, scale, useCORS: true, width: w, height: h, windowWidth: Math.max(w + 100, 1200) });
+        const dataUrl = canvas.toDataURL("image/png");
+
+        if (isMobileExport()) {
+            document.getElementById('generated-image-preview').src = dataUrl;
+            document.getElementById('image-result-modal').style.display = 'flex';
+            showedModal = true;
+        } else {
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = dataUrl;
+            link.click();
+        }
+    } catch (e) {
+        alert("画像の生成に失敗しました。");
+        console.error(e);
+    } finally {
+        document.body.removeChild(root);
+        btn.innerText = originalText;
+        if (!showedModal) endImageExport();
+    }
+}
+
+function exportDateStr() {
+    return new Date().toISOString().slice(0, 10);
+}
+
+// ==========================================
+// ★ 全体統計画像（Lv50〜46 のクリア・メダル状況）
+// ==========================================
+async function generateOverviewImage() {
+    const btn = document.getElementById('btn-overview-image');
+    const originalText = await prepareExport(btn);
+    if (originalText === null) return;
+
+    const sortedMedalKeys = Object.keys(MEDAL_TYPES)
+        .sort((a, b) => MEDAL_TYPES[b].rank - MEDAL_TYPES[a].rank);
+    const targetLevels = ['50', '49', '48', '47', '46'];
+    const COL_W = 62;
+
+    const root = createExportRoot();
+    let html = buildExportHeader('ALL', "pop'n music 全体統計");
+
+    // 見出し行（メダルアイコン）
+    html += `<div style="display: flex; align-items: stretch; gap: 10px; margin-bottom: 6px;">
+        <div style="width: 72px; flex-shrink: 0;"></div>
+        <div style="width: 96px; flex-shrink: 0; ${EXPORT_CENTER} font-size: 12px; line-height: 1.3; font-weight: bold; color: #555;">クリア数<br>/ 曲数</div>
+        <div style="display: flex; gap: 4px;">`;
+    sortedMedalKeys.forEach(k => {
+        html += `<div style="width: ${COL_W}px; height: 40px; ${EXPORT_CENTER} background: #fff; border: 2px solid #90a4ae; border-radius: 6px; box-sizing: border-box;">${k === '' ? '<span style="font-size: 11px; line-height: 1; color: #555;">未プレイ</span>' : buildMedalIconHtml(k, 30)}</div>`;
+    });
+    html += `</div></div>`;
+
+    let rowCount = 0;
+    targetLevels.forEach(lv => {
+        const lvSongs = songs.filter(s => s.level === lv);
+        if (lvSongs.length === 0) return;
+        rowCount++;
+
+        const counts = {};
+        sortedMedalKeys.forEach(k => counts[k] = 0);
+        let clearedCount = 0; // イージークリアは含まない（ノーマル以上のみ）
+        lvSongs.forEach(s => {
+            const medalKey = clearRecords[s.id] || '';
+            if (counts[medalKey] !== undefined) counts[medalKey]++;
+            if (MEDAL_TYPES[medalKey] && MEDAL_TYPES[medalKey].isNormalClear) clearedCount++;
+        });
+        const total = lvSongs.length;
+
+        html += `<div style="background: #fff; border: 2px solid #90a4ae; border-radius: 8px; padding: 8px; margin-bottom: 8px;">
+            <div style="display: flex; align-items: stretch; gap: 10px;">
+                <div style="width: 72px; height: 56px; flex-shrink: 0; ${EXPORT_CENTER} background: ${EXPORT_ACCENT}; color: #fff; border-radius: 6px; font-size: 26px; line-height: 1; font-weight: bold;">${lv}</div>
+                <div style="width: 96px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+                    <div style="font-size: 22px; line-height: 1.1; font-weight: bold; color: #d32f2f;">${clearedCount}</div>
+                    <div style="font-size: 13px; line-height: 1.2; color: #666;">/ ${total}</div>
+                </div>
+                <div style="display: flex; gap: 4px;">`;
+        sortedMedalKeys.forEach(k => {
+            const c = counts[k];
+            const opacity = c === 0 ? 'opacity: 0.25;' : '';
+            html += `<div style="width: ${COL_W}px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; ${opacity}">
+                <div style="font-size: 18px; line-height: 1.1; font-weight: bold; color: #333;">${c}</div>
+                <div style="font-size: 11px; line-height: 1.3; color: #666;">${formatRate(c, total)}%</div>
+            </div>`;
+        });
+        html += `</div></div>
+            <div style="display: flex; width: 100%; height: 14px; border-radius: 4px; overflow: hidden; background: #eee; margin-top: 8px;">`;
+        sortedMedalKeys.forEach(k => {
+            if (counts[k] > 0) {
+                html += `<div style="width: ${(counts[k] / total) * 100}%; background: ${MEDAL_COLORS[k] || '#ccc'};"></div>`;
+            }
+        });
+        html += `</div></div>`;
+    });
+
+    if (rowCount === 0) {
+        html += `<div style="${EXPORT_CENTER} padding: 30px; font-size: 16px; color: #666;">Lv46〜50 の楽曲データがありません。</div>`;
+    }
+
+    root.innerHTML = html;
+    await outputExportImage(root, `popn_overview_${currentUser}_${exportDateStr()}.png`, btn, originalText);
+}
+
+// ==========================================
+// ★ 難易度順画像（指数ごとにバナーとクリアメダルを並べた画像）
+// ==========================================
 const DIFF_TABLE_COLORS = {
     '危険': '#212121',
     '別格': '#e53935',
     '詐称': '#f4511e',
     '強': '#fb8c00',
-    '中': '#7cb342',
-    '弱': '#42a5f5',
-    '逆詐称': '#1e88e5',
-    '入門': '#26a69a',
+    '中': '#7cb342',      // 中(プラス)
+    '中-': '#aed581',     // 中(マイナス)：やや薄い緑
+    '弱': '#81d4fa',      // 水色
+    '逆詐称': '#81d4fa',
+    '入門': '#42a5f5',
     '未定': '#9e9e9e'
 };
 
@@ -1498,79 +1514,13 @@ function buildDiffTableGroups(targetSongs) {
     return groups;
 }
 
-function buildDiffTableMedalHtml(medalKey) {
-    const m = MEDAL_TYPES[medalKey];
-    const boxStyle = 'width: 34px; height: 34px; flex-shrink: 0; border-radius: 6px; display: flex; align-items: center; justify-content: center; box-sizing: border-box;';
-    if (m && m.imgUrl && (m.imgUrl.startsWith('http') || m.imgUrl.startsWith('data:'))) {
-        return `<div style="${boxStyle} background: #fff; border: 2px solid #90a4ae;"><img src="${toImageProxyUrl(m.imgUrl)}" crossorigin="anonymous" style="width: 28px; height: 28px; object-fit: contain;"></div>`;
-    }
-    if (medalKey === '未解禁') {
-        return `<div style="${boxStyle} background: #424242; border: 2px solid #212121; color: #fff; font-size: 14px;">🔒</div>`;
-    }
-    return `<div style="${boxStyle} background: #fff; border: 2px solid #90a4ae;"></div>`;
+function getDiffTableLabelColor(g) {
+    if (g.cls === '中' && g.label.startsWith('-')) return DIFF_TABLE_COLORS['中-'];
+    return DIFF_TABLE_COLORS[g.cls] || DIFF_TABLE_COLORS['未定'];
 }
 
-function buildDiffTableBannerHtml(song) {
-    const bannerStyle = 'width: 168px; height: 42px; flex-shrink: 0; border-radius: 3px; box-sizing: border-box;';
-    if (song.bannerUrl && song.bannerUrl.trim() !== '') {
-        return `<img src="${toImageProxyUrl(song.bannerUrl)}" crossorigin="anonymous" style="${bannerStyle} object-fit: cover; display: block; background: #eee;">`;
-    }
-    return `<div style="${bannerStyle} background: #37474f; color: #fff; font-size: 11px; font-weight: bold; padding: 2px 6px; display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1.15; overflow: hidden;">${escapeHtmlText(song.title)}</div>`;
-}
-
-async function generateDiffTableImage() {
-    const btn = document.getElementById('btn-diff-image');
-    const originalText = btn.innerText;
-
-    const targetSongs = lastDisplaySongs.slice();
-    if (targetSongs.length === 0) {
-        alert("表示中の楽曲がありません。");
-        return;
-    }
-
-    btn.innerText = "準備中... (ライブラリ読込)";
-    try {
-        await ensureHtml2Canvas();
-    } catch (e) {
-        alert("画像生成ライブラリの読み込みに失敗しました。");
-        btn.innerText = originalText;
-        return;
-    }
-    btn.innerText = "生成中... (画像読込待機)";
-
-    const COLS = 5;
-    const exportContainer = document.createElement('div');
-    exportContainer.style.position = 'absolute';
-    exportContainer.style.left = '-9999px';
-    exportContainer.style.top = '0';
-    exportContainer.style.backgroundColor = '#f5f1e6';
-    exportContainer.style.padding = '16px 20px 20px';
-    exportContainer.style.width = 'max-content';
-    exportContainer.style.fontFamily = 'sans-serif';
-    document.body.appendChild(exportContainer);
-
-    // ヘッダー
-    const searchInput = document.getElementById('search-input');
-    const isSearching = searchInput && searchInput.value.trim() !== '';
-    let levelText = currentViewLevel === 'ALL' ? 'ALL' : currentViewLevel;
-    if (isSearching) levelText = '検索';
-    const now = new Date();
-    const dateText = `${now.getFullYear()}.${now.getMonth() + 1}.${now.getDate()}`;
-
-    let html = `
-        <div style="display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 12px;">
-            <div style="background: #fff; border: 3px solid #3949ab; border-radius: 12px; padding: 6px 18px; text-align: center; min-width: 90px;">
-                <div style="font-size: 16px; font-weight: bold; color: #3949ab; letter-spacing: 1px;">LEVEL</div>
-                <div style="font-size: ${levelText.length > 2 ? 26 : 44}px; font-weight: bold; color: #3949ab; line-height: 1.1;">${escapeHtmlText(levelText)}</div>
-            </div>
-            <div style="flex: 1; text-align: center; font-size: 28px; font-weight: bold; color: #3949ab;">pop'n music 難易度表</div>
-            <div style="text-align: right; color: #555; font-size: 14px; line-height: 1.5;">
-                <div>作成日 ${dateText}</div>
-                <div style="font-weight: bold;">User: ${escapeHtmlText(currentUser)}</div>
-            </div>
-        </div>`;
-
-    // メダル集計の帯
+// メダル別の曲数の帯（「/ 総数」付き）
+function buildMedalSummaryHtml(targetSongs) {
     const counts = {};
     targetSongs.forEach(s => {
         const k = clearRecords[s.id] || '';
@@ -1579,284 +1529,167 @@ async function generateDiffTableImage() {
     const summaryKeys = Object.keys(MEDAL_TYPES)
         .filter(k => k !== '' && (k !== '未解禁' || counts[k]))
         .sort((a, b) => MEDAL_TYPES[b].rank - MEDAL_TYPES[a].rank);
-    html += `<div style="display: flex; justify-content: flex-end; margin-bottom: 14px;">
-        <div style="display: flex; align-items: center; gap: 4px; background: #fff; border: 2px solid #90a4ae; border-radius: 8px; padding: 4px 10px;">`;
+    let html = `<div style="display: flex; justify-content: flex-end; margin-bottom: 14px;">
+        <div style="display: flex; align-items: center; background: #fff; border: 2px solid #90a4ae; border-radius: 8px; padding: 4px 6px;">`;
     summaryKeys.forEach(k => {
-        const m = MEDAL_TYPES[k];
-        const icon = m.imgUrl && m.imgUrl.startsWith('http')
-            ? `<img src="${toImageProxyUrl(m.imgUrl)}" crossorigin="anonymous" style="width: 24px; height: 24px; object-fit: contain;">`
-            : `<span style="font-size: 11px; color: #555;">${escapeHtmlText(m.label)}</span>`;
-        html += `<div style="display: flex; align-items: center; gap: 4px; padding: 0 6px; border-right: 1px solid #ddd;">
-            ${icon}<span style="font-size: 15px; font-weight: bold; color: #333; min-width: 18px; text-align: right;">${counts[k] || 0}</span>
+        html += `<div style="display: flex; align-items: center; justify-content: center; gap: 4px; height: 30px; padding: 0 7px; border-right: 1px solid #ddd;">
+            <div style="width: 24px; height: 24px; ${EXPORT_CENTER}">${buildMedalIconHtml(k, 24)}</div>
+            <div style="min-width: 20px; height: 24px; ${EXPORT_CENTER} font-size: 15px; line-height: 1; font-weight: bold; color: #333;">${counts[k] || 0}</div>
         </div>`;
     });
-    html += `<div style="font-size: 15px; font-weight: bold; color: #333; padding-left: 6px;">/ ${targetSongs.length}</div></div></div>`;
+    html += `<div style="height: 30px; ${EXPORT_CENTER} padding: 0 4px 0 8px; font-size: 15px; line-height: 1; font-weight: bold; color: #333;">/ ${targetSongs.length}</div></div></div>`;
+    return html;
+}
 
-    // 難易度ごとの行
+async function generateDiffTableImage() {
+    const btn = document.getElementById('btn-diff-image');
+    const targetSongs = lastDisplaySongs.slice();
+    if (targetSongs.length === 0) {
+        alert("表示中の楽曲がありません。");
+        return;
+    }
+    const originalText = await prepareExport(btn);
+    if (originalText === null) return;
+
+    const COLS = 5;
+    const root = createExportRoot();
+    let html = buildExportHeader(getExportLevelText(), "pop'n music 難易度表");
+    html += buildMedalSummaryHtml(targetSongs);
+
     const groups = buildDiffTableGroups(targetSongs);
     html += `<div style="display: flex; flex-direction: column; gap: 8px;">`;
     groups.forEach(g => {
-        const color = DIFF_TABLE_COLORS[g.cls] || DIFF_TABLE_COLORS['未定'];
+        const color = getDiffTableLabelColor(g);
+        const textShadow = (g.cls === '弱' || g.cls === '逆詐称' || (g.cls === '中' && g.label.startsWith('-'))) ? 'text-shadow: 0 1px 2px rgba(0,0,0,0.45);' : '';
         const labelHtml = g.cls === '未定'
-            ? `<div style="font-size: 13px;">未定</div>`
-            : `<div style="font-size: 12px;">${escapeHtmlText(g.cls)}</div><div style="font-size: 17px;">${escapeHtmlText(g.label)}</div>`;
+            ? `<div style="font-size: 14px; line-height: 1;">未定</div>`
+            : `<div style="font-size: 12px; line-height: 1;">${escapeHtmlText(g.cls)}</div><div style="font-size: 17px; line-height: 1; margin-top: 4px;">${escapeHtmlText(g.label)}</div>`;
         html += `<div style="display: flex; gap: 10px; align-items: stretch;">
-            <div style="width: 58px; flex-shrink: 0; background: ${color}; color: #fff; font-weight: bold; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; line-height: 1.2; padding: 4px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.25);">${labelHtml}</div>
-            <div style="display: grid; grid-template-columns: repeat(${COLS}, 220px); gap: 8px 12px; align-content: center;">`;
+            <div style="width: 58px; min-height: 42px; flex-shrink: 0; background: ${color}; color: #fff; font-weight: bold; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 4px 0; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.25); ${textShadow}">${labelHtml}</div>
+            <div style="display: grid; grid-template-columns: repeat(${COLS}, 216px); gap: 8px 12px; align-content: center;">`;
         // 強い曲ほど上・右に来るよう、強い順に1行ずつ区切ってから各行を左右反転する（右上が最強）
         const orderedSongs = [];
         for (let i = 0; i < g.songs.length; i += COLS) {
             orderedSongs.push(...g.songs.slice(i, i + COLS).reverse());
         }
         orderedSongs.forEach(song => {
-            const medalKey = clearRecords[song.id] || '';
             html += `<div style="display: flex; align-items: center; gap: 6px;">
-                ${buildDiffTableMedalHtml(medalKey)}${buildDiffTableBannerHtml(song)}
+                ${buildMedalBoxHtml(clearRecords[song.id] || '')}${buildBannerBoxHtml(song, 168, 42)}
             </div>`;
         });
         html += `</div></div>`;
     });
     html += `</div>`;
 
-    exportContainer.innerHTML = html;
+    root.innerHTML = html;
+    const fileLevel = getExportLevelText() === '検索' ? 'Search' : currentViewLevel;
+    await outputExportImage(root, `popn_difftable_${currentUser}_Lv${fileLevel}_${exportDateStr()}.png`, btn, originalText);
+}
 
-    // 画像の読み込み完了を待機
-    const images = Array.from(exportContainer.querySelectorAll('img'));
-    await Promise.all(images.map(img => new Promise(res => {
-        if (img.complete) {
-            res();
-        } else {
-            img.onload = res;
-            img.onerror = () => { console.warn("Image proxy failed:", img.src); res(); };
-        }
-    })));
-
-    btn.innerText = "生成中... (描画中)";
-
-    try {
-        const canvas = await html2canvas(exportContainer, { backgroundColor: '#f5f1e6', scale: 2, useCORS: true });
-        const dataUrl = canvas.toDataURL("image/png");
-
-        const isMobile = window.innerWidth <= 768 || /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-        if (isMobile) {
-            document.getElementById('generated-image-preview').src = dataUrl;
-            document.getElementById('image-result-modal').style.display = 'flex';
-        } else {
-            const link = document.createElement('a');
-            const date = new Date().toISOString().slice(0, 10);
-            link.download = `popn_difftable_${currentUser}_Lv${isSearching ? 'Search' : currentViewLevel}_${date}.png`;
-            link.href = dataUrl;
-            link.click();
-        }
-    } catch (e) {
-        alert("画像の生成に失敗しました。");
-        console.error(e);
-    } finally {
-        document.body.removeChild(exportContainer);
-        btn.innerText = originalText;
-    }
+// ==========================================
+// ★ 表示曲画像（表に表示中の楽曲一覧）
+// ==========================================
+// 画面の統計表示（クリア率）を、画像用のカードに組み立て直す
+function buildExportStatsHtml() {
+    const statsEl = document.getElementById('stats-display');
+    const groups = statsEl ? Array.from(statsEl.querySelectorAll('.stats-group')) : [];
+    if (groups.length === 0) return '';
+    const colorOf = (el) => {
+        if (el.querySelector('.stats-kurohishipercentage')) return '#1a237e';
+        if (el.querySelector('.stats-kuroboshipercentage')) return '#000051';
+        if (el.querySelector('.stats-easypercentage')) return '#2cbc21';
+        return '#d32f2f';
+    };
+    let html = `<div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px;">`;
+    groups.forEach(gEl => {
+        const title = (gEl.querySelector('.stats-title')?.textContent || '').replace(/[:：]\s*$/, '');
+        const fracEl = gEl.querySelector('.stats-fraction');
+        const remain = fracEl?.querySelector('.stats-remain')?.textContent || '';
+        const fraction = fracEl ? fracEl.textContent.replace(remain, '').trim() : '';
+        const percEl = gEl.querySelector('[class*="percentage"]');
+        const perc = percEl ? percEl.textContent.trim() : '';
+        const color = colorOf(gEl);
+        html += `<div style="background: #fff; border: 2px solid #90a4ae; border-left: 8px solid ${color}; border-radius: 8px; padding: 8px 14px; display: flex; align-items: center; gap: 16px;">
+            <div style="display: flex; flex-direction: column; justify-content: center;">
+                <div style="font-size: 13px; line-height: 1.2; font-weight: bold; color: #555;">${escapeHtmlText(title)}</div>
+                <div style="font-size: 16px; line-height: 1.3; font-weight: bold; color: #333;">${escapeHtmlText(fraction)} <span style="font-size: 12px; font-weight: normal; color: #777;">${escapeHtmlText(remain)}</span></div>
+            </div>
+            <div style="font-size: 30px; line-height: 1; font-weight: bold; color: ${color};">${escapeHtmlText(perc)}</div>
+        </div>`;
+    });
+    html += `</div>`;
+    return html;
 }
 
 async function exportAsImage(event) {
-    const exportBtn = event.currentTarget; 
-    const originalText = exportBtn.innerText;
-    
-    const activeCheckboxes = Array.from(document.querySelectorAll('.export-col-toggle'));
-    const activeIndices = activeCheckboxes.filter(cb => cb.checked).map(cb => parseInt(cb.value));
-
+    const exportBtn = event.currentTarget;
+    const activeIndices = Array.from(document.querySelectorAll('.export-col-toggle'))
+        .filter(cb => cb.checked).map(cb => parseInt(cb.value));
     if (activeIndices.length === 0) {
         alert("画像に出力する項目を1つ以上選択してください。");
         return;
     }
-
-    exportBtn.innerText = "準備中... (ライブラリ読込)";
-    await ensureHtml2Canvas();
-    exportBtn.innerText = originalText;
-
-    exportBtn.innerText = "生成中... (画像読込待機)";
-    
-    const exportContainer = document.createElement('div');
-    exportContainer.style.position = 'absolute';
-    exportContainer.style.left = '-9999px';
-    exportContainer.style.top = '0';
-    exportContainer.style.backgroundColor = '#f9f9f9';
-    exportContainer.style.padding = '20px';
-    exportContainer.style.width = 'max-content';
-    exportContainer.style.fontFamily = 'sans-serif';
-    document.body.appendChild(exportContainer);
-
-    const userHeader = document.createElement('h2');
-    userHeader.style.margin = '0 0 10px 0';
-    userHeader.style.color = '#333';
-    userHeader.innerText = `User: ${currentUser}`;
-    exportContainer.appendChild(userHeader);
-
-    const statsClone = document.getElementById('stats-display').cloneNode(true);
-    statsClone.style.marginBottom = '20px';
-    statsClone.style.fontSize = '1.3em';
-    statsClone.style.padding = '20px'; 
-
-    const statGroups = statsClone.querySelectorAll('.stats-group');
-    statGroups.forEach(group => { group.style.gap = '15px'; });
-    const statTitles = statsClone.querySelectorAll('.stats-title');
-    statTitles.forEach(title => { title.style.fontSize = '1.1em'; });
-    const statFractions = statsClone.querySelectorAll('.stats-fraction');
-    statFractions.forEach(frac => { frac.style.fontSize = '1.3em'; });
-    const statRemains = statsClone.querySelectorAll('.stats-remain');
-    statRemains.forEach(rem => { rem.style.fontSize = '0.9em'; });
-    
-    const khPercs = statsClone.querySelectorAll('.stats-kurohishipercentage');
-    khPercs.forEach(perc => { perc.style.fontSize = '2.3em'; });
-    const kbPercs = statsClone.querySelectorAll('.stats-kuroboshipercentage');
-    kbPercs.forEach(perc => { perc.style.fontSize = '2.3em'; });
-    const easyPercs = statsClone.querySelectorAll('.stats-easypercentage');
-    easyPercs.forEach(perc => { perc.style.fontSize = '2.3em'; });
-    const percs = statsClone.querySelectorAll('.stats-percentage');
-    percs.forEach(perc => { perc.style.fontSize = '2.3em'; });
-    
-    const levelBadges = statsClone.querySelectorAll('.stats-level');
-    levelBadges.forEach(badge => {
-        badge.style.fontSize = '1.9em';
-        badge.style.padding = '10px 25px'; 
-    });
-    
-    const statsImages = Array.from(statsClone.querySelectorAll('img'));
-    statsImages.forEach(img => {
-        const originalSrc = img.getAttribute('src');
-        if (originalSrc && originalSrc.startsWith('http') && !originalSrc.includes('wsrv.nl')) {
-            img.setAttribute('crossOrigin', 'anonymous');
-            img.src = `https://wsrv.nl/?url=${encodeURIComponent(originalSrc)}`;
-        }
-    });
-
-    exportContainer.appendChild(statsClone);
-
-    const tablesWrapper = document.createElement('div');
-    tablesWrapper.style.display = 'flex';
-    tablesWrapper.style.gap = '20px';
-    tablesWrapper.style.alignItems = 'flex-start';
-    exportContainer.appendChild(tablesWrapper);
-
-    const originalRows = Array.from(document.querySelectorAll('#song-list tr'));
-    const chunkSize = 30;
-
-    const colWidths = [8, 10, 10, 5, 5, 12, 20, 6, 6, 13];
-    let totalPct = 0;
-    activeIndices.forEach(idx => totalPct += colWidths[idx]);
-    const totalWidth = totalPct * 10; 
-
-    const colProps = [
-        { id: 0, html: `<th style="width: ${colWidths[0]}%; text-align: center; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">メダル</th>` },
-        { id: 1, html: `<th style="width: ${colWidths[1]}%; text-align: center; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">スコア</th>` },
-        { id: 2, html: `<th style="width: ${colWidths[2]}%; text-align: center; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">比較</th>` },
-        { id: 3, html: `<th style="width: ${colWidths[3]}%; text-align: center; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">Lv</th>` },
-        { id: 4, html: `<th style="width: ${colWidths[4]}%; text-align: center; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">Ver</th>` },
-        { id: 5, html: `<th style="width: ${colWidths[5]}%; text-align: center; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">バナー</th>` },
-        { id: 6, html: `<th style="width: ${colWidths[6]}%; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2; text-align: left;">ジャンル / 曲名 (+メモ)</th>` },
-        { id: 7, html: `<th style="width: ${colWidths[7]}%; text-align: right; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">BPM</th>` },
-        { id: 8, html: `<th style="width: ${colWidths[8]}%; text-align: right; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">ノーツ</th>` },
-        { id: 9, html: `<th style="width: ${colWidths[9]}%; border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2; text-align: center;">難易度 (指数)</th>` }
-    ];
-
-    for (let i = 0; i < originalRows.length; i += chunkSize) {
-        const chunk = originalRows.slice(i, i + chunkSize);
-
-        const table = document.createElement('table');
-        table.style.borderCollapse = 'collapse';
-        table.style.backgroundColor = '#fff';
-        table.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-        table.style.width = `${totalWidth}px`;
-
-        const thead = document.createElement('thead');
-        let theadHtml = '<tr>';
-        colProps.forEach(prop => {
-            if (activeIndices.includes(prop.id)) {
-                theadHtml += prop.html;
-            }
-        });
-        theadHtml += '</tr>';
-        thead.innerHTML = theadHtml;
-        table.appendChild(thead);
-
-        const tbody = document.createElement('tbody');
-        chunk.forEach(row => {
-            const clonedRow = row.cloneNode(true);
-            if (clonedRow.lastElementChild) { clonedRow.removeChild(clonedRow.lastElementChild); }
-            const cells = Array.from(clonedRow.children);
-            cells.forEach((cell, index) => {
-                cell.style.border = '1px solid #ddd';
-                cell.style.padding = '8px';
-                cell.style.verticalAlign = 'middle';
-                if (index === 0 || index === 5) {
-                    const img = cell.querySelector('img');
-                    if (img) {
-                        const originalSrc = img.getAttribute('src');
-                        if (originalSrc && originalSrc.startsWith('http') && !originalSrc.includes('wsrv.nl')) {
-                            img.setAttribute('crossOrigin', 'anonymous');
-                            img.src = `https://wsrv.nl/?url=${encodeURIComponent(originalSrc)}`;
-                        }
-                    }
-                }
-            });
-
-            for (let c = cells.length - 1; c >= 0; c--) {
-                if (!activeIndices.includes(c)) {
-                    clonedRow.removeChild(cells[c]);
-                } else {
-                    cells[c].style.display = ''; 
-                }
-            }
-            tbody.appendChild(clonedRow);
-        });
-        
-        table.appendChild(tbody);
-        tablesWrapper.appendChild(table);
+    const targetSongs = lastDisplaySongs.slice();
+    if (targetSongs.length === 0) {
+        alert("表示中の楽曲がありません。");
+        return;
     }
+    const originalText = await prepareExport(exportBtn);
+    if (originalText === null) return;
 
-    const exportImages = Array.from(exportContainer.querySelectorAll('img'));
-    await Promise.all(exportImages.map(img => {
-        return new Promise(resolve => {
-            if (img.complete) {
-                resolve();
-            } else {
-                img.onload = resolve;
-                img.onerror = resolve; 
-            }
+    // スコア・比較は画面の行から文字をもらう（表示順と同じ並び）
+    const rows = Array.from(document.querySelectorAll('#song-list tr'));
+    const cellText = (i, cls) => {
+        const cell = rows[i] && rows[i].querySelector(cls);
+        return cell ? cell.innerText.replace(/\s+/g, ' ').trim() : '';
+    };
+
+    const th = (label, width, align = 'center') => `<th style="width: ${width}px; padding: 8px 6px; background: ${EXPORT_ACCENT}; color: #fff; font-size: 13px; line-height: 1.2; text-align: ${align}; border: 1px solid #c5cae9;">${label}</th>`;
+    const td = (inner, align = 'center', extra = '') => `<td style="padding: 6px; border: 1px solid #d7dbe6; text-align: ${align}; vertical-align: middle; font-size: 13px; line-height: 1.3; ${extra}">${inner}</td>`;
+
+    const columns = [
+        { id: 0, w: 60, head: th('メダル', 60), cell: (s) => td(`<div style="${EXPORT_CENTER}">${buildMedalBoxHtml(clearRecords[s.id] || '')}</div>`) },
+        { id: 1, w: 90, head: th('スコア', 90), cell: (s, i) => td(escapeHtmlText(cellText(i, '.col-score'))) },
+        { id: 2, w: 90, head: th('比較', 90), cell: (s, i) => td(escapeHtmlText(cellText(i, '.col-compare'))) },
+        { id: 3, w: 44, head: th('Lv', 44), cell: (s) => td(escapeHtmlText(s.level)) },
+        { id: 4, w: 44, head: th('Ver', 44), cell: (s) => td(escapeHtmlText(s.version)) },
+        { id: 5, w: 140, head: th('バナー', 140), cell: (s) => td(`<div style="${EXPORT_CENTER}">${buildBannerBoxHtml(s, 128, 32)}</div>`) },
+        { id: 6, w: 240, head: th('ジャンル / 曲名', 240, 'left'), cell: (s) => {
+            const memo = memoRecords[s.id] || {};
+            const memoParts = [memo.affinity, memo.sudden ? `SUD+ ${memo.sudden}` : '', memo.comment].filter(Boolean);
+            const memoHtml = memoParts.length ? `<div style="font-size: 11px; color: #e65100; margin-top: 2px;">📝 ${escapeHtmlText(memoParts.join(' / '))}</div>` : '';
+            return td(`<div style="font-size: 11px; color: #777;">${escapeHtmlText(s.genre)}</div><div style="font-weight: bold;">${escapeHtmlText(s.title)}</div>${memoHtml}`, 'left');
+        } },
+        { id: 7, w: 64, head: th('BPM', 64), cell: (s) => td(escapeHtmlText(s.bpm || '-'), 'right') },
+        { id: 8, w: 60, head: th('ノーツ', 60), cell: (s) => td(escapeHtmlText(s.notes), 'right') },
+        { id: 9, w: 90, head: th('難易度', 90), cell: (s) => {
+            const c = getDifficultyColor(s.diffClass || '未分類', s.diffIndex);
+            const shadow = c.shadow && c.shadow !== 'none' ? `text-shadow: ${c.shadow};` : '';
+            return td(`<span style="font-weight: bold; color: ${c.color}; ${shadow}">${escapeHtmlText(s.diffRaw || '-')}</span>`);
+        } }
+    ].filter(c => activeIndices.includes(c.id));
+
+    const root = createExportRoot();
+    let html = buildExportHeader(getExportLevelText(), "pop'n music 表示曲一覧");
+    html += buildExportStatsHtml();
+
+    const tableWidth = columns.reduce((sum, c) => sum + c.w, 0);
+    const CHUNK = 30;
+    html += `<div style="display: flex; gap: 16px; align-items: flex-start;">`;
+    for (let start = 0; start < targetSongs.length; start += CHUNK) {
+        html += `<table class="export-table" style="width: ${tableWidth}px; border-collapse: collapse; background: #fff; table-layout: fixed; box-shadow: 0 1px 3px rgba(0,0,0,0.15);"><thead><tr>${columns.map(c => c.head).join('')}</tr></thead><tbody>`;
+        targetSongs.slice(start, start + CHUNK).forEach((s, j) => {
+            const i = start + j;
+            const bg = j % 2 ? 'background: #fafafa;' : '';
+            html += `<tr style="${bg}">${columns.map(c => c.cell(s, i)).join('')}</tr>`;
         });
-    }));
-
-    exportBtn.innerText = "生成中... (描画中)";
-
-    const searchInput = document.getElementById('search-input');
-    const isSearching = searchInput && searchInput.value.trim() !== '';
-    const fileNameLevel = isSearching ? 'Search' : currentViewLevel;
-
-    try {
-        const canvas = await html2canvas(exportContainer, {
-            backgroundColor: "#f9f9f9",
-            useCORS: true,
-            scale: 2 
-        });
-        const dataUrl = canvas.toDataURL("image/png");
-        
-        const isMobile = window.innerWidth <= 768 || /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-        if (isMobile) {
-            document.getElementById('generated-image-preview').src = dataUrl;
-            document.getElementById('image-result-modal').style.display = 'flex';
-        } else {
-            const link = document.createElement('a');
-            const date = new Date().toISOString().slice(0,10);
-            link.download = `popn_clearrate_${currentUser}_Lv${fileNameLevel}_${date}.png`;
-            link.href = dataUrl;
-            link.click();
-        }
-    } catch (err) {
-        alert("画像の生成に失敗しました。（一部の画像URLがセキュリティ制限に引っかかっている可能性があります）");
-        console.error(err);
-    } finally {
-        document.body.removeChild(exportContainer);
-        exportBtn.innerText = originalText;
+        html += `</tbody></table>`;
     }
+    html += `</div>`;
+
+    root.innerHTML = html;
+    const fileLevel = getExportLevelText() === '検索' ? 'Search' : currentViewLevel;
+    await outputExportImage(root, `popn_clearrate_${currentUser}_Lv${fileLevel}_${exportDateStr()}.png`, exportBtn, originalText);
 }
 
 async function deleteLevelData() {
