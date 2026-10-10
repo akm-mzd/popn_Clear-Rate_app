@@ -118,121 +118,133 @@
         <div id="menu-backdrop" onclick="toggleMenu(false)"></div>
         <div class="view-header" id="menu-panel">
             <div class="menu-title">メニュー</div>
-            <div class="menu-user-section">
-                <span class="user-label">👤 ユーザー:</span>
-                <select id="current-user-select" onchange="switchUser()"></select>
-                <button onclick="addNewUser()" class="menu-add-user-btn">+ 新規追加</button>
-                <button onclick="saveAllToCloud()" class="menu-save-all-btn pc-only">☁️ 全体保存 (楽曲リスト＋全ユーザー)</button>
-            </div>
-            <div class="menu-main-row" style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
-                <div class="menu-level-row">
-                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                        <span style="font-weight: bold; font-size: 1.1em;">表示レベル:</span>
-                        <label class="check-label" style="font-size: 0.9em; cursor: pointer;"><input type="checkbox" id="level-btn-on-main" onchange="setLevelButtonPlacement(this.checked)" checked> メイン画面に表示</label>
-                    </div>
-                    <div id="menu-level-slot">
-                        <div id="view-level-buttons"></div>
-                    </div>
+            <!-- ① ユーザー -->
+            <section class="menu-card menu-user-section">
+                <div class="menu-card-title">👤 ユーザー</div>
+                <div class="menu-user-controls">
+                    <select id="current-user-select" onchange="switchUser()"></select>
+                    <button onclick="addNewUser()" class="menu-add-user-btn">+ 新規追加</button>
+                    <button onclick="saveAllToCloud()" class="menu-save-all-btn pc-only">☁️ 全体保存 (楽曲リスト＋全ユーザー)</button>
                 </div>
-                
+            </section>
+
+            <!-- ② 表示レベル -->
+            <section class="menu-card menu-level-row">
+                <div class="menu-card-title">
+                    <span>表示レベル</span>
+                    <label class="check-label" style="font-size: 0.85em; font-weight: normal; cursor: pointer;"><input type="checkbox" id="level-btn-on-main" onchange="setLevelButtonPlacement(this.checked)" checked> メイン画面に表示</label>
+                </div>
+                <div id="menu-level-slot">
+                    <div id="view-level-buttons"></div>
+                </div>
+            </section>
+
+            <!-- ③ 検索（検索・ランダムセレクト・絞り込み） -->
+            <section class="menu-card">
+                <div class="menu-card-title">🔍 検索</div>
                 <div class="menu-search-row">
                     <span class="menu-row-label">検索</span>
                     <input type="text" id="search-input" class="search-box" placeholder="ジャンル・曲名で全レベル検索..." oninput="handleSearch()">
                     <button onclick="clearSearch()" style="padding: 6px 12px; border: 1px solid #ccc; background: #eee; cursor: pointer;">クリア</button>
                 </div>
-
                 <div class="menu-random-row">
                     <span class="menu-row-label">ランダムセレクト</span>
                     <button onclick="openRandomModal()" class="random-ready-btn">Are You Ready?</button>
                 </div>
+                <details class="menu-filter-details">
+                    <summary style="cursor: pointer; font-weight: bold; color: #555; user-select: none;">🔍 さらに条件で絞り込む</summary>
+                    <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 10px; font-size: 0.9em; border-top: 1px dashed #eee; padding-top: 10px;">
+                        <div style="display: flex; flex-direction: column;">
+                            <label style="font-size: 0.8em; font-weight: bold; color: #666; margin-bottom: 2px;">クリア状態</label>
+                            <select id="filter-clear" onchange="renderTable()" style="padding: 4px;">
+                                <option value="ALL">すべて</option>
+                                <option value="uncleared">未クリアのみ</option>
+                                <option value="kurohishi_cleared">黒菱以上</option>
+                                <option value="kuroboshi_cleared">黒星以上</option>
+                                <option value="cleared">イージー以上</option>
+                                <option value="normal_cleared">ノーマル以上</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; flex-direction: column;">
+                            <label style="font-size: 0.8em; font-weight: bold; color: #666; margin-bottom: 2px;">メダル別</label>
+                            <select id="filter-medal" onchange="renderTable()" style="padding: 4px;">
+                                <option value="ALL">すべて</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; flex-direction: column;">
+                            <label style="font-size: 0.8em; font-weight: bold; color: #666; margin-bottom: 2px;">バージョン</label>
+                            <select id="filter-version" onchange="renderTable()" style="padding: 4px;">
+                                <option value="ALL">すべて</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; flex-direction: column;">
+                            <label style="font-size: 0.8em; font-weight: bold; color: #666; margin-bottom: 2px;">難易度</label>
+                            <select id="filter-diff" onchange="renderTable()" style="padding: 4px;">
+                                <option value="ALL">すべて</option>
+                                <option value="危険">危険</option>
+                                <option value="別格">別格</option>
+                                <option value="詐称">詐称</option>
+                                <option value="強">強</option>
+                                <option value="中(全体)">中 (すべて)</option>
+                                <option value="中(+)">中(+)</option>
+                                <option value="中(-)">中(-)</option>
+                                <option value="弱">弱</option>
+                                <option value="逆詐称">逆詐称</option>
+                                <option value="入門">入門</option>
+                                <option value="未分類">未分類</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; flex-direction: column;">
+                            <label style="font-size: 0.8em; font-weight: bold; color: #666; margin-bottom: 2px;">相性 (メモ)</label>
+                            <select id="filter-affinity" onchange="renderTable()" style="padding: 4px;">
+                                <option value="ALL">すべて</option>
+                                <option value="得意">得意</option>
+                                <option value="苦手">苦手</option>
+                                <option value="噛み合い待ち">噛み合い待ち</option>
+                                <option value="敵">敵</option>
+                                <option value="💩">💩</option>
+                                <option value="未設定">未設定(メモ無含む)</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; align-items: flex-end;">
+                            <button onclick="resetFilters()" style="padding: 4px 12px; height: 28px; background: #eee; border: 1px solid #ccc;">リセット</button>
+                        </div>
+                    </div>
+                </details>
+            </section>
 
-            </div>
-            
-            <details style="width: 100%; margin-bottom: 15px; background: #fff; padding: 8px 15px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box;">
-                <summary style="cursor: pointer; font-weight: bold; color: #555; user-select: none;">🔍 さらに条件で絞り込む</summary>
-                <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 10px; font-size: 0.9em; border-top: 1px dashed #eee; padding-top: 10px;">
-                    <div style="display: flex; flex-direction: column;">
-                        <label style="font-size: 0.8em; font-weight: bold; color: #666; margin-bottom: 2px;">クリア状態</label>
-                        <select id="filter-clear" onchange="renderTable()" style="padding: 4px;">
-                            <option value="ALL">すべて</option>
-                            <option value="uncleared">未クリアのみ</option>
-                            <option value="kurohishi_cleared">黒菱以上</option>
-                            <option value="kuroboshi_cleared">黒星以上</option>
-                            <option value="cleared">イージー以上</option>
-                            <option value="normal_cleared">ノーマル以上</option>
-                        </select>
-                    </div>
-                    <div style="display: flex; flex-direction: column;">
-                        <label style="font-size: 0.8em; font-weight: bold; color: #666; margin-bottom: 2px;">メダル別</label>
-                        <select id="filter-medal" onchange="renderTable()" style="padding: 4px;">
-                            <option value="ALL">すべて</option>
-                        </select>
-                    </div>
-                    <div style="display: flex; flex-direction: column;">
-                        <label style="font-size: 0.8em; font-weight: bold; color: #666; margin-bottom: 2px;">バージョン</label>
-                        <select id="filter-version" onchange="renderTable()" style="padding: 4px;">
-                            <option value="ALL">すべて</option>
-                        </select>
-                    </div>
-                    <div style="display: flex; flex-direction: column;">
-                        <label style="font-size: 0.8em; font-weight: bold; color: #666; margin-bottom: 2px;">難易度</label>
-                        <select id="filter-diff" onchange="renderTable()" style="padding: 4px;">
-                            <option value="ALL">すべて</option>
-                            <option value="危険">危険</option>
-                            <option value="別格">別格</option>
-                            <option value="詐称">詐称</option>
-                            <option value="強">強</option>
-                            <option value="中(全体)">中 (すべて)</option>
-                            <option value="中(+)">中(+)</option>
-                            <option value="中(-)">中(-)</option>
-                            <option value="弱">弱</option>
-                            <option value="逆詐称">逆詐称</option>
-                            <option value="入門">入門</option>
-                            <option value="未分類">未分類</option>
-                        </select>
-                    </div>
-                    <div style="display: flex; flex-direction: column;">
-                        <label style="font-size: 0.8em; font-weight: bold; color: #666; margin-bottom: 2px;">相性 (メモ)</label>
-                        <select id="filter-affinity" onchange="renderTable()" style="padding: 4px;">
-                            <option value="ALL">すべて</option>
-                            <option value="得意">得意</option>
-                            <option value="苦手">苦手</option>
-                            <option value="噛み合い待ち">噛み合い待ち</option>
-                            <option value="敵">敵</option>
-                            <option value="💩">💩</option>
-                            <option value="未設定">未設定(メモ無含む)</option>
-                        </select>
-                    </div>
-                    <div style="display: flex; align-items: flex-end;">
-                        <button onclick="resetFilters()" style="padding: 4px 12px; height: 28px; background: #eee; border: 1px solid #ccc;">リセット</button>
-                    </div>
+            <!-- ④ 統計表示 -->
+            <section class="menu-card">
+                <div class="menu-card-title">📊 統計表示</div>
+                <div class="stats-toggles">
+                    <label><input type="checkbox" id="show-kurohishi-rate" onchange="renderTable()" style="margin:0;"> 黒菱</label>
+                    <label><input type="checkbox" id="show-kuroboshi-rate" onchange="renderTable()" style="margin:0;"> 黒星</label>
+                    <label><input type="checkbox" id="show-easy-rate" onchange="renderTable()" style="margin:0;"> イージー</label>
+                    <label><input type="checkbox" id="show-normal-rate" checked onchange="renderTable()" style="margin:0;"> ノーマル</label>
+                    <label><input type="checkbox" id="show-unreleased" onchange="renderTable()" style="margin:0;"> 未解禁を含む</label>
+                    <label><input type="checkbox" id="show-diff-stats" onchange="renderTable(); toggleMenu(false);" style="margin:0;"> 難易度別</label>
+                    <label><input type="checkbox" id="show-medal-stats" onchange="renderTable(); toggleMenu(false);" style="margin:0;"> メダル内訳</label>
                 </div>
-            </details>
+            </section>
 
-            <div class="stats-toggles">
-                <span style="font-size: 0.9em; font-weight: bold; color: #666; margin-right: auto;">📊 統計表示:</span>
-                <label><input type="checkbox" id="show-kurohishi-rate" onchange="renderTable()" style="margin:0;"> 黒菱</label>
-                <label><input type="checkbox" id="show-kuroboshi-rate" onchange="renderTable()" style="margin:0;"> 黒星</label>
-                <label><input type="checkbox" id="show-easy-rate" onchange="renderTable()" style="margin:0;"> イージー</label>
-                <label><input type="checkbox" id="show-normal-rate" checked onchange="renderTable()" style="margin:0;"> ノーマル</label>
-                <label><input type="checkbox" id="show-unreleased" onchange="renderTable()" style="margin:0;"> 未解禁を含む</label>
-                <label><input type="checkbox" id="show-diff-stats" onchange="renderTable(); toggleMenu(false);" style="margin:0;"> 難易度別</label>
-                <label><input type="checkbox" id="show-medal-stats" onchange="renderTable(); toggleMenu(false);" style="margin:0;"> メダル内訳</label>
-            </div>
-            
-            <div class="stats-toggles" style="justify-content: flex-start; border-top: 1px solid #eee; padding-top: 10px; margin-top: 10px;">
-                <span style="font-size: 0.9em; font-weight: bold; color: #666; margin-right: auto;">🔢 スコア・比較機能:</span>
-                <label><input type="checkbox" id="show-score-col" onchange="handleScoreToggle()" style="margin:0;"> スコア表示</label>
-                <label><input type="checkbox" id="enable-compare" onchange="renderTable()" style="margin:0;"> スコア比較</label>
-                <select id="compare-user-select" onchange="if(document.getElementById('enable-compare').checked) renderTable()" style="padding: 4px 8px; font-size: 0.9em; border-radius: 4px; border: 1px solid #ccc;">
-                </select>
-            </div>
-            <div class="menu-image-section">
+            <!-- ⑤ スコア -->
+            <section class="menu-card">
+                <div class="menu-card-title">🔢 スコア</div>
+                <div class="stats-toggles">
+                    <label><input type="checkbox" id="show-score-col" onchange="handleScoreToggle()" style="margin:0;"> スコア表示</label>
+                    <label><input type="checkbox" id="enable-compare" onchange="renderTable()" style="margin:0;"> スコア比較</label>
+                    <select id="compare-user-select" onchange="if(document.getElementById('enable-compare').checked) renderTable()" style="padding: 4px 8px; font-size: 0.9em; border-radius: 4px; border: 1px solid #ccc;">
+                    </select>
+                </div>
+            </section>
+
+            <!-- ⑥ 画像 -->
+            <section class="menu-card menu-image-section">
+                <div class="menu-card-title">🖼️ 画像</div>
                 <div id="image-export-area" class="controls" style="margin: 0; padding: 0; box-shadow: none; background: transparent; display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 8px;">
-                    <div class="menu-section-title">🖼️ 画像出力</div>
-                    <button id="btn-overview-image" onclick="generateOverviewImage()" class="btn-image" ...>全体統計画像</button>
-                    <button id="btn-diff-image" onclick="generateDiffTableImage()" class="btn-image" ...>難易度順画像</button>
-                    <button onclick="exportAsImage(event)" class="btn-image" ...>表示曲画像</button>
+                    <button id="btn-overview-image" onclick="generateOverviewImage()" class="btn-image">全体統計画像</button>
+                    <button id="btn-diff-image" onclick="generateDiffTableImage()" class="btn-image">難易度順画像</button>
+                    <button onclick="exportAsImage(event)" class="btn-image">表示曲画像</button>
 
                     <details style="position: relative;">
                         <summary style="padding: 6px 12px; border: 1px solid #ccc; background-color: #fff; border-radius: 4px; cursor: pointer; font-size: 0.9em; font-weight: bold; color: #555;">⚙️ 画像の列設定</summary>
@@ -251,7 +263,7 @@
                         </div>
                     </details>
                 </div>
-            </div>
+            </section>
             <div class="app-version" id="app-version"></div>
         </div>
 
