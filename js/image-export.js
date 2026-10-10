@@ -106,19 +106,27 @@ function waitExportImages(root) {
     })));
 }
 
+// ボタンの元の名前を取り出す。
+//   innerText は閉じたメニュー（visibility:hidden）の中では空になるため、textContent を使う。
+//   最初に読んだ名前を data-label に残しておき、以後はそれを正とする。
+function getButtonLabel(btn) {
+    if (!btn.dataset.label) btn.dataset.label = btn.textContent.trim();
+    return btn.dataset.label;
+}
+
 async function prepareExport(btn) {
+    const originalText = getButtonLabel(btn);
     beginImageExport();
-    const originalText = btn.innerText;
-    btn.innerText = "準備中... (ライブラリ読込)";
+    btn.textContent = "準備中... (ライブラリ読込)";
     try {
         await ensureHtml2Canvas();
     } catch (e) {
         alert("画像生成ライブラリの読み込みに失敗しました。通信環境を確認してください。");
-        btn.innerText = originalText;
+        btn.textContent = originalText;
         endImageExport();
         return null;
     }
-    btn.innerText = "生成中... (画像読込待機)";
+    btn.textContent = "生成中... (画像読込待機)";
     return originalText;
 }
 
@@ -145,7 +153,7 @@ function downloadDataUrl(dataUrl, filename) {
 
 // 1枚の画像を出力する（スマホ：画面に表示して長押し保存 / PC：ダウンロード）
 async function outputExportImage(root, filename, btn, originalText) {
-    btn.innerText = "生成中... (描画中)";
+    btn.textContent = "生成中... (描画中)";
     let showedModal = false;
     try {
         const dataUrl = await renderExportToDataUrl(root);
@@ -160,7 +168,7 @@ async function outputExportImage(root, filename, btn, originalText) {
         alert("画像の生成に失敗しました。");
         console.error(e);
     } finally {
-        btn.innerText = originalText;
+        btn.textContent = originalText;
         if (!showedModal) endImageExport();
     }
 }
@@ -258,9 +266,9 @@ const DIFF_TABLE_COLORS = {
     '詐称': '#f4511e',
     '強': '#fb8c00',
     '中': '#7cb342',      // 中(プラス)
-    '中-': '#aed581',     // 中(マイナス)：やや薄い緑
+    '中-': '#9ccc65',     // 中(マイナス)：やや薄い緑
     '弱': '#81d4fa',      // 水色
-    '逆詐称': '#81d4fa',
+    '逆詐称': '#1a4fa3',  // 濃い青
     '入門': '#42a5f5',
     '未定': '#9e9e9e'
 };
@@ -343,7 +351,7 @@ function buildDiffTableRoot(targetSongs, levelText) {
     html += `<div style="display: flex; flex-direction: column; gap: 8px;">`;
     groups.forEach(g => {
         const color = getDiffTableLabelColor(g);
-        const textShadow = (g.cls === '弱' || g.cls === '逆詐称' || (g.cls === '中' && g.label.startsWith('-'))) ? 'text-shadow: 0 1px 2px rgba(0,0,0,0.45);' : '';
+        const textShadow = (g.cls === '弱' || (g.cls === '中' && g.label.startsWith('-'))) ? 'text-shadow: 0 1px 2px rgba(0,0,0,0.45);' : '';
         const labelHtml = g.cls === '未定'
             ? `<div style="font-size: 14px; line-height: 1;">未定</div>`
             : `<div style="font-size: 12px; line-height: 1;">${escapeHtml(g.cls)}</div><div style="font-size: 17px; line-height: 1; margin-top: 4px;">${escapeHtml(g.label)}</div>`;
@@ -449,7 +457,7 @@ async function generateDiffTableImagesForSelectedLevels() {
         console.error(e);
     } finally {
         showLoading(false);
-        btn.innerText = originalText;
+        btn.textContent = originalText;
         endImageExport();
     }
 }
