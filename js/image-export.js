@@ -318,7 +318,10 @@ function buildDiffTableGroups(targetSongs) {
             label = '';
             sortVal = -Infinity;
         } else {
-            const r = Math.round(idx * 10) / 10;
+            // 小数第1位で切り捨てて枠を分ける（例: +0.977 → +0.9、-0.43 → -0.4）
+            //   ±0.5 などの誤差表記は parseDifficulty の時点で読み飛ばされている
+            //   1e-9 は 0.3×10=2.9999… のような浮動小数の誤差で1つ下の枠に落ちないための補正
+            const r = Math.trunc(idx * 10 + (idx >= 0 ? 1e-9 : -1e-9)) / 10;
             if (r === 0) {
                 label = idx < 0 ? '-0' : '+0';
                 sortVal = idx < 0 ? -0.0001 : 0;
