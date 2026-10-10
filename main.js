@@ -1304,7 +1304,7 @@ async function generateOverviewImage() {
         let counts = {};
         sortedMedalKeys.forEach(k => counts[k] = 0);
         
-        // ★ クリア数をカウントする処理 ★
+        // ★ クリア数をカウントする処理（イージークリアは含まない：ノーマル以上のみ） ★
         let clearedCount = 0;
 
         lvSongs.forEach(s => {
@@ -1312,7 +1312,7 @@ async function generateOverviewImage() {
             if (counts[medalKey] !== undefined) {
                 counts[medalKey]++;
             }
-            if (MEDAL_TYPES[medalKey] && MEDAL_TYPES[medalKey].isEasyClear) {
+            if (MEDAL_TYPES[medalKey] && MEDAL_TYPES[medalKey].isNormalClear) {
                 clearedCount++;
             }
         });
