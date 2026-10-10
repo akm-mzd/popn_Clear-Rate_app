@@ -1485,8 +1485,16 @@ function buildDiffTableGroups(targetSongs) {
         groupMap[key].songs.push(song);
     });
     const groups = Object.values(groupMap);
-    groups.sort((a, b) => b.sortVal - a.sortVal);
-    groups.forEach(g => g.songs.sort((a, b) => a.title.localeCompare(b.title, 'ja')));
+    // 指数が同じ行は、難易度の種類が強い方を上にする
+    const clsRank = { '危険': 8, '別格': 7, '詐称': 6, '強': 5, '中': 4, '弱': 3, '逆詐称': 2, '入門': 1, '未定': 0 };
+    groups.sort((a, b) => (b.sortVal - a.sortVal) || ((clsRank[b.cls] || 0) - (clsRank[a.cls] || 0)));
+    // 行内はカッコ内の指数が高い順（同じ指数は曲名順）
+    groups.forEach(g => g.songs.sort((a, b) => {
+        const ia = (a.diffIndex === null || a.diffIndex === undefined || isNaN(a.diffIndex)) ? -Infinity : a.diffIndex;
+        const ib = (b.diffIndex === null || b.diffIndex === undefined || isNaN(b.diffIndex)) ? -Infinity : b.diffIndex;
+        if (ia !== ib) return ib - ia;
+        return a.title.localeCompare(b.title, 'ja');
+    }));
     return groups;
 }
 
@@ -1595,7 +1603,12 @@ async function generateDiffTableImage() {
         html += `<div style="display: flex; gap: 10px; align-items: stretch;">
             <div style="width: 58px; flex-shrink: 0; background: ${color}; color: #fff; font-weight: bold; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; line-height: 1.2; padding: 4px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.25);">${labelHtml}</div>
             <div style="display: grid; grid-template-columns: repeat(${COLS}, 220px); gap: 8px 12px; align-content: center;">`;
-        g.songs.forEach(song => {
+        // 強い曲ほど上・右に来るよう、強い順に1行ずつ区切ってから各行を左右反転する（右上が最強）
+        const orderedSongs = [];
+        for (let i = 0; i < g.songs.length; i += COLS) {
+            orderedSongs.push(...g.songs.slice(i, i + COLS).reverse());
+        }
+        orderedSongs.forEach(song => {
             const medalKey = clearRecords[song.id] || '';
             html += `<div style="display: flex; align-items: center; gap: 6px;">
                 ${buildDiffTableMedalHtml(medalKey)}${buildDiffTableBannerHtml(song)}
