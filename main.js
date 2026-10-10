@@ -14,6 +14,30 @@ let clearRecords = {};
 let scoreRecords = {}; 
 let memoRecords = {}; 
 
+// ==========================================
+// ★ クリア率の表示形式（タップで切替）
+//   'fixed1' : 小数点1桁 (例: 98.7)
+//   'sig2'   : 有効数字2桁 (例: 99)
+// ==========================================
+let rateFormatMode = 'fixed1';
+try { if (localStorage.getItem('popn_rate_format') === 'sig2') rateFormatMode = 'sig2'; } catch (e) {}
+
+function formatRate(count, total) {
+    if (!total) return '0';
+    const x = (count / total) * 100;
+    if (rateFormatMode === 'sig2') {
+        if (x === 0) return '0';
+        return String(Number(x.toPrecision(2)));
+    }
+    return x.toFixed(1);
+}
+
+function toggleRateFormat() {
+    rateFormatMode = rateFormatMode === 'sig2' ? 'fixed1' : 'sig2';
+    try { localStorage.setItem('popn_rate_format', rateFormatMode); } catch (e) {}
+    renderTable();
+}
+
 let isAdminAuthenticated = false;
 
 function checkAdminAuth() {
@@ -2375,10 +2399,10 @@ function renderTable() {
 
     updateSortHeaders();
 
-    const kuroHishiPerc = rateTotal === 0 ? 0 : ((kuroHishiClearCount / rateTotal) * 100).toFixed(1);
-    const kuroBoshiPerc = rateTotal === 0 ? 0 : ((kuroBoshiClearCount / rateTotal) * 100).toFixed(1);
-    const easyPerc = rateTotal === 0 ? 0 : ((easyClearCount / rateTotal) * 100).toFixed(1);
-    const normalPerc = rateTotal === 0 ? 0 : ((normalClearCount / rateTotal) * 100).toFixed(1);
+    const kuroHishiPerc = formatRate(kuroHishiClearCount, rateTotal);
+    const kuroBoshiPerc = formatRate(kuroBoshiClearCount, rateTotal);
+    const easyPerc = formatRate(easyClearCount, rateTotal);
+    const normalPerc = formatRate(normalClearCount, rateTotal);
     
     const kuroHishiRemain = rateTotal - kuroHishiClearCount;
     const kuroBoshiRemain = rateTotal - kuroBoshiClearCount;
@@ -2406,7 +2430,7 @@ function renderTable() {
             <div class="stats-group">
                 <span class="stats-title">黒菱クリア以上:</span>
                 <span class="stats-fraction">${kuroHishiClearCount} / ${rateTotal} <span class="stats-remain">(未クリア: ${kuroHishiRemain})</span></span>
-                <span class="stats-kurohishipercentage">${kuroHishiPerc}%</span>
+                <span class="stats-kurohishipercentage rate-toggle" onclick="toggleRateFormat()" title="タップで表示形式を切替 (小数点1桁 / 有効数字2桁)">${kuroHishiPerc}%</span>
             </div>`;
     }
     if (showKuroBoshiRate) {
@@ -2414,7 +2438,7 @@ function renderTable() {
             <div class="stats-group">
                 <span class="stats-title">黒星クリア以上:</span>
                 <span class="stats-fraction">${kuroBoshiClearCount} / ${rateTotal} <span class="stats-remain">(未クリア: ${kuroBoshiRemain})</span></span>
-                <span class="stats-kuroboshipercentage">${kuroBoshiPerc}%</span>
+                <span class="stats-kuroboshipercentage rate-toggle" onclick="toggleRateFormat()" title="タップで表示形式を切替 (小数点1桁 / 有効数字2桁)">${kuroBoshiPerc}%</span>
             </div>`;
     }
     if (showEasyRate) {
@@ -2422,7 +2446,7 @@ function renderTable() {
             <div class="stats-group">
                 <span class="stats-title">イージークリア以上:</span>
                 <span class="stats-fraction">${easyClearCount} / ${rateTotal} <span class="stats-remain">(未クリア: ${easyRemain})</span></span>
-                <span class="stats-easypercentage">${easyPerc}%</span>
+                <span class="stats-easypercentage rate-toggle" onclick="toggleRateFormat()" title="タップで表示形式を切替 (小数点1桁 / 有効数字2桁)">${easyPerc}%</span>
             </div>`;
     }
     if (showNormalRate) {
@@ -2430,7 +2454,7 @@ function renderTable() {
             <div class="stats-group">
                 <span class="stats-title">ノーマルクリア以上:</span>
                 <span class="stats-fraction">${normalClearCount} / ${rateTotal} <span class="stats-remain">(未クリア: ${normalRemain})</span></span>
-                <span class="stats-percentage">${normalPerc}%</span>
+                <span class="stats-percentage rate-toggle" onclick="toggleRateFormat()" title="タップで表示形式を切替 (小数点1桁 / 有効数字2桁)">${normalPerc}%</span>
             </div>`;
     }
     statsHtml += `</div>`;
@@ -2518,10 +2542,10 @@ function renderTable() {
                 const stat = diffStats[dKey];
                 if (stat.total === 0) return; 
                 
-                const khPerc = ((stat.kuroHishi / stat.total) * 100).toFixed(1);
-                const kbPerc = ((stat.kuroBoshi / stat.total) * 100).toFixed(1);
-                const ePerc = ((stat.easy / stat.total) * 100).toFixed(1);
-                const nPerc = ((stat.normal / stat.total) * 100).toFixed(1);
+                const khPerc = formatRate(stat.kuroHishi, stat.total);
+                const kbPerc = formatRate(stat.kuroBoshi, stat.total);
+                const ePerc = formatRate(stat.easy, stat.total);
+                const nPerc = formatRate(stat.normal, stat.total);
                 
                 let baseClass = dKey.startsWith('中') ? '中' : dKey;
                 let baseIndex = dKey === '中(+)' ? 0.5 : (dKey === '中(-)' ? -0.5 : 0);
@@ -2538,19 +2562,19 @@ function renderTable() {
                         </div>
                         <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
                             <span style="color: #1a237e; font-weight: bold;">黒菱以上 <span style="color: #333;">${stat.kuroHishi}/${stat.total}</span></span>
-                            <span style="color: #666;">${khPerc}%</span>
+                            <span class="rate-toggle" onclick="toggleRateFormat()" title="タップで表示形式を切替" style="color: #666;">${khPerc}%</span>
                         </div>
                         <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
                             <span style="color: #000051; font-weight: bold;">黒星以上 <span style="color: #333;">${stat.kuroBoshi}/${stat.total}</span></span>
-                            <span style="color: #666;">${kbPerc}%</span>
+                            <span class="rate-toggle" onclick="toggleRateFormat()" title="タップで表示形式を切替" style="color: #666;">${kbPerc}%</span>
                         </div>
                         <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
                             <span style="color: #2cbc21; font-weight: bold;">イージー以上 <span style="color: #333;">${stat.easy}/${stat.total}</span></span>
-                            <span style="color: #666;">${ePerc}%</span>
+                            <span class="rate-toggle" onclick="toggleRateFormat()" title="タップで表示形式を切替" style="color: #666;">${ePerc}%</span>
                         </div>
                         <div style="display: flex; justify-content: space-between;">
                             <span style="color: #d32f2f; font-weight: bold;">ノーマル以上 <span style="color: #333;">${stat.normal}/${stat.total}</span></span>
-                            <span style="color: #666;">${nPerc}%</span>
+                            <span class="rate-toggle" onclick="toggleRateFormat()" title="タップで表示形式を切替" style="color: #666;">${nPerc}%</span>
                         </div>
                     </div>
                 `;
