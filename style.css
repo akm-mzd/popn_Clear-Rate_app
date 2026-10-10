@@ -508,4 +508,14 @@ body.exporting-image #back-to-top { display: none !important; }
 .filter-checks .check-label { margin: 0; }
 .filter-group-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .filter-hint { font-size: 0.8em; color: #888; }
-#filter-summary-count { color: #d32f2f; }
+#filter-summary-count, .filter-count { color: #d32f2f; }
+
+/* バージョン・相性は押すと開く */
+.filter-sub-details > summary.filter-group-title {
+    cursor: pointer; user-select: none; margin-bottom: 0; padding: 4px 0; font-size: 0.9em;
+}
+.filter-sub-details[open] > summary.filter-group-title { margin-bottom: 6px; }
+.filter-sub-details > summary { list-style: none; }
+.filter-sub-details > summary::-webkit-details-marker { display: none; }
+.filter-sub-details > summary::before { content: '▶'; display: inline-block; width: 1.2em; font-size: 0.8em; color: #999; }
+.filter-sub-details[open] > summary::before { content: '▼'; }

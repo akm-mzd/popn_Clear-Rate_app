@@ -49,12 +49,15 @@ function countActiveFilters() {
     return FILTER_IDS.reduce((n, id) => n + getFilterValues(id).length, 0);
 }
 
-// 「さらに条件で絞り込む」の見出しに、選んでいる数を出す
+// 「さらに条件で絞り込む」と、折りたたみ（バージョン・相性）の見出しに、選んでいる数を出す
 function updateFilterSummaryCount() {
-    const el = document.getElementById('filter-summary-count');
-    if (!el) return;
-    const n = countActiveFilters();
-    el.textContent = n > 0 ? `（${n}）` : '';
+    const setCount = (elId, n) => {
+        const el = document.getElementById(elId);
+        if (el) el.textContent = n > 0 ? `（${n}）` : '';
+    };
+    setCount('filter-summary-count', countActiveFilters());
+    setCount('filter-version-count', getFilterValues('filter-version').length);
+    setCount('filter-affinity-count', getFilterValues('filter-affinity').length);
 }
 
 function initFilters() {
