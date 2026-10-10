@@ -46,6 +46,8 @@ select { padding: 6px 12px; font-size: 16px; border-radius: 4px; border: 1px sol
 .stats-kuroboshipercentage { font-size: 1.6em; font-weight: bold; color: #000051; }
 .stats-easypercentage { font-size: 1.6em; font-weight: bold; color: #2cbc21; }
 .stats-percentage { font-size: 1.6em; font-weight: bold; color: #d32f2f; }
+.rate-toggle { cursor: pointer; user-select: none; }
+.rate-toggle:hover { text-decoration: underline dotted; }
 .stats-level { font-size: 1.2em; font-weight: bold; color: #0056b3; background: #e3f2fd; padding: 4px 10px; border-radius: 20px; }
 
 table { width: 100%; border-collapse: collapse; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
@@ -111,13 +113,6 @@ details > summary::-webkit-details-marker { display: none; }
 }
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-.user-selector-area {
-    background: #333; color: white; padding: 10px 20px;
-    display: flex; justify-content: space-between; align-items: center;
-    border-radius: 8px; margin-bottom: 15px;
-}
-.user-selector-area select { padding: 5px; border-radius: 4px; }
-.user-label { font-weight: bold; margin-right: 10px; }
 
 /* ランダム選曲チェックボックス用 */
 .check-label {
@@ -219,11 +214,6 @@ details > summary::-webkit-details-marker { display: none; }
 
     details > div[style*="position: absolute"] { right: 0; left: auto; max-width: 90vw; }
     
-    .user-selector-area { padding: 10px; }
-    .user-selector-area > div { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; align-items: center; }
-    .user-selector-area .user-label { white-space: nowrap; margin: 0; }
-    .user-selector-area select { flex-grow: 1; margin: 0; min-width: 150px; font-size: 16px; }
-    .user-selector-area button { width: 100%; margin: 5px 0 0 0 !important; padding: 10px !important; font-size: 1em !important; box-sizing: border-box; }
 }
 
 /* レベル選択ボタン用スタイル */
@@ -287,6 +277,69 @@ details > summary::-webkit-details-marker { display: none; }
     }
 }
 
+/* 保存ボタン（トップに戻るボタンの上） */
+#save-btn {
+    position: fixed !important;
+    bottom: 90px !important;
+    right: 20px !important;
+    width: 50px !important;
+    height: 50px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background-color: #4caf50 !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 50% !important;
+    font-size: 14px !important;
+    font-weight: bold !important;
+    cursor: pointer;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3) !important;
+    display: flex;
+    justify-content: center !important;
+    align-items: center !important;
+    z-index: 9000 !important;
+    transition: background-color 0.2s, transform 0.2s;
+}
+#save-btn:hover {
+    background-color: #388e3c !important;
+    transform: scale(1.1);
+}
+
+@media screen and (max-width: 768px) {
+    #save-btn {
+        bottom: 135px !important;
+        right: 15px !important;
+        width: 45px !important;
+        height: 45px !important;
+        font-size: 13px !important;
+    }
+}
+
+/* タイトル下のユーザー名表示 */
+.current-user-label {
+    font-weight: bold; color: #555; margin: -10px 0 15px;
+}
+
+/* メニュー内のユーザー切替・追加・全体保存 */
+.menu-user-section {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    background: #fff; padding: 10px; border: 1px solid #ddd; border-radius: 8px;
+}
+.menu-user-section .user-label { font-weight: bold; white-space: nowrap; }
+.menu-user-section select { flex: 1; min-width: 120px; padding: 5px; border-radius: 4px; font-size: 16px; }
+.menu-user-section button {
+    padding: 6px 12px; font-size: 0.9em; color: white; border: none; border-radius: 4px; cursor: pointer;
+}
+.menu-add-user-btn { background: #4caf50; }
+.menu-save-all-btn {
+    flex: 1 1 100%; background: #2196F3; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+/* PC版のみ表示 */
+@media screen and (max-width: 768px) {
+    .pc-only { display: none !important; }
+}
+
 /* =========================================
     ☰ メニューボタンとメニューパネル
     ========================================= */
@@ -342,7 +395,6 @@ details > summary::-webkit-details-marker { display: none; }
 }
 
 /* メニューボタンと重ならないよう右側を空ける */
-.user-selector-area { padding-right: 80px; }
 .stats-container { padding-right: 80px; }
 
 @media screen and (max-width: 768px) {
@@ -353,31 +405,21 @@ details > summary::-webkit-details-marker { display: none; }
         height: 45px !important;
         font-size: 20px !important;
     }
-    .user-selector-area { padding-right: 65px; }
 }
 
 /* =========================================
     💻 PCでのメニュー表示の調整
     ========================================= */
 @media screen and (min-width: 769px) {
-    /* メニューボタンを黒い帯の中に収める */
-    #menu-btn {
-        top: 25px !important;
-        right: 28px !important;
-        width: 44px !important;
-        height: 44px !important;
-        font-size: 22px !important;
-    }
-    .user-selector-area { padding-right: 70px; }
     .stats-container { padding-right: 55px; }
 
     /* メニューの中身を縦に並べて左寄せにそろえる */
-    #menu-panel > div:nth-child(2) {
+    #menu-panel > .menu-main-row {
         flex-direction: column;
         align-items: stretch !important;
         gap: 14px !important;
     }
-    #menu-panel > div:nth-child(2) > div { width: 100%; }
+    #menu-panel > .menu-main-row > div { width: 100%; }
     #menu-panel .search-box { flex: 1; width: auto; min-width: 0; }
     #menu-panel #image-export-area {
         justify-content: flex-start !important;
