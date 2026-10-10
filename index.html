@@ -159,10 +159,6 @@
                             <div class="filter-checks" id="filter-medal"></div>
                         </div>
                         <div class="filter-group">
-                            <div class="filter-group-title">バージョン</div>
-                            <div class="filter-checks" id="filter-version"></div>
-                        </div>
-                        <div class="filter-group">
                             <div class="filter-group-title">難易度</div>
                             <div class="filter-checks" id="filter-diff">
                                 <label class="check-label"><input type="checkbox" value="危険" onchange="renderTable()"> 危険</label>
@@ -177,8 +173,12 @@
                                 <label class="check-label"><input type="checkbox" value="未分類" onchange="renderTable()"> 未分類</label>
                             </div>
                         </div>
-                        <div class="filter-group">
-                            <div class="filter-group-title">相性 (メモ)</div>
+                        <details class="filter-group filter-sub-details">
+                            <summary class="filter-group-title">バージョン<span id="filter-version-count" class="filter-count"></span></summary>
+                            <div class="filter-checks" id="filter-version"></div>
+                        </details>
+                        <details class="filter-group filter-sub-details">
+                            <summary class="filter-group-title">相性 (メモ)<span id="filter-affinity-count" class="filter-count"></span></summary>
                             <div class="filter-checks" id="filter-affinity">
                                 <label class="check-label"><input type="checkbox" value="得意" onchange="renderTable()"> 得意</label>
                                 <label class="check-label"><input type="checkbox" value="苦手" onchange="renderTable()"> 苦手</label>
@@ -187,7 +187,7 @@
                                 <label class="check-label"><input type="checkbox" value="💩" onchange="renderTable()"> 💩</label>
                                 <label class="check-label"><input type="checkbox" value="未設定" onchange="renderTable()"> 未設定(メモ無含む)</label>
                             </div>
-                        </div>
+                        </details>
                         <div class="filter-group-footer">
                             <span class="filter-hint">何も選ばない項目は「すべて」になります</span>
                             <button onclick="resetFilters()" style="padding: 4px 12px; background: #eee; border: 1px solid #ccc;">リセット</button>
