@@ -644,14 +644,7 @@ function openBulkDiffModal() {
     if (!checkAdminAuth()) return;
 
     const select = document.getElementById('bulk-diff-level');
-    const levels = [...new Set(songs.map(s => s.level))].filter(l => l);
-    levels.sort((a, b) => {
-        const na = parseInt(a, 10), nb = parseInt(b, 10);
-        if (!isNaN(na) && !isNaN(nb)) return nb - na;
-        if (isNaN(na)) return 1;
-        if (isNaN(nb)) return -1;
-        return 0;
-    });
+    const levels = getSortedLevels();
     select.innerHTML = '';
     levels.forEach(l => {
         const opt = document.createElement('option');

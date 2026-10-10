@@ -187,3 +187,16 @@ function getDifficultyColor(diffClass, index) {
     
     return { color: `rgba(0, 0, 0, 1.0)`, shadow: 'none' };
 }
+
+// データに含まれるレベルの一覧（数字は大きい順、「その他」などの文字は後ろ）
+function getSortedLevels() {
+    const levels = [...new Set(songs.map(s => s.level))].filter(l => l);
+    return levels.sort((a, b) => {
+        const numA = parseInt(a, 10);
+        const numB = parseInt(b, 10);
+        if (!isNaN(numA) && !isNaN(numB)) return numB - numA;
+        if (isNaN(numA)) return 1;
+        if (isNaN(numB)) return -1;
+        return 0;
+    });
+}

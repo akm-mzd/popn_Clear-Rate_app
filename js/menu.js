@@ -32,6 +32,12 @@ function scrollToTop() {
 // ==========================================
 // ★ メニューの開閉
 // ==========================================
+// メニュー最下部にバージョンを表示する
+(function showAppVersion() {
+    const el = document.getElementById('app-version');
+    if (el) el.textContent = `Pop'n Clear Rate app  ver ${APP_VERSION}`;
+})();
+
 function toggleMenu(force) {
     const panel = document.getElementById('menu-panel');
     if (!panel) return;

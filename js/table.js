@@ -53,15 +53,7 @@ function updateDynamicFilters() {
         allBtn.innerText = 'すべて';
         allBtn.onclick = () => changeViewLevel('ALL');
         
-        const levels = [...new Set(songs.map(s => s.level))].filter(l => l);
-        levels.sort((a, b) => {
-            const numA = parseInt(a, 10);
-            const numB = parseInt(b, 10);
-            if (!isNaN(numA) && !isNaN(numB)) return numB - numA;
-            if (isNaN(numA)) return 1;
-            if (isNaN(numB)) return -1;
-            return 0;
-        });
+        const levels = getSortedLevels();
         
         if (currentViewLevel !== 'ALL' && !levels.includes(currentViewLevel)) {
             currentViewLevel = 'ALL';
@@ -157,17 +149,29 @@ function updateSortHeaders() {
     }
 }
 
+// バージョンの並び順を数値にする（小さいほど上）
+//   AC(1〜20) → sp〜jf → HC → 未登録の新しいバージョン → CS・PMP・EE（一番下に固定）
+const VERSION_ORDER_AC_NAMED = { 'sp': 21, 'lt': 22, 'écl': 23, 'うさ': 24, 'pe': 25, '解': 26, 'ul': 27, 'jf': 28 };
+const VERSION_ORDER_HC = 400;
+const VERSION_ORDER_NEW = 500;     // 上の表にない新しいバージョンは HC の下
+const VERSION_ORDER_CS = 1000;     // CS・PMP・EE はこれ以降（常に一番下）
+const VERSION_ORDER_EMPTY = 9999;  // バージョン未入力
+
 function getVersionSortValue(ver) {
-    if (!ver) return 9999;
-    let v = ver.toLowerCase();
-    if (!isNaN(v)) return parseInt(v, 10);
-    const acOrder = { 'sp': 21, 'lt': 22, 'écl': 23, 'うさ': 24, 'pe': 25, '解': 26, 'ul': 27, 'jf': 28 };
-    if (acOrder[v] !== undefined) return acOrder[v];
-    if (v.startsWith('cs')) return 100 + parseInt(v.replace('cs', ''), 10) || 199;
-    if (v.startsWith('pmp')) return 200 + parseInt(v.replace('pmp', ''), 10) || 299;
-    if (v === 'ee') return 300;
-    if (v === 'hc') return 400;
-    return 999; 
+    if (!ver) return VERSION_ORDER_EMPTY;
+    const v = String(ver).trim().toLowerCase();
+    if (v !== '' && !isNaN(v)) return parseInt(v, 10);
+    if (VERSION_ORDER_AC_NAMED[v] !== undefined) return VERSION_ORDER_AC_NAMED[v];
+    if (v === 'hc') return VERSION_ORDER_HC;
+
+    // CS系（例: cs4, pmp2, ee, ee2）は番号順に一番下へ
+    const consumer = v.match(/^(cs|pmp|ee)(\d*)$/);
+    if (consumer) {
+        const groupBase = { cs: 0, pmp: 100, ee: 200 }[consumer[1]];
+        const num = consumer[2] === '' ? 0 : parseInt(consumer[2], 10);
+        return VERSION_ORDER_CS + groupBase + num;
+    }
+    return VERSION_ORDER_NEW;
 }
 
 function getTitleSortCategory(title) {
@@ -348,9 +352,13 @@ function renderTable() {
         });
     } else if (currentSort === 'version') {
         displaySongs.sort((a, b) => {
-            let valA = getVersionSortValue(a.version);
-            let valB = getVersionSortValue(b.version);
+            const valA = getVersionSortValue(a.version);
+            const valB = getVersionSortValue(b.version);
             if (valA === valB) return a.originalOrder - b.originalOrder;
+            // CS系（と未入力）は、昇順・降順どちらでも一番下に固定する
+            const bottomA = valA >= VERSION_ORDER_CS, bottomB = valB >= VERSION_ORDER_CS;
+            if (bottomA !== bottomB) return bottomA ? 1 : -1;
+            if (bottomA && bottomB) return valA - valB;
             return sortDesc ? valB - valA : valA - valB;
         });
     } else if (currentSort === 'level') {

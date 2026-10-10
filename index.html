@@ -135,10 +135,15 @@
                     </div>
                 </div>
                 
-                <div style="display: flex; align-items: center; gap: 5px; flex-wrap: wrap;">
-                    <input type="text" id="search-input" class="search-box" placeholder="🔍 ジャンル・曲名で全レベル検索..." oninput="handleSearch()">
+                <div class="menu-search-row">
+                    <span class="menu-row-label">検索</span>
+                    <input type="text" id="search-input" class="search-box" placeholder="ジャンル・曲名で全レベル検索..." oninput="handleSearch()">
                     <button onclick="clearSearch()" style="padding: 6px 12px; border: 1px solid #ccc; background: #eee; cursor: pointer;">クリア</button>
-                    <button onclick="openRandomModal()" style="padding: 6px 12px; border: 1px solid #2196F3; background: #e3f2fd; color: #0056b3; font-weight: bold; cursor: pointer; border-radius: 4px;">ランダムセレクト</button>
+                </div>
+
+                <div class="menu-random-row">
+                    <span class="menu-row-label">ランダムセレクト</span>
+                    <button onclick="openRandomModal()" class="random-ready-btn">Are You Ready?</button>
                 </div>
 
             </div>
@@ -151,10 +156,10 @@
                         <select id="filter-clear" onchange="renderTable()" style="padding: 4px;">
                             <option value="ALL">すべて</option>
                             <option value="uncleared">未クリアのみ</option>
-                            <option value="kurohishi_cleared">クリア済 (黒菱以上)</option>
-                            <option value="kuroboshi_cleared">クリア済 (黒星以上)</option>
-                            <option value="cleared">クリア済 (イージー以上)</option>
-                            <option value="normal_cleared">クリア済 (ノーマル以上)</option>
+                            <option value="kurohishi_cleared">黒菱以上</option>
+                            <option value="kuroboshi_cleared">黒星以上</option>
+                            <option value="cleared">イージー以上</option>
+                            <option value="normal_cleared">ノーマル以上</option>
                         </select>
                     </div>
                     <div style="display: flex; flex-direction: column;">
@@ -247,6 +252,7 @@
                     </details>
                 </div>
             </div>
+            <div class="app-version" id="app-version"></div>
         </div>
 
         <div id="main-level-slot"></div>
@@ -301,6 +307,23 @@
 
             <div class="modal-actions" style="justify-content: flex-end; margin-top: 15px;">
                 <button onclick="closeRandomModal()" style="border: 1px solid #ccc; background: #eee; padding: 8px 20px;">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 難易度順画像：作成するレベルを選ぶ（PC版） -->
+    <div id="diff-level-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 460px;">
+            <h3>難易度順画像を作るレベル</h3>
+            <div style="font-size: 0.85em; color: #666; margin-bottom: 10px;">選んだレベルごとに1枚ずつ画像を保存します（各レベルの全曲が対象）。</div>
+            <div id="diff-level-checkboxes" style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;"></div>
+            <div style="display: flex; gap: 8px; margin-bottom: 15px;">
+                <button onclick="setAllDiffLevelChecks(true)" style="padding: 4px 12px; border: 1px solid #ccc; background: #fff;">すべて選択</button>
+                <button onclick="setAllDiffLevelChecks(false)" style="padding: 4px 12px; border: 1px solid #ccc; background: #fff;">選択解除</button>
+            </div>
+            <div class="modal-actions" style="justify-content: flex-end; gap: 10px;">
+                <button onclick="closeDiffLevelModal()" style="border: 1px solid #ccc; background: #eee; padding: 8px 20px;">キャンセル</button>
+                <button onclick="generateDiffTableImagesForSelectedLevels()" style="background-color: #4caf50; color: white; font-weight: bold; border: 1px solid #388e3c; padding: 8px 20px;">画像を作成</button>
             </div>
         </div>
     </div>

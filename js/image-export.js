@@ -122,31 +122,44 @@ async function prepareExport(btn) {
     return originalText;
 }
 
+// 組み立てた画像の要素を PNG(dataURL) にする。終わったら要素は取り除く
+async function renderExportToDataUrl(root) {
+    try {
+        await waitExportImages(root);
+        const w = root.scrollWidth, h = root.scrollHeight;
+        // iOS のキャンバス上限を超えないよう、大きい画像は倍率を下げる
+        const scale = Math.max(0.5, Math.min(2, Math.sqrt(EXPORT_MAX_PIXELS / Math.max(1, w * h))));
+        const canvas = await html2canvas(root, { backgroundColor: EXPORT_BG, scale, useCORS: true, width: w, height: h, windowWidth: Math.max(w + 100, 1200) });
+        return canvas.toDataURL("image/png");
+    } finally {
+        root.remove();
+    }
+}
+
+function downloadDataUrl(dataUrl, filename) {
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = dataUrl;
+    link.click();
+}
+
+// 1枚の画像を出力する（スマホ：画面に表示して長押し保存 / PC：ダウンロード）
 async function outputExportImage(root, filename, btn, originalText) {
-    await waitExportImages(root);
     btn.innerText = "生成中... (描画中)";
     let showedModal = false;
     try {
-        const w = root.scrollWidth, h = root.scrollHeight;
-        const scale = Math.max(0.5, Math.min(2, Math.sqrt(EXPORT_MAX_PIXELS / Math.max(1, w * h))));
-        const canvas = await html2canvas(root, { backgroundColor: EXPORT_BG, scale, useCORS: true, width: w, height: h, windowWidth: Math.max(w + 100, 1200) });
-        const dataUrl = canvas.toDataURL("image/png");
-
+        const dataUrl = await renderExportToDataUrl(root);
         if (isMobileDevice()) {
             document.getElementById('generated-image-preview').src = dataUrl;
             document.getElementById('image-result-modal').style.display = 'flex';
             showedModal = true;
         } else {
-            const link = document.createElement('a');
-            link.download = filename;
-            link.href = dataUrl;
-            link.click();
+            downloadDataUrl(dataUrl, filename);
         }
     } catch (e) {
         alert("画像の生成に失敗しました。");
         console.error(e);
     } finally {
-        document.body.removeChild(root);
         btn.innerText = originalText;
         if (!showedModal) endImageExport();
     }
@@ -215,10 +228,14 @@ async function generateOverviewImage() {
             </div>`;
         });
         html += `</div></div>
-            <div style="display: flex; width: 100%; height: 14px; border-radius: 4px; overflow: hidden; background: #eee; margin-top: 8px;">`;
+            <div style="display: flex; width: 100%; height: 16px; border-radius: 4px; overflow: hidden; background: #eee; margin-top: 8px; border: 1px solid #cfd8dc; box-sizing: border-box;">`;
+        // 近い色が隣り合っても境目が分かるよう、2つ目以降の区切りの左に白い線を入れる
+        let isFirstSegment = true;
         sortedMedalKeys.forEach(k => {
             if (counts[k] > 0) {
-                html += `<div style="width: ${(counts[k] / total) * 100}%; background: ${MEDAL_COLORS[k] || '#ccc'};"></div>`;
+                const divider = isFirstSegment ? '' : 'border-left: 2px solid #fff;';
+                html += `<div style="width: ${(counts[k] / total) * 100}%; background: ${MEDAL_COLORS[k] || '#ccc'}; box-sizing: border-box; ${divider}"></div>`;
+                isFirstSegment = false;
             }
         });
         html += `</div></div>`;
@@ -315,19 +332,11 @@ function buildMedalSummaryHtml(targetSongs) {
     return html;
 }
 
-async function generateDiffTableImage() {
-    const btn = document.getElementById('btn-diff-image');
-    const targetSongs = lastDisplaySongs.slice();
-    if (targetSongs.length === 0) {
-        alert("表示中の楽曲がありません。");
-        return;
-    }
-    const originalText = await prepareExport(btn);
-    if (originalText === null) return;
-
+// 難易度順画像の中身を組み立てて、画像用の要素を返す
+function buildDiffTableRoot(targetSongs, levelText) {
     const COLS = 5;
     const root = createExportRoot();
-    let html = buildExportHeader(getExportLevelText(), "pop'n music 難易度表");
+    let html = buildExportHeader(levelText, "pop'n music 難易度表");
     html += buildMedalSummaryHtml(targetSongs);
 
     const groups = buildDiffTableGroups(targetSongs);
@@ -356,8 +365,93 @@ async function generateDiffTableImage() {
     html += `</div>`;
 
     root.innerHTML = html;
-    const fileLevel = getExportLevelText() === '検索' ? 'Search' : currentViewLevel;
+    return root;
+}
+
+// 「難易度順画像」ボタン
+//   PC版   ：作成するレベルを選ぶ画面を開く（選んだレベルごとに1枚ずつ保存）
+//   スマホ版：いま表に表示している曲で1枚作る
+async function generateDiffTableImage() {
+    if (!isMobileDevice()) {
+        openDiffLevelModal();
+        return;
+    }
+    const btn = document.getElementById('btn-diff-image');
+    const targetSongs = lastDisplaySongs.slice();
+    if (targetSongs.length === 0) {
+        alert("表示中の楽曲がありません。");
+        return;
+    }
+    const originalText = await prepareExport(btn);
+    if (originalText === null) return;
+
+    const levelText = getExportLevelText();
+    const root = buildDiffTableRoot(targetSongs, levelText);
+    const fileLevel = levelText === '検索' ? 'Search' : currentViewLevel;
     await outputExportImage(root, `popn_difftable_${currentUser}_Lv${fileLevel}_${exportDateStr()}.png`, btn, originalText);
+}
+
+// ---------- PC版：複数レベルをまとめて作成 ----------
+function openDiffLevelModal() {
+    toggleMenu(false);
+    const container = document.getElementById('diff-level-checkboxes');
+    container.innerHTML = '';
+    getSortedLevels().forEach(lv => {
+        const label = document.createElement('label');
+        label.className = 'check-label';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.className = 'diff-level-check';
+        cb.value = lv;
+        cb.checked = (lv === currentViewLevel); // 今表示しているレベルを最初から選んでおく
+        label.appendChild(cb);
+        label.appendChild(document.createTextNode(isNaN(parseInt(lv, 10)) ? ` ${lv}` : ` Lv${lv}`));
+        container.appendChild(label);
+    });
+    document.getElementById('diff-level-modal').style.display = 'flex';
+}
+
+function closeDiffLevelModal() {
+    document.getElementById('diff-level-modal').style.display = 'none';
+}
+
+function setAllDiffLevelChecks(checked) {
+    document.querySelectorAll('.diff-level-check').forEach(cb => { cb.checked = checked; });
+}
+
+async function generateDiffTableImagesForSelectedLevels() {
+    const levels = Array.from(document.querySelectorAll('.diff-level-check:checked')).map(cb => cb.value);
+    if (levels.length === 0) {
+        alert("レベルを1つ以上選んでください。");
+        return;
+    }
+    closeDiffLevelModal();
+
+    const btn = document.getElementById('btn-diff-image');
+    const originalText = await prepareExport(btn);
+    if (originalText === null) return;
+
+    let savedCount = 0;
+    try {
+        for (let i = 0; i < levels.length; i++) {
+            const lv = levels[i];
+            const lvSongs = songs.filter(s => s.level === lv);
+            if (lvSongs.length === 0) continue;
+            showLoading(true, `難易度順画像を作成中... (${i + 1}/${levels.length}) Lv${lv}`);
+            const dataUrl = await renderExportToDataUrl(buildDiffTableRoot(lvSongs, lv));
+            downloadDataUrl(dataUrl, `popn_difftable_${currentUser}_Lv${lv}_${exportDateStr()}.png`);
+            savedCount++;
+            // 連続ダウンロードがブラウザに止められにくいよう、少し間を空ける
+            if (i < levels.length - 1) await new Promise(res => setTimeout(res, 400));
+        }
+    } catch (e) {
+        alert(`画像の生成に失敗しました。（${savedCount}枚は保存済み）`);
+        console.error(e);
+    } finally {
+        showLoading(false);
+        btn.innerText = originalText;
+        endImageExport();
+    }
 }
 
 // ==========================================
