@@ -396,7 +396,7 @@ function renderTable() {
         '未分類': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 }
     };
 
-    const isMobile = window.innerWidth <= 768;
+    const isMobile = isNarrowScreen();
 
     // ★ 統計の計算は「絞り込み前」の baseSongs で行う
     baseSongs.forEach(song => {

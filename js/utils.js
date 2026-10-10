@@ -137,12 +137,9 @@ function toImageProxyUrl(url) {
     return url;
 }
 
-function escapeHtmlText(str) {
+// HTML に埋め込む文字をエスケープする（曲名・メモなど、外から入ってくる文字は必ず通す）
+function escapeHtml(str) {
     return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
-
-function isMobileExport() {
-    return window.innerWidth <= 768 || /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
 
 function getDifficultyColor(diffClass, index) {

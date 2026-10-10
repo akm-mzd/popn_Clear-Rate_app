@@ -47,12 +47,12 @@ function buildExportHeader(levelText, titleText) {
         <div style="display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 14px;">
             <div style="background: #fff; border: 3px solid ${EXPORT_ACCENT}; border-radius: 12px; width: 104px; height: 84px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0;">
                 <div style="font-size: 15px; line-height: 1; font-weight: bold; color: ${EXPORT_ACCENT}; letter-spacing: 1px;">LEVEL</div>
-                <div style="font-size: ${lvSize}px; line-height: 1; font-weight: bold; color: ${EXPORT_ACCENT}; margin-top: 6px;">${escapeHtmlText(levelText)}</div>
+                <div style="font-size: ${lvSize}px; line-height: 1; font-weight: bold; color: ${EXPORT_ACCENT}; margin-top: 6px;">${escapeHtml(levelText)}</div>
             </div>
-            <div style="flex: 1; ${EXPORT_CENTER} font-size: 28px; line-height: 1.2; font-weight: bold; color: ${EXPORT_ACCENT};">${escapeHtmlText(titleText)}</div>
+            <div style="flex: 1; ${EXPORT_CENTER} font-size: 28px; line-height: 1.2; font-weight: bold; color: ${EXPORT_ACCENT};">${escapeHtml(titleText)}</div>
             <div style="text-align: right; color: #555; font-size: 14px; line-height: 1.6; flex-shrink: 0;">
                 <div>作成日 ${dateText}</div>
-                <div style="font-weight: bold;">User: ${escapeHtmlText(currentUser)}</div>
+                <div style="font-weight: bold;">User: ${escapeHtml(currentUser)}</div>
             </div>
         </div>`;
 }
@@ -69,7 +69,7 @@ function buildMedalIconHtml(medalKey, size) {
         return `<img src="${toImageProxyUrl(m.imgUrl)}" crossorigin="anonymous" style="width: ${size}px; height: ${size}px; object-fit: contain; display: block;">`;
     }
     const label = m ? m.label : '';
-    return `<span style="font-size: 11px; line-height: 1; color: #555; white-space: nowrap;">${escapeHtmlText(label)}</span>`;
+    return `<span style="font-size: 11px; line-height: 1; color: #555; white-space: nowrap;">${escapeHtml(label)}</span>`;
 }
 
 // メダル枠（未プレイは空枠、未解禁は鍵）
@@ -90,7 +90,7 @@ function buildBannerBoxHtml(song, width, height) {
     if (song.bannerUrl && song.bannerUrl.trim() !== '') {
         return `<img src="${toImageProxyUrl(song.bannerUrl)}" crossorigin="anonymous" style="${style} object-fit: cover; display: block; background: #eee;">`;
     }
-    return `<div style="${style} ${EXPORT_CENTER} background: #37474f; color: #fff; padding: 2px 6px; overflow: hidden;"><span style="font-size: 11px; line-height: 1.2; font-weight: bold;">${escapeHtmlText(song.title)}</span></div>`;
+    return `<div style="${style} ${EXPORT_CENTER} background: #37474f; color: #fff; padding: 2px 6px; overflow: hidden;"><span style="font-size: 11px; line-height: 1.2; font-weight: bold;">${escapeHtml(song.title)}</span></div>`;
 }
 
 function waitExportImages(root) {
@@ -131,7 +131,7 @@ async function outputExportImage(root, filename, btn, originalText) {
         const canvas = await html2canvas(root, { backgroundColor: EXPORT_BG, scale, useCORS: true, width: w, height: h, windowWidth: Math.max(w + 100, 1200) });
         const dataUrl = canvas.toDataURL("image/png");
 
-        if (isMobileExport()) {
+        if (isMobileDevice()) {
             document.getElementById('generated-image-preview').src = dataUrl;
             document.getElementById('image-result-modal').style.display = 'flex';
             showedModal = true;
@@ -336,7 +336,7 @@ async function generateDiffTableImage() {
         const textShadow = (g.cls === '弱' || g.cls === '逆詐称' || (g.cls === '中' && g.label.startsWith('-'))) ? 'text-shadow: 0 1px 2px rgba(0,0,0,0.45);' : '';
         const labelHtml = g.cls === '未定'
             ? `<div style="font-size: 14px; line-height: 1;">未定</div>`
-            : `<div style="font-size: 12px; line-height: 1;">${escapeHtmlText(g.cls)}</div><div style="font-size: 17px; line-height: 1; margin-top: 4px;">${escapeHtmlText(g.label)}</div>`;
+            : `<div style="font-size: 12px; line-height: 1;">${escapeHtml(g.cls)}</div><div style="font-size: 17px; line-height: 1; margin-top: 4px;">${escapeHtml(g.label)}</div>`;
         html += `<div style="display: flex; gap: 10px; align-items: stretch;">
             <div style="width: 58px; min-height: 42px; flex-shrink: 0; background: ${color}; color: #fff; font-weight: bold; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 4px 0; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.25); ${textShadow}">${labelHtml}</div>
             <div style="display: grid; grid-template-columns: repeat(${COLS}, 216px); gap: 8px 12px; align-content: center;">`;
@@ -384,10 +384,10 @@ function buildExportStatsHtml() {
         const color = colorOf(gEl);
         html += `<div style="background: #fff; border: 2px solid #90a4ae; border-left: 8px solid ${color}; border-radius: 8px; padding: 8px 14px; display: flex; align-items: center; gap: 16px;">
             <div style="display: flex; flex-direction: column; justify-content: center;">
-                <div style="font-size: 13px; line-height: 1.2; font-weight: bold; color: #555;">${escapeHtmlText(title)}</div>
-                <div style="font-size: 16px; line-height: 1.3; font-weight: bold; color: #333;">${escapeHtmlText(fraction)} <span style="font-size: 12px; font-weight: normal; color: #777;">${escapeHtmlText(remain)}</span></div>
+                <div style="font-size: 13px; line-height: 1.2; font-weight: bold; color: #555;">${escapeHtml(title)}</div>
+                <div style="font-size: 16px; line-height: 1.3; font-weight: bold; color: #333;">${escapeHtml(fraction)} <span style="font-size: 12px; font-weight: normal; color: #777;">${escapeHtml(remain)}</span></div>
             </div>
-            <div style="font-size: 30px; line-height: 1; font-weight: bold; color: ${color};">${escapeHtmlText(perc)}</div>
+            <div style="font-size: 30px; line-height: 1; font-weight: bold; color: ${color};">${escapeHtml(perc)}</div>
         </div>`;
     });
     html += `</div>`;
@@ -422,23 +422,23 @@ async function exportAsImage(event) {
 
     const columns = [
         { id: 0, w: 60, head: th('メダル', 60), cell: (s) => td(`<div style="${EXPORT_CENTER}">${buildMedalBoxHtml(clearRecords[s.id] || '')}</div>`) },
-        { id: 1, w: 90, head: th('スコア', 90), cell: (s, i) => td(escapeHtmlText(cellText(i, '.col-score'))) },
-        { id: 2, w: 90, head: th('比較', 90), cell: (s, i) => td(escapeHtmlText(cellText(i, '.col-compare'))) },
-        { id: 3, w: 44, head: th('Lv', 44), cell: (s) => td(escapeHtmlText(s.level)) },
-        { id: 4, w: 44, head: th('Ver', 44), cell: (s) => td(escapeHtmlText(s.version)) },
+        { id: 1, w: 90, head: th('スコア', 90), cell: (s, i) => td(escapeHtml(cellText(i, '.col-score'))) },
+        { id: 2, w: 90, head: th('比較', 90), cell: (s, i) => td(escapeHtml(cellText(i, '.col-compare'))) },
+        { id: 3, w: 44, head: th('Lv', 44), cell: (s) => td(escapeHtml(s.level)) },
+        { id: 4, w: 44, head: th('Ver', 44), cell: (s) => td(escapeHtml(s.version)) },
         { id: 5, w: 140, head: th('バナー', 140), cell: (s) => td(`<div style="${EXPORT_CENTER}">${buildBannerBoxHtml(s, 128, 32)}</div>`) },
         { id: 6, w: 240, head: th('ジャンル / 曲名', 240, 'left'), cell: (s) => {
             const memo = memoRecords[s.id] || {};
             const memoParts = [memo.affinity, memo.sudden ? `SUD+ ${memo.sudden}` : '', memo.comment].filter(Boolean);
-            const memoHtml = memoParts.length ? `<div style="font-size: 11px; color: #e65100; margin-top: 2px;">📝 ${escapeHtmlText(memoParts.join(' / '))}</div>` : '';
-            return td(`<div style="font-size: 11px; color: #777;">${escapeHtmlText(s.genre)}</div><div style="font-weight: bold;">${escapeHtmlText(s.title)}</div>${memoHtml}`, 'left');
+            const memoHtml = memoParts.length ? `<div style="font-size: 11px; color: #e65100; margin-top: 2px;">📝 ${escapeHtml(memoParts.join(' / '))}</div>` : '';
+            return td(`<div style="font-size: 11px; color: #777;">${escapeHtml(s.genre)}</div><div style="font-weight: bold;">${escapeHtml(s.title)}</div>${memoHtml}`, 'left');
         } },
-        { id: 7, w: 64, head: th('BPM', 64), cell: (s) => td(escapeHtmlText(s.bpm || '-'), 'right') },
-        { id: 8, w: 60, head: th('ノーツ', 60), cell: (s) => td(escapeHtmlText(s.notes), 'right') },
+        { id: 7, w: 64, head: th('BPM', 64), cell: (s) => td(escapeHtml(s.bpm || '-'), 'right') },
+        { id: 8, w: 60, head: th('ノーツ', 60), cell: (s) => td(escapeHtml(s.notes), 'right') },
         { id: 9, w: 90, head: th('難易度', 90), cell: (s) => {
             const c = getDifficultyColor(s.diffClass || '未分類', s.diffIndex);
             const shadow = c.shadow && c.shadow !== 'none' ? `text-shadow: ${c.shadow};` : '';
-            return td(`<span style="font-weight: bold; color: ${c.color}; ${shadow}">${escapeHtmlText(s.diffRaw || '-')}</span>`);
+            return td(`<span style="font-weight: bold; color: ${c.color}; ${shadow}">${escapeHtml(s.diffRaw || '-')}</span>`);
         } }
     ].filter(c => activeIndices.includes(c.id));
 

@@ -126,7 +126,7 @@ async function processImportText(text, targetLevel) {
 }
 
 async function updateBannerFromClipboard(id) {
-    if (window.innerWidth <= 768) return;
+    if (isNarrowScreen()) return;
 
     if (!checkAdminAuth()) return;
 
@@ -534,11 +534,6 @@ const BULK_RE_CHART_SUFFIX = /\((?:ex|h|n|e)\)$/; // ジャンル名の末尾の
 
 let bulkDiffResults = [];
 
-function bulkEsc(s) {
-    return String(s === undefined || s === null ? '' : s)
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
 // 表記ゆれを吸収する（全角/半角・大文字/小文字・ハイフンや波ダッシュの違い・ⓊとUPPER）
 function bulkNormText(s) {
     return String(s || '')
@@ -798,10 +793,10 @@ function analyzeBulkDiff() {
             const st = getDifficultyColor(p.diffClass, p.diffIndex);
             html += `<tr>
                 <td style="text-align: center;"><input type="checkbox" class="bulk-diff-check" value="${i}" ${r.ambiguous ? '' : 'checked'}></td>
-                <td><div style="font-size: 0.85em; color: #666;">${bulkEsc(r.song.genre)}</div><b>${bulkEsc(r.song.title)}</b>${level === 'ALL' ? ` <span class="level-badge">${bulkEsc(r.song.level)}</span>` : ''}</td>
-                <td style="color: #888;">${bulkEsc(r.song.diffRaw) || '（なし）'}</td>
-                <td style="font-weight: bold; color: ${st.color}; text-shadow: ${st.shadow};">${bulkEsc(r.newRaw)}</td>
-                <td style="font-size: 0.85em; color: #e65100;">${bulkEsc(r.notes.join(' / '))}</td>
+                <td><div style="font-size: 0.85em; color: #666;">${escapeHtml(r.song.genre)}</div><b>${escapeHtml(r.song.title)}</b>${level === 'ALL' ? ` <span class="level-badge">${escapeHtml(r.song.level)}</span>` : ''}</td>
+                <td style="color: #888;">${escapeHtml(r.song.diffRaw) || '（なし）'}</td>
+                <td style="font-weight: bold; color: ${st.color}; text-shadow: ${st.shadow};">${escapeHtml(r.newRaw)}</td>
+                <td style="font-size: 0.85em; color: #e65100;">${escapeHtml(r.notes.join(' / '))}</td>
             </tr>`;
         });
         html += `</tbody></table></div>`;
@@ -812,7 +807,7 @@ function analyzeBulkDiff() {
     const listBlock = (title, items) => items.length === 0 ? '' : `
         <details style="margin-top: 8px; background: #f5f5f5; padding: 8px; border-radius: 4px;">
             <summary style="cursor: pointer; font-size: 0.85em; font-weight: bold; color: #555;">${title} (${items.length})</summary>
-            <div style="max-height: 150px; overflow-y: auto; font-size: 0.8em; margin-top: 6px; white-space: pre-wrap; word-break: break-all;">${items.map(bulkEsc).join('\n')}</div>
+            <div style="max-height: 150px; overflow-y: auto; font-size: 0.8em; margin-top: 6px; white-space: pre-wrap; word-break: break-all;">${items.map(escapeHtml).join('\n')}</div>
         </details>`;
 
     html += listBlock('⚠ 曲は見つかったが難易度を読み取れなかった行', noDiffLines);

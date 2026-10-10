@@ -5,6 +5,21 @@
 // ==========================================
 
 // ==========================================
+// ★ 端末の判定（スマホ表示に切り替える画面幅）
+// ==========================================
+const MOBILE_MAX_WIDTH = 768;
+
+// 画面幅がスマホ表示の範囲か（レイアウトの切替に使う）
+function isNarrowScreen() {
+    return window.innerWidth <= MOBILE_MAX_WIDTH;
+}
+
+// スマホ・タブレット端末か（画像を「長押しで保存」させるかの判定に使う）
+function isMobileDevice() {
+    return isNarrowScreen() || /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
+// ==========================================
 // ★クラウド同期設定（GAS）と管理者パスワード
 // ==========================================
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbz7aEE4z7w7KLxSVRU5Mm8xPiotV5hAdxu1BUYQ1---NtTSr2kUpCisX6g0x-0TXO0kqw/exec';
@@ -55,8 +70,8 @@ const MEDAL_COLORS = {
 };
 
 let currentMedalEditId = null;
-let currentSort = window.innerWidth <= 768 ? 'diff' : 'version';
-let sortDesc = window.innerWidth <= 768 ? true : false;
+let currentSort = isNarrowScreen() ? 'diff' : 'version';
+let sortDesc = isNarrowScreen();
 let currentViewLevel = '48';
 let lastDisplaySongs = []; // 現在テーブルに表示中の楽曲（難易度順画像で使用）
 
