@@ -823,7 +823,7 @@ function setLevelButtonPlacement(onMain) {
 // ==========================================
 // ★ 表示方法（リスト / 難易度表）
 // ==========================================
-let viewMode = storageGet('popn_view_mode') === 'grid' ? 'grid' : 'list';
+let viewMode = storageGet('popn_view_mode') === 'list' ? 'list' : 'grid'; // 最初は「難易度表」
 let lastGridNarrow = null; // 難易度表を描いたときの画面幅の区分（列数の切り替え用）
 
 function setViewMode(mode) {
