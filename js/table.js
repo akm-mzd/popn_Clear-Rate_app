@@ -556,9 +556,7 @@ function renderTable() {
         const scoreDisplay = showScore ? '' : 'display: none;';
         const compareDisplay = showCompare ? '' : 'display: none;';
 
-        const searchKey = (song.genre && song.genre.trim() !== '') ? song.genre : song.title;
-        const autoWikiUrl = `https://popn.wiki/search?q=${encodeURIComponent(searchKey)}`;
-        const finalWikiUrl = safeUrl(song.wikiUrl) || autoWikiUrl; // http(s) 以外のURLは使わない
+        const finalWikiUrl = getWikiUrl(song); // http(s) 以外のURLは使わない
 
         const memo = memoRecords[song.id] || {};
         const hasMemo = memo.comment || memo.sudden || memo.affinity;
@@ -608,6 +606,7 @@ function renderTable() {
     });
 
     lastDisplaySongs = displaySongs;
+    applyViewMode(displaySongs);
     updateSortHeaders();
 
     const kuroHishiPerc = formatRate(kuroHishiClearCount, rateTotal);
@@ -803,9 +802,10 @@ function renderTable() {
 // ★ 表示レベルボタンの配置（メイン画面 / メニュー内）
 // ==========================================
 function applyLevelButtonPlacement(onMain) {
-    const buttons = document.getElementById('view-level-buttons');
+    // レベルボタンと表示方法の切り替えを、枠ごと移動する
+    const panel = document.getElementById('level-view-panel');
     const slot = document.getElementById(onMain ? 'main-level-slot' : 'menu-level-slot');
-    if (buttons && slot && buttons.parentElement !== slot) slot.appendChild(buttons);
+    if (panel && slot && panel.parentElement !== slot) slot.appendChild(panel);
     const checkbox = document.getElementById('level-btn-on-main');
     if (checkbox) checkbox.checked = onMain;
 }
@@ -816,7 +816,107 @@ function setLevelButtonPlacement(onMain) {
 }
 
 (function initLevelButtonPlacement() {
-    let onMain = true;
-    onMain = storageGet('popn_level_btn_main') !== '0';
+    const onMain = storageGet('popn_level_btn_main') !== '0';
     applyLevelButtonPlacement(onMain);
 })();
+
+// ==========================================
+// ★ 表示方法（リスト / 難易度表）
+// ==========================================
+let viewMode = storageGet('popn_view_mode') === 'grid' ? 'grid' : 'list';
+let lastGridNarrow = null; // 難易度表を描いたときの画面幅の区分（列数の切り替え用）
+
+function setViewMode(mode) {
+    viewMode = mode === 'grid' ? 'grid' : 'list';
+    storageSet('popn_view_mode', viewMode);
+    toggleMenu(false);
+    renderTable();
+}
+
+function updateViewModeButtons() {
+    document.querySelectorAll('#view-mode-switch button').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === viewMode);
+    });
+}
+
+// renderTable の最後に呼ばれる：表と難易度表のどちらを見せるかを切り替える
+//   表の行は難易度表のときも作っておく（表示曲画像がスコア・比較の文字を表の行から読むため）
+function applyViewMode(displaySongs) {
+    updateViewModeButtons();
+    const capture = document.getElementById('capture-area');
+    const grid = document.getElementById('diff-grid-view');
+    if (!capture || !grid) return;
+    const isGrid = viewMode === 'grid';
+    capture.style.display = isGrid ? 'none' : '';
+    grid.style.display = isGrid ? '' : 'none';
+    if (isGrid) renderDiffGrid(displaySongs);
+    else grid.innerHTML = '';
+}
+
+// メダル枠の中身（メダル画像 / 未解禁は鍵 / 未プレイは空）
+function buildGridMedalInner(medalKey) {
+    const m = MEDAL_TYPES[medalKey];
+    if (medalKey === '未解禁') return '<span class="dg-lock">🔒</span>';
+    if (m && m.imgUrl && (m.imgUrl.startsWith('http') || m.imgUrl.startsWith('data:'))) {
+        return `<img src="${escapeHtml(m.imgUrl)}" alt="${escapeHtml(m.label)}" loading="lazy">`;
+    }
+    return '';
+}
+
+function renderDiffGrid(targetSongs) {
+    const grid = document.getElementById('diff-grid-view');
+    const narrow = isNarrowScreen();
+    const COLS = narrow ? 2 : 5;
+    lastGridNarrow = narrow;
+
+    if (targetSongs.length === 0) {
+        grid.innerHTML = '<div class="dg-empty">表示する曲がありません</div>';
+        return;
+    }
+
+    let html = '';
+    buildDiffTableGroups(targetSongs).forEach(g => {
+        const labelHtml = g.cls === '未定'
+            ? '<span class="dg-label-cls">未定</span>'
+            : `<span class="dg-label-cls">${escapeHtml(g.cls)}</span><span class="dg-label-idx">${escapeHtml(g.label)}</span>`;
+        const lightLabel = (g.cls === '弱' || (g.cls === '中' && g.label.startsWith('-'))) ? ' dg-label-light' : '';
+
+        // 強い曲ほど上・右に来るよう、強い順に1行ずつ区切ってから各行を左右反転する（右上が最強）
+        const ordered = [];
+        for (let i = 0; i < g.songs.length; i += COLS) {
+            ordered.push(...g.songs.slice(i, i + COLS).reverse());
+        }
+
+        let cells = '';
+        ordered.forEach(song => {
+            const medalKey = clearRecords[song.id] || '';
+            const medalClass = medalKey === '' ? ' dg-medal-empty' : '';
+            const bannerSrc = safeUrl(song.bannerUrl, true);
+            const bannerInner = bannerSrc
+                ? `<img src="${escapeHtml(bannerSrc)}" alt="${escapeHtml(song.title)}" loading="lazy">`
+                : `<span class="dg-banner-text">${escapeHtml(song.title)}</span>`;
+            cells += `
+                <div class="dg-cell">
+                    <button type="button" class="dg-medal${medalClass}" onclick="openMedalModal('${jsStringAttr(song.id)}')" title="メダルを変更">${buildGridMedalInner(medalKey)}</button>
+                    <a class="dg-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（攻略wikiを開く）">${bannerInner}</a>
+                </div>`;
+        });
+
+        html += `
+            <div class="dg-row">
+                <div class="dg-label${lightLabel}" style="background: ${getDiffTableLabelColor(g)};">${labelHtml}</div>
+                <div class="dg-cells" style="grid-template-columns: repeat(${COLS}, minmax(0, 1fr));">${cells}</div>
+            </div>`;
+    });
+    grid.innerHTML = html;
+}
+
+// 画面幅がPCとスマホの境目をまたいだら、列の数が変わるので描き直す
+let gridResizeTimer = null;
+window.addEventListener('resize', () => {
+    if (viewMode !== 'grid') return;
+    clearTimeout(gridResizeTimer);
+    gridResizeTimer = setTimeout(() => {
+        if (lastGridNarrow !== null && lastGridNarrow !== isNarrowScreen()) renderTable();
+    }, 200);
+});
