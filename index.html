@@ -131,11 +131,18 @@
             <!-- ② 表示レベル -->
             <section class="menu-card menu-level-row">
                 <div class="menu-card-title">
-                    <span>表示レベル</span>
+                    <span>表示レベル・方法</span>
                     <label class="check-label" style="font-size: 0.85em; font-weight: normal; cursor: pointer;"><input type="checkbox" id="level-btn-on-main" onchange="setLevelButtonPlacement(this.checked)" checked> メイン画面に表示</label>
                 </div>
                 <div id="menu-level-slot">
-                    <div id="view-level-buttons"></div>
+                    <!-- 「メイン画面に表示」で、この枠ごとメイン画面とメニューを行き来する -->
+                    <div id="level-view-panel">
+                        <div id="view-level-buttons"></div>
+                        <div id="view-mode-switch" role="group" aria-label="表示方法">
+                            <button type="button" data-mode="list" onclick="setViewMode('list')">リスト</button>
+                            <button type="button" data-mode="grid" onclick="setViewMode('grid')">難易度表</button>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -275,6 +282,9 @@
                 <tbody id="song-list"></tbody>
             </table>
         </div>
+
+        <!-- 表示方法「難易度表」：指数ごとの行に「メダル＋バナー」を並べる -->
+        <div id="diff-grid-view" style="display: none;"></div>
     </div>
 
     <div id="random-modal" class="modal-overlay" style="display: none;">
