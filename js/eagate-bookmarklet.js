@@ -101,18 +101,11 @@
     }
 
     // ---------- ページの取得 ----------
-    function getListUrl(page) {
-        const here = new URL(location.href);
-        let url;
-        if (/\/playdata\/mu_[a-z_]+\.html$/i.test(here.pathname) && here.pathname.indexOf('detail') === -1) {
-            url = here; // 今開いている一覧ページの条件（並び順など）をそのまま使う
-        } else {
-            const m = here.pathname.match(/\/game\/popn\/(popn\d+)\//);
-            const ver = m ? m[1] : 'popn29';
-            url = new URL(`/game/popn/${ver}/playdata/mu_top.html?page=0&version=-1&bemani=0&category=0&keyword=&sort=music&sort_type=up`, location.origin);
-        }
-        url.searchParams.set('page', String(page));
-        return url.href;
+    // レベル別一覧（mu_lv.html）の URL。pop'n のバージョン（popn29 など）は今のページのパスから取る
+    function getLevelUrl(lv, page) {
+        const m = location.pathname.match(/\/game\/popn\/(popn\d+)\//);
+        const ver = m ? m[1] : 'popn29';
+        return new URL(`/game/popn/${ver}/playdata/mu_lv.html?page=${page}&version=-1&bemani=0&category=0&keyword=&lv=${lv}&sort=none&sort_type=none`, location.origin).href;
     }
 
     async function fetchDoc(url) {
@@ -162,7 +155,8 @@
     const isMedalImg = img => MEDAL_IMG_RE.test(img.getAttribute('src') || '');
     const medalImgOf = el => Array.from(el.querySelectorAll('img')).find(isMedalImg) || null;
 
-    function parsePage(doc, diag) {
+    // pageLevel：レベル別一覧のレベル。1行に譜面が1つなら、その譜面のレベルになる
+    function parsePage(doc, diag, pageLevel) {
         const imgs = Array.from(doc.querySelectorAll('img')).filter(isMedalImg);
         const rows = [];
         imgs.forEach(img => {
@@ -203,7 +197,9 @@
             // 譜面ごとの列（曲名の列より後ろ）
             const cells = Array.from(row.children).filter(c => c !== musicCell && (!musicCell || (musicCell.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING)));
             const medalCells = cells.filter(c => medalImgOf(c));
-            const single = medalCells.length === 1 && rowLevel !== null;
+            const inLevelPage = pageLevel !== undefined && medalCells.length === 1;
+            if (pageLevel !== undefined && medalCells.length > 1) diag.multiInLevelPage++;
+            const single = inLevelPage || (medalCells.length === 1 && rowLevel !== null);
 
             medalCells.forEach(cell => {
                 const src = medalImgOf(cell).getAttribute('src');
@@ -215,7 +211,7 @@
                     diff = single ? '' : (['EX', 'H', 'N', 'E'][fromEnd] || '');
                     if (!single) diag.positional++;
                 }
-                const level = levelFromText(cell.textContent) || (single ? rowLevel : null);
+                const level = inLevelPage ? pageLevel : (levelFromText(cell.textContent) || (single ? rowLevel : null));
                 if (!(code in MEDAL_FILES)) {
                     diag.unknownMedals[code] = (diag.unknownMedals[code] || 0) + 1;
                     return;
@@ -253,6 +249,7 @@
             title: clean(doc.title),
             unknownMedals: diag.unknownMedals,
             positional: diag.positional,
+            multiInLevelPage: diag.multiInLevelPage,
             badRows: diag.badRows,
             images: imgs,
             html: html.slice(0, 6000)
@@ -296,23 +293,30 @@
             return finish();
         }
 
-        const diag = { unknownMedals: {}, positional: 0, badRows: 0 };
+        const diag = { unknownMedals: {}, positional: 0, badRows: 0, multiInLevelPage: 0 };
         const charts = [];
-        let lastSig = null, firstDoc = null, firstUrl = '', pages = 0;
+        const levelCounts = {};
+        let firstDoc = null, firstUrl = '', pages = 0;
         try {
-            for (let page = 0; page < MAX_PAGES; page++) {
-                setStatus(`読み取り中… ${page + 1}ページ目（${charts.length}譜面）`);
-                const url = getListUrl(page);
-                const doc = await fetchDoc(url);
-                if (!firstDoc) { firstDoc = doc; firstUrl = url; }
-                const result = parsePage(doc, diag);
-                if (result.rows === 0) break;
-                const sig = result.rows + ':' + result.firstTitle;
-                if (sig === lastSig) break; // 最後のページを過ぎて、同じページが返ってきた
-                lastSig = sig;
-                charts.push(...result.charts);
-                pages++;
-                await sleep(PAGE_INTERVAL_MS);
+            // Lv46〜50 のレベル別一覧だけを、レベルごとに最後のページまで読む
+            for (let lv = MIN_LEVEL; lv <= MAX_LEVEL; lv++) {
+                let lastSig = null;
+                levelCounts[lv] = 0;
+                for (let page = 0; page < MAX_PAGES; page++) {
+                    setStatus(`読み取り中… Lv${lv} の ${page + 1}ページ目（全部で ${charts.length}譜面）`);
+                    const url = getLevelUrl(lv, page);
+                    const doc = await fetchDoc(url);
+                    if (!firstDoc) { firstDoc = doc; firstUrl = url; }
+                    const result = parsePage(doc, diag, lv);
+                    if (result.rows === 0) break;
+                    const sig = result.rows + ':' + result.firstTitle;
+                    if (sig === lastSig) break; // 最後のページを過ぎて、同じページが返ってきた
+                    lastSig = sig;
+                    charts.push(...result.charts);
+                    levelCounts[lv] += result.charts.length;
+                    pages++;
+                    await sleep(PAGE_INTERVAL_MS);
+                }
             }
         } catch (e) {
             setStatus('読み取りに失敗しました：' + e.message);
@@ -336,7 +340,8 @@
         const summary = Object.keys(counts).sort((a, b) => order.indexOf(a) - order.indexOf(b)).map(k => `${k} ${counts[k]}`).join(' / ');
         const json = JSON.stringify({ type: 'popn-eagate', v: 1, at: new Date().toISOString(), pages, charts });
 
-        setStatus(`${pages}ページから ${charts.length}譜面（ハイパー・EX）を読み取りました。`);
+        setStatus(`Lv${MIN_LEVEL}〜${MAX_LEVEL} の ${pages}ページから、${charts.length}譜面を読み取りました。`);
+        addNote('レベル別：' + Object.keys(levelCounts).map(lv => `Lv${lv} ${levelCounts[lv]}`).join(' / '));
         addNote('内訳：' + summary);
         addButton('アプリに送る（新しいタブで開く）', '#e91e63', () => sendToApp(json));
         const box = addTextBox(json);
