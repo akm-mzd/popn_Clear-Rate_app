@@ -351,8 +351,10 @@ function applyEagateImport() {
         return;
     }
     pending.changes.forEach(c => {
-        if (c.newMedal !== null) clearRecords[c.song.id] = c.newMedal;
-        if (c.newScore !== null) scoreRecords[c.song.id] = c.newScore;
+        const change = {};
+        if (c.newMedal !== null) { change.medal = [c.oldMedal, c.newMedal]; clearRecords[c.song.id] = c.newMedal; }
+        if (c.newScore !== null) { change.score = [c.oldScore, c.newScore]; scoreRecords[c.song.id] = c.newScore; }
+        addHistoryEntry(c.song, change, 'e');
     });
     if (!allUsersData[currentUser]) allUsersData[currentUser] = emptyUser();
     allUsersData[currentUser].clearRecords = clearRecords;

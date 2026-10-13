@@ -5,7 +5,7 @@
 // ==========================================
 
 function downloadSongsAndClearsJson() {
-    const exportData = { songs: songs, clearRecords: clearRecords, scoreRecords: scoreRecords, memoRecords: memoRecords };
+    const exportData = { songs: songs, clearRecords: clearRecords, scoreRecords: scoreRecords, memoRecords: memoRecords, historyRecords: getHistoryRecords() };
     const dataStr = JSON.stringify(exportData, null, 2);
     triggerDownload(dataStr, `popn_data_${currentUser}.json`, 'クリア・スコア・メモを含めて');
 }
@@ -484,6 +484,7 @@ async function restoreFromJson(event) {
             }
             if (isObj(data.scoreRecords)) user.scoreRecords = data.scoreRecords;
             if (isObj(data.memoRecords)) user.memoRecords = data.memoRecords;
+            if (isObj(data.historyRecords)) user.historyRecords = data.historyRecords;
 
             clearRecords = user.clearRecords;
             scoreRecords = user.scoreRecords;

@@ -146,6 +146,7 @@
                         </div>
                     </div>
                 </div>
+                <button type="button" class="btn-history" onclick="openHistoryModal()">📜 更新履歴を見る</button>
                 <!-- 起動時の表示（メニューの中だけ。この端末に保存） -->
                 <div class="startup-view-settings">
                     <div class="startup-view-title">起動時の表示 <span>（この端末に保存）</span></div>
@@ -481,6 +482,17 @@
         </div>
     </div>
 
+    <!-- メダル・スコアの更新履歴 -->
+    <div id="history-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content hist-modal" style="max-width: 560px;">
+            <h3 id="history-modal-title">📜 更新履歴</h3>
+            <div id="history-modal-body" class="hist-list"></div>
+            <div class="modal-actions" style="justify-content: flex-end;">
+                <button onclick="closeHistoryModal()" style="border: 1px solid #ccc; background: #eee;">閉じる</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 公式データ取り込み：確認画面 -->
     <div id="eagate-import-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content" style="max-width: 560px;">
@@ -564,6 +576,7 @@
     <script src="js/users.js"></script>
     <script src="js/table.js"></script>
     <script src="js/modals.js"></script>
+    <script src="js/history.js"></script>
     <script src="js/admin.js"></script>
     <script src="js/image-export.js"></script>
     <script src="js/eagate-import.js"></script>

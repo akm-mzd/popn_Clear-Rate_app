@@ -38,6 +38,7 @@ function closeMedalModal() {
 
 async function selectMedal(medalKey) {
     if (currentMedalEditId) {
+        addHistoryEntry(songs.find(s => s.id === currentMedalEditId), { medal: [clearRecords[currentMedalEditId] || '', medalKey] }, 'm');
         if (medalKey === '') {
             delete clearRecords[currentMedalEditId];
         } else {
@@ -68,6 +69,7 @@ function closeScoreModal() {
 async function saveScoreModal() {
     const id = document.getElementById('score-modal-id').value;
     const val = document.getElementById('score-input-val').value.trim();
+    const oldScore = scoreRecords[id];
     
     if (val === '') {
         delete scoreRecords[id];
@@ -82,6 +84,7 @@ async function saveScoreModal() {
     
     if (!allUsersData[currentUser]) allUsersData[currentUser] = { clearRecords: {}, scoreRecords: {}, memoRecords: {} };
     allUsersData[currentUser].scoreRecords = scoreRecords;
+    addHistoryEntry(songs.find(s => s.id === id), { score: [oldScore, scoreRecords[id]] }, 'm');
 
     closeScoreModal();
     scheduleAutoSave();   // ←追加

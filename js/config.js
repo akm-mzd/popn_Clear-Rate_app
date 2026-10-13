@@ -10,7 +10,7 @@
 //   小数第2位: UI・操作感の変更 / 小数第3位: バグ修正
 //   ※ 変更を加えるたびに必ず更新する（CLAUDE.md 参照）
 // ==========================================
-const APP_VERSION = '1.800';
+const APP_VERSION = '1.900';
 
 // ==========================================
 // ★ 端末の判定（スマホ表示に切り替える画面幅）
@@ -101,7 +101,7 @@ let lastDisplaySongs = []; // 現在テーブルに表示中の楽曲（難易�
 const STORAGE_KEY_CACHE = 'popn_cloud_cache_v1';
 let dataLoaded = false; // キャッシュかクラウドのどちらかを読めたか
 
-const emptyUser = () => ({ clearRecords: {}, scoreRecords: {}, memoRecords: {} });
+const emptyUser = () => ({ clearRecords: {}, scoreRecords: {}, memoRecords: {}, historyRecords: {} });
 
 const RANK_IMAGES = {
     'S+':  'https://p.eagate.573.jp/game/popn/popn29/images/p/common/medal/rank_big_s_plus.png',

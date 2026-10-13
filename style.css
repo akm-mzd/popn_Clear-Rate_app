@@ -676,3 +676,27 @@ body.exporting-image #back-to-top { display: none !important; }
 .eagate-help textarea { display: block; width: 100%; height: 70px; box-sizing: border-box; margin: 8px 0; font-size: 11px; }
 .eagate-bookmarklet-link { display: inline-block; margin-top: 4px; padding: 6px 12px; border-radius: 16px; background: #e91e63; color: #fff !important; font-weight: bold; text-decoration: none; cursor: grab; }
 .eagate-how { font-size: 0.8em; color: #e65100; white-space: nowrap; }
+
+/* ===== メダル・スコアの更新履歴 ===== */
+.btn-history { margin-top: 8px; padding: 7px 12px; border: 1px solid #90a4ae; border-radius: 6px; background: #fff; color: #37474f; font-weight: bold; cursor: pointer; }
+.btn-history:hover { background: #eceff1; }
+.hist-modal { display: flex; flex-direction: column; max-height: 90vh; }
+.hist-list { flex: 1; overflow-y: auto; min-height: 120px; }
+.hist-empty { padding: 20px; text-align: center; color: #888; }
+.hist-day { position: sticky; top: 0; z-index: 1; background: #eceff1; color: #37474f; font-weight: bold; font-size: 0.9em; padding: 4px 8px; margin-top: 8px; border-radius: 4px; }
+.hist-item { padding: 6px 4px; border-bottom: 1px solid #eee; }
+.hist-head { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 0.9em; }
+.hist-time { color: #888; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.hist-src { flex-shrink: 0; font-size: 0.75em; font-weight: bold; padding: 1px 6px; border-radius: 8px; color: #fff; }
+.hist-src.eagate { background: #e91e63; }
+.hist-src.manual { background: #607d8b; }
+.hist-title { font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.hist-body { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin-top: 4px; padding-left: 4px; }
+.hist-change { display: inline-flex; align-items: center; gap: 4px; }
+.hist-medal { width: 26px; height: 26px; object-fit: contain; vertical-align: middle; }
+.hist-medal-text { font-size: 0.8em; color: #666; }
+.hist-arrow { color: #999; }
+.hist-score { font-size: 0.9em; font-variant-numeric: tabular-nums; }
+.hist-diff.up { color: #2e7d32; font-weight: bold; }
+.hist-diff.down { color: #c62828; font-weight: bold; }
+.hist-more { display: block; width: 100%; margin-top: 8px; padding: 8px; border: 1px solid #ccc; background: #f5f5f5; border-radius: 4px; cursor: pointer; }
