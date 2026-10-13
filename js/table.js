@@ -954,6 +954,8 @@ function updateViewModeButtons() {
         btn.classList.toggle('active', btn.dataset.mode === viewMode);
         if (SCORE_VIEW_MODES.includes(btn.dataset.mode)) btn.style.display = scoreOk ? '' : 'none';
     });
+    const pkImageBtn = document.getElementById('btn-pokkura-image');
+    if (pkImageBtn) pkImageBtn.style.display = scoreOk ? '' : 'none';
 }
 
 // renderTable の最後に呼ばれる：表・難易度表・スコア表のどれを見せるかを切り替える
