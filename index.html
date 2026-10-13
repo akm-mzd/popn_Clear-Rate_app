@@ -243,7 +243,21 @@
                 </div>
             </section>
 
-            <!-- ⑥ 画像 -->
+            <!-- ⑥ 公式データ取り込み -->
+            <section class="menu-card">
+                <div class="menu-card-title">📥 公式データ取り込み</div>
+                <div class="eagate-import-actions">
+                    <button onclick="importEagateFromClipboard()" class="btn-eagate">クリップボードから取り込む</button>
+                    <button onclick="openEagateHelpModal()" class="btn-eagate-sub">ブックマークレットと使い方</button>
+                </div>
+                <details class="eagate-manual">
+                    <summary>手で貼り付けて取り込む</summary>
+                    <textarea id="eagate-import-text" placeholder="公式サイトでコピーしたデータを貼り付け"></textarea>
+                    <button onclick="importEagateFromText()" class="btn-eagate">取り込む</button>
+                </details>
+            </section>
+
+            <!-- ⑦ 画像 -->
             <section class="menu-card menu-image-section">
                 <div class="menu-card-title">🖼️ 画像</div>
                 <div id="image-export-area" class="controls" style="margin: 0; padding: 0; box-shadow: none; background: transparent; display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 8px;">
@@ -458,6 +472,45 @@
         </div>
     </div>
 
+    <!-- 公式データ取り込み：確認画面 -->
+    <div id="eagate-import-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 560px;">
+            <h3>📥 公式データの取り込み</h3>
+            <div id="eagate-import-body"></div>
+            <div class="modal-actions">
+                <button onclick="closeEagateImportModal()" style="border: 1px solid #ccc; background: #eee;">やめる</button>
+                <button id="eagate-import-apply" onclick="applyEagateImport()" class="btn-eagate">反映</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 公式データ取り込み：ブックマークレットと使い方 -->
+    <div id="eagate-help-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content eagate-help" style="max-width: 560px;">
+            <h3>📥 ブックマークレットと使い方</h3>
+            <ol>
+                <li>下のブックマークレットを、ブラウザのブックマークに登録します（最初の1回だけ）。</li>
+                <li>e-amusement にログインして、pop'n music の<b>プレーデータの楽曲一覧</b>を開きます。</li>
+                <li>そのページで、登録したブックマークを開きます。Lv46〜50 のメダルとスコアを読み取ります（1分ほどかかります）。</li>
+                <li>「アプリに送る」か「コピー」を押します。コピーした場合は、このアプリのメニューで「クリップボードから取り込む」を押します。</li>
+                <li>確認画面で中身を見て、「反映」を押します。メダルは上がるときだけ、スコアは高いときだけ更新します。</li>
+            </ol>
+            <div class="eagate-help-title">PC の登録方法</div>
+            <div>このボタンを、ブックマークバーにドラッグします。 <a id="eagate-bookmarklet-link" class="eagate-bookmarklet-link" href="#" onclick="onBookmarkletLinkClick(event)">ポップン取り込み</a></div>
+            <div class="eagate-help-title">スマホの登録方法</div>
+            <div>
+                <b>iPhone（Safari）</b>：今のページをブックマークに追加して、そのブックマークを「編集」します。名前を「ポップン取り込み」に、URL を下のコードに書き換えます。<br>
+                <b>Android（Chrome）</b>：今のページをブックマークに追加して、URL を下のコードに書き換えます。使うときは、公式サイトのアドレス欄に「ポップン取り込み」と入力して、候補に出たブックマークを押します。
+            </div>
+            <textarea id="eagate-bookmarklet-code" readonly></textarea>
+            <button onclick="copyBookmarkletCode()" class="btn-eagate">コードをコピー</button>
+            <div style="font-size: 0.8em; color: #666; margin-top: 8px;">うまく読めなかったときは、公式サイトの上に「診断データをコピー」が出ます。それを作者に送ってください。</div>
+            <div class="modal-actions" style="justify-content: flex-end;">
+                <button onclick="closeEagateHelpModal()" style="border: 1px solid #ccc; background: #eee;">閉じる</button>
+            </div>
+        </div>
+    </div>
+
     <div id="image-result-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content" style="max-width: 95vw; max-height: 95vh; display: flex; flex-direction: column; align-items: center; padding: 15px;">
             <h3 style="margin-top: 0; margin-bottom: 10px;">画像の生成が完了しました</h3>
@@ -504,6 +557,7 @@
     <script src="js/modals.js"></script>
     <script src="js/admin.js"></script>
     <script src="js/image-export.js"></script>
+    <script src="js/eagate-import.js"></script>
     <script src="js/menu.js"></script>
     <script src="js/app.js"></script>
 
