@@ -690,7 +690,12 @@ body.exporting-image #back-to-top { display: none !important; }
 .hist-src { flex-shrink: 0; font-size: 0.75em; font-weight: bold; padding: 1px 6px; border-radius: 8px; color: #fff; }
 .hist-src.eagate { background: #e91e63; }
 .hist-src.manual { background: #607d8b; }
-.hist-title { font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.hist-title { font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+.hist-delete {
+    flex-shrink: 0; width: 28px; height: 28px; margin: 0; padding: 0; border: 1px solid #ddd; border-radius: 50%;
+    background: #fff; color: #999; font-size: 13px; line-height: 1; cursor: pointer;
+}
+.hist-delete:hover, .hist-delete:active { background: #ffebee; border-color: #e57373; color: #d32f2f; }
 .hist-body { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin-top: 4px; padding-left: 4px; }
 .hist-change { display: inline-flex; align-items: center; gap: 4px; }
 .hist-medal { width: 26px; height: 26px; object-fit: contain; vertical-align: middle; }
