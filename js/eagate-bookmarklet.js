@@ -344,7 +344,7 @@
         return pkFloor(pkFloor((level * (3750 * level + (PK_BONUS[medal] || 0) + (score - 50000))) / 3881250, 8) * 60, 2);
     }
 
-    // 今作の新曲（Lv46〜49）の番号を集める
+    // 今作の新曲（Lv46〜49）の番号を集める（ssdh233/popn-class と同じく、新曲枠は Lv49 まで）
     async function fetchNewSongNos() {
         const nos = new Set();
         for (let lv = 46; lv <= 49; lv++) {
@@ -384,8 +384,7 @@
     }
 
     // 旧曲（Lv48〜50）に、今作のスコア（vs）とメダル（vm）を付ける。調べた数を返す
-    async function addVersionRecords(charts) {
-        const newNos = await fetchNewSongNos();
+    async function addVersionRecords(charts, newNos) {
         const old = charts.filter(c => c.no && c.l >= 48 && c.l <= 50 && !newNos.has(c.no) && c.s >= 50000)
             .map(c => ({ c, point: pkPoint(c.l, c.s, c.m) }))
             .sort((a, b) => b.point - a.point)
@@ -412,6 +411,39 @@
             }
         }
         return resolved.length;
+    }
+
+    // Lv46 以上の今作の新曲（プレー済み）が20曲に満たないとき、Lv45 以下の今作の新曲も読む。
+    //   新バージョンが出た直後は、低いレベルの新曲もポックラの新曲枠に入るため。
+    //   上のレベルから読み、20番目のポイントに次のレベルの最高ポイント（100000・金星）が届かなくなったら止める
+    async function readLowLevelNewSongs(charts, newNos) {
+        const points = charts.filter(c => c.no && newNos.has(c.no) && c.s >= 50000).map(c => pkPoint(c.l, c.s, c.m));
+        if (points.length >= 20) return [];
+        const extra = [];
+        const dummyDiag = { unknownMedals: {}, badRows: 0 };
+        for (let lv = MIN_LEVEL - 1; lv >= 1; lv--) {
+            let pageCount = null;
+            for (let page = 0; page < MAX_PAGES; page++) {
+                if (pageCount !== null && page >= pageCount) break;
+                setStatus(`Lv45以下の新曲を確認中… Lv${lv} の ${page + 1}${pageCount ? '/' + pageCount : ''}ページ目（${extra.length}曲）`);
+                const doc = await fetchDoc(getLevelUrl(lv, page, VER_NUM));
+                if (page === 0) pageCount = getPageCount(doc);
+                const result = parseLevelPage(doc, dummyDiag, lv);
+                if (!result || result.rows === 0) break;
+                result.charts.forEach(c => {
+                    if (!(c.s >= 50000)) return;
+                    extra.push({ t: c.t, g: c.g, l: lv, s: c.s, m: c.m });
+                    points.push(pkPoint(lv, c.s, c.m));
+                });
+                await sleep(PAGE_INTERVAL_MS);
+                if (pageCount === null) break;
+            }
+            if (points.length >= 20 && lv > 1) {
+                const twentieth = points.slice().sort((a, b) => b - a)[19];
+                if (pkPoint(lv - 1, 100000, '金星') < twentieth) break;
+            }
+        }
+        return extra;
     }
 
     // ---------- 本体 ----------
@@ -470,9 +502,13 @@
         }
 
         // ポックラ用に、旧曲の今作スコアを調べる（失敗しても、メダル・スコアの取り込みはできる）
+        //   あわせて、Lv46 以上の新曲が少ないときは Lv45 以下の新曲も読む
         let versionChecked = 0, versionError = '';
+        let extraNew = [];
         try {
-            versionChecked = await addVersionRecords(charts);
+            const newNos = await fetchNewSongNos();
+            versionChecked = await addVersionRecords(charts, newNos);
+            extraNew = await readLowLevelNewSongs(charts, newNos);
         } catch (e) {
             versionError = e.message;
         }
@@ -482,14 +518,16 @@
         charts.forEach(c => { const k = c.m || '未プレイ(スコアのみ)'; counts[k] = (counts[k] || 0) + 1; });
         const order = ['金星', '銀星', '銀菱', '銀丸', '銅星', '銅菱', '銅丸', 'イージー', '黒星', '黒菱', '黒丸'];
         const summary = Object.keys(counts).sort((a, b) => order.indexOf(a) - order.indexOf(b)).map(k => `${k} ${counts[k]}`).join(' / ');
-        const json = JSON.stringify({ type: 'popn-eagate', v: 1, at: new Date().toISOString(), pages, charts });
+        const payload = { type: 'popn-eagate', v: 1, at: new Date().toISOString(), pages, charts };
+        if (extraNew.length > 0) payload.extraNew = extraNew;
+        const json = JSON.stringify(payload);
 
         setStatus(`Lv${MIN_LEVEL}〜${MAX_LEVEL} の ${pages}ページから、${charts.length}譜面を読み取りました。`);
         addNote('レベル別（プレー済み / 全曲）：' + Object.keys(levelCounts).map(lv => `Lv${lv} ${levelCounts[lv].played}/${levelCounts[lv].rows}`).join('　'));
         addNote('内訳：' + summary);
         addNote(versionError
             ? `旧曲の今作スコアは読めませんでした（${versionError}）。ポックラは歴代ベストで計算されます。`
-            : `ポックラ用に、旧曲 ${versionChecked}曲の今作スコアを読み取りました。`);
+            : `ポックラ用に、旧曲 ${versionChecked}曲の今作スコアを読み取りました。` + (extraNew.length ? `Lv45以下の新曲 ${extraNew.length}曲も読み取りました。` : ''));
         addButton('アプリに送る（新しいタブで開く）', '#e91e63', () => sendToApp(json));
         const box = addTextBox(json);
         addButton('コピー（アプリで「クリップボードから取り込む」）', '#2196F3', async () => {
