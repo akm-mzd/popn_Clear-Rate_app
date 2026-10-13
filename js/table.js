@@ -672,6 +672,9 @@ function renderTable() {
     if (isFiltered) {
         levelLabel += ' (絞り込み中)';
     }
+    if (typeof updateNewUiChrome === 'function') {
+        updateNewUiChrome({ levelLabel, cleared: normalClearCount, total: rateTotal, shown: displaySongs.length });
+    }
     
     const showKuroHishiRate = document.getElementById('show-kurohishi-rate') ? document.getElementById('show-kurohishi-rate').checked : false;
     const showKuroBoshiRate = document.getElementById('show-kuroboshi-rate') ? document.getElementById('show-kuroboshi-rate').checked : false;

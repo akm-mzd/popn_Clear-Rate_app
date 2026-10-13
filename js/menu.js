@@ -45,6 +45,7 @@ function toggleMenu(force) {
     panel.classList.toggle('open', open);
     document.getElementById('menu-backdrop').classList.toggle('open', open);
     document.getElementById('menu-btn').textContent = open ? '✕' : '☰';
+    if (!open && typeof onMenuClosed === 'function') onMenuClosed();
 }
 
 // Escキーでも閉じる

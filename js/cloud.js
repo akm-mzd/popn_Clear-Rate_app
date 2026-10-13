@@ -101,6 +101,9 @@ function showToast(id, text, color, hideAfterMs) {
 }
 
 function setSaveStatus(text, color, hideAfterMs) {
+    // 新しいデザインでは、上部バーの表示だけを変える（通知は出さない）
+    if (typeof updateSaveChip === 'function') updateSaveChip(text, color);
+    if (document.body.classList.contains('ui-new')) return;
     showToast('toast-save', text, color, hideAfterMs);
 }
 
