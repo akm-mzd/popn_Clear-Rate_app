@@ -10,7 +10,7 @@
 //   小数第2位: UI・操作感の変更 / 小数第3位: バグ修正
 //   ※ 変更を加えるたびに必ず更新する（CLAUDE.md 参照）
 // ==========================================
-const APP_VERSION = '1.800';
+const APP_VERSION = '1.901';
 
 // ==========================================
 // ★ 端末の判定（スマホ表示に切り替える画面幅）
@@ -44,7 +44,7 @@ function storageRemove(key) {
 // ==========================================
 // ★クラウド同期設定（GAS）と管理者パスワード
 // ==========================================
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbz7aEE4z7w7KLxSVRU5Mm8xPiotV5hAdxu1BUYQ1---NtTSr2kUpCisX6g0x-0TXO0kqw/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbyWlAKYVscjezHrqwpJ32ydFxsJSgMukfovhVN0clOAAwP7vaVMgE1tzBe9yD4flbmlLg/exec';
 
 // ★ 楽曲リストの編集用パスワード
 const ADMIN_PASSWORD = "1005"; 
@@ -101,7 +101,7 @@ let lastDisplaySongs = []; // 現在テーブルに表示中の楽曲（難易�
 const STORAGE_KEY_CACHE = 'popn_cloud_cache_v1';
 let dataLoaded = false; // キャッシュかクラウドのどちらかを読めたか
 
-const emptyUser = () => ({ clearRecords: {}, scoreRecords: {}, memoRecords: {} });
+const emptyUser = () => ({ clearRecords: {}, scoreRecords: {}, memoRecords: {}, historyRecords: {} });
 
 const RANK_IMAGES = {
     'S+':  'https://p.eagate.573.jp/game/popn/popn29/images/p/common/medal/rank_big_s_plus.png',
