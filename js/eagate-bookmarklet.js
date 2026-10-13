@@ -102,11 +102,14 @@
     }
 
     // ---------- ページの取得 ----------
-    // レベル別一覧（mu_lv.html）の URL。pop'n のバージョン（popn29 など）は今のページのパスから取る
-    function getLevelUrl(lv, page) {
-        const m = location.pathname.match(/\/game\/popn\/(popn\d+)\//);
-        const ver = m ? m[1] : 'popn29';
-        return new URL(`/game/popn/${ver}/playdata/mu_lv.html?page=${page}&version=-1&bemani=0&category=0&keyword=&lv=${lv}&sort=none&sort_type=none`, location.origin).href;
+    // pop'n のバージョンのフォルダ（popn29 など）は今のページのパスから取る。番号（29）は今作の新曲一覧に使う
+    const VER_DIR = (location.pathname.match(/\/game\/popn\/(popn\d+)\//) || [])[1] || 'popn29';
+    const VER_NUM = parseInt(VER_DIR.replace(/\D/g, ''), 10) || 29;
+    const playdataUrl = path => new URL(`/game/popn/${VER_DIR}/playdata/${path}`, location.origin).href;
+
+    // レベル別一覧（mu_lv.html）の URL。version=-1 は全バージョン、VER_NUM は今作の新曲だけ
+    function getLevelUrl(lv, page, version) {
+        return playdataUrl(`mu_lv.html?page=${page}&version=${version === undefined ? -1 : version}&bemani=0&category=0&keyword=&lv=${lv}&sort=none&sort_type=none`);
     }
 
     async function fetchDoc(url) {
@@ -158,6 +161,9 @@
             if (!medal && score === null) return; // 未プレイ
             const chart = { t: title, g: genreEl ? clean(genreEl.textContent) : '', d: '', m: medal, l: lv };
             if (score !== null) chart.s = score;
+            // 曲の番号（詳細ページを開くのに使う。アプリには送らない）
+            const no = new URLSearchParams((link.getAttribute('href') || '').split('?')[1] || '').get('no');
+            if (no) Object.defineProperty(chart, 'no', { value: no, enumerable: false });
             charts.push(chart);
         });
         diag.badRows += bad;
@@ -328,6 +334,86 @@
         window.addEventListener('message', onMessage);
     }
 
+    // ---------- ポックラ用：旧曲の「今作のスコア」 ----------
+    // 公式のポックラは、旧曲を今作のスコア・メダルで数える。一覧には歴代ベストしか出ないので、
+    // ポイントの高い旧曲から順に詳細ページを開き、上位40曲が確定したところで止める（ssdh233/popn-class と同じ考え方）
+    const PK_BONUS = { '金星': 21250, '銀星': 17500, '銀菱': 17500, '銀丸': 17500, '銅星': 12500, '銅菱': 12500, '銅丸': 12500, 'ロングオフ': 10000, 'イージー': 6250 };
+    const pkFloor = (n, p) => Math.floor(n * 10 ** p) / 10 ** p;
+    function pkPoint(level, score, medal) {
+        if (!(score >= 50000)) return 0;
+        return pkFloor(pkFloor((level * (3750 * level + (PK_BONUS[medal] || 0) + (score - 50000))) / 3881250, 8) * 60, 2);
+    }
+
+    // 今作の新曲（Lv46〜49）の番号を集める
+    async function fetchNewSongNos() {
+        const nos = new Set();
+        for (let lv = 46; lv <= 49; lv++) {
+            let pageCount = null;
+            for (let page = 0; page < MAX_PAGES; page++) {
+                if (pageCount !== null && page >= pageCount) break;
+                setStatus(`新曲の一覧を確認中… Lv${lv} の ${page + 1}ページ目`);
+                const doc = await fetchDoc(getLevelUrl(lv, page, VER_NUM));
+                if (page === 0) pageCount = getPageCount(doc);
+                const links = doc.querySelectorAll('.mu_list_lv_table li:not(.st_th) a');
+                if (links.length === 0) break;
+                links.forEach(a => {
+                    const no = new URLSearchParams((a.getAttribute('href') || '').split('?')[1] || '').get('no');
+                    if (no) nos.add(no);
+                });
+                if (pageCount === null) break;
+                await sleep(PAGE_INTERVAL_MS);
+            }
+        }
+        return nos;
+    }
+
+    // 詳細ページの EX 譜面の「今作」の欄から、スコアとメダル（回数から推定）を読む。読めなければ null
+    function parseVersionRecord(doc) {
+        const section = doc.querySelector('#ex');
+        if (!section) return null;
+        const tables = section.querySelectorAll('table');
+        if (tables.length < 2) return null;
+        const scoreEl = tables[1].querySelector('tr.score td.play_value');
+        if (!scoreEl) return null;
+        const text = clean(scoreEl.textContent);
+        if (text === '-' || text === '') return { score: 0, medal: '' };
+        const counts = Array.from(tables[1].querySelectorAll('tr.play td.play_value')).map(td => parseInt(td.textContent, 10) || 0);
+        const [, clear = 0, fc = 0, perfect = 0] = counts;
+        const medal = perfect > 0 ? '金星' : fc > 0 ? '銀星' : clear > 0 ? '銅星' : '黒星';
+        return { score: scoreFromText(text) || 0, medal };
+    }
+
+    // 旧曲（Lv48〜50）に、今作のスコア（vs）とメダル（vm）を付ける。調べた数を返す
+    async function addVersionRecords(charts) {
+        const newNos = await fetchNewSongNos();
+        const old = charts.filter(c => c.no && c.l >= 48 && c.l <= 50 && !newNos.has(c.no) && c.s >= 50000)
+            .map(c => ({ c, point: pkPoint(c.l, c.s, c.m) }))
+            .sort((a, b) => b.point - a.point)
+            .slice(0, 120);
+        const resolved = [];
+        for (let i = 0; i < old.length; i += 5) {
+            const batch = old.slice(i, i + 5);
+            setStatus(`旧曲の今作スコアを確認中… ${i + batch.length}/${old.length}曲（上位40曲が決まったら終わります）`);
+            for (const item of batch) {
+                const rec = parseVersionRecord(await fetchDoc(playdataUrl(`mu_detail.html?no=${encodeURIComponent(item.c.no)}&back=index`)));
+                if (!rec) continue;
+                // メダルのボーナスが同じなら、歴代のメダル（菱・丸の区別がある）を使う
+                const medal = (PK_BONUS[rec.medal] || 0) === (PK_BONUS[item.c.m] || 0) ? item.c.m : rec.medal;
+                item.c.vs = rec.score;
+                item.c.vm = medal;
+                resolved.push(pkPoint(item.c.l, rec.score, medal));
+            }
+            await sleep(PAGE_INTERVAL_MS);
+            // 40曲目のポイントが、まだ調べていない曲の歴代ポイント以上なら、もう入れ替わらない
+            const next = old[i + 5];
+            if (resolved.length >= 40 && next) {
+                const cutoff = resolved.slice().sort((a, b) => b - a)[39];
+                if (cutoff >= next.point) return resolved.length;
+            }
+        }
+        return resolved.length;
+    }
+
     // ---------- 本体 ----------
     async function run() {
         buildPanel();
@@ -383,6 +469,14 @@
             return finish();
         }
 
+        // ポックラ用に、旧曲の今作スコアを調べる（失敗しても、メダル・スコアの取り込みはできる）
+        let versionChecked = 0, versionError = '';
+        try {
+            versionChecked = await addVersionRecords(charts);
+        } catch (e) {
+            versionError = e.message;
+        }
+
         // 結果
         const counts = {};
         charts.forEach(c => { const k = c.m || '未プレイ(スコアのみ)'; counts[k] = (counts[k] || 0) + 1; });
@@ -393,6 +487,9 @@
         setStatus(`Lv${MIN_LEVEL}〜${MAX_LEVEL} の ${pages}ページから、${charts.length}譜面を読み取りました。`);
         addNote('レベル別（プレー済み / 全曲）：' + Object.keys(levelCounts).map(lv => `Lv${lv} ${levelCounts[lv].played}/${levelCounts[lv].rows}`).join('　'));
         addNote('内訳：' + summary);
+        addNote(versionError
+            ? `旧曲の今作スコアは読めませんでした（${versionError}）。ポックラは歴代ベストで計算されます。`
+            : `ポックラ用に、旧曲 ${versionChecked}曲の今作スコアを読み取りました。`);
         addButton('アプリに送る（新しいタブで開く）', '#e91e63', () => sendToApp(json));
         const box = addTextBox(json);
         addButton('コピー（アプリで「クリップボードから取り込む」）', '#2196F3', async () => {
