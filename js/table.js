@@ -1128,19 +1128,32 @@ function calcPokkuraPoint(level, score, medalKey) {
     return pkFloor(pkFloor((level * (3750 * level + bonus + (s - 50000))) / 3881250, 8) * 60, 2);
 }
 
-// 新曲（今作 = HC）は Lv46〜49、旧曲は Lv48〜50 が対象
-function getPokkuraGroup(song) {
+// 今作（新曲枠のバージョン）：曲データの中で一番新しいアーケードのバージョン（CS 系・未入力は除く）
+//   今は HC。次のバージョンの曲を入れると、自動でそちらになる
+function getPokkuraNewVersion() {
+    let best = null;
+    songs.forEach(s => {
+        const v = getVersionSortValue(s.version);
+        if (v >= VERSION_ORDER_CS) return;
+        if (!best || v > best.value) best = { value: v, label: String(s.version).trim() };
+    });
+    return best || { value: VERSION_ORDER_HC, label: 'HC' };
+}
+
+// 新曲（今作）は Lv49 まで（アプリにあるのは Lv46 以上）、旧曲は Lv48〜50 が対象
+function getPokkuraGroup(song, newVersionValue) {
     const lv = parseInt(song.level, 10);
-    if (getVersionSortValue(song.version) === VERSION_ORDER_HC) return (lv >= 46 && lv <= 49) ? 'new' : null;
+    if (getVersionSortValue(song.version) === newVersionValue && lv <= 49) return 'new';
     return (lv >= 48 && lv <= 50) ? 'old' : null;
 }
 
 function calcPokkura() {
     const entries = { new: [], old: [] };
+    const newVersion = getPokkuraNewVersion();
     // 旧曲は、公式データ取り込みで保存した「今作のスコア」があればそれで数える（なければ歴代ベスト）
     const version = loadPokkuraVersionRecords(currentUser);
     songs.forEach(song => {
-        const group = getPokkuraGroup(song);
+        const group = getPokkuraGroup(song, newVersion.value);
         if (!group) return;
         const vr = group === 'old' && version ? version.records[song.id] : null;
         const score = vr ? vr.s : scoreRecords[song.id];
@@ -1148,7 +1161,14 @@ function calcPokkura() {
         const point = calcPokkuraPoint(parseInt(song.level, 10), score, medal);
         if (point > 0) entries[group].push({ song, point, score: parseInt(score, 10) || 0, isVersion: !!vr });
     });
-    const byPoint = (a, b) => (b.point - a.point) || (a.song.originalOrder - b.song.originalOrder);
+    // Lv45 以下の今作の新曲（公式データ取り込みで保存したもの。アプリには曲として入っていない）
+    const extraNew = version ? version.extraNew : [];
+    extraNew.forEach((c, i) => {
+        const point = calcPokkuraPoint(c.l, c.s, c.m);
+        if (point > 0) entries.new.push({ extra: { title: c.t, genre: c.g, level: String(c.l), medal: c.m, order: 100000 + i }, point, score: c.s });
+    });
+    const orderOf = e => e.song ? e.song.originalOrder : e.extra.order;
+    const byPoint = (a, b) => (b.point - a.point) || (orderOf(a) - orderOf(b));
     entries.new.sort(byPoint);
     entries.old.sort(byPoint);
     const sum = list => list.reduce((acc, e) => acc + e.point, 0);
@@ -1156,6 +1176,8 @@ function calcPokkura() {
     const topOld = entries.old.slice(0, POKKURA_OLD_COUNT);
     return {
         version,
+        newVersionLabel: newVersion.label,
+        extraCount: extraNew.length,
         topNew, topOld,
         restNew: entries.new.slice(POKKURA_NEW_COUNT),
         restOld: entries.old.slice(POKKURA_OLD_COUNT),
@@ -1180,11 +1202,11 @@ function renderPokkuraGrid() {
     let html = `
         <div class="pk-summary">
             <div class="pk-total"><span class="pk-total-label">推定ポックラ</span><span class="pk-total-value">${pk.total.toFixed(2)}</span></div>
-            <div class="pk-parts">新曲 ${pk.newPoint.toFixed(2)}（${pk.topNew.length}/${POKKURA_NEW_COUNT}曲） ＋ 旧曲 ${pk.oldPoint.toFixed(2)}（${pk.topOld.length}/${POKKURA_OLD_COUNT}曲）</div>
+            <div class="pk-parts">新曲（${escapeHtml(pk.newVersionLabel)}） ${pk.newPoint.toFixed(2)}（${pk.topNew.length}/${POKKURA_NEW_COUNT}曲） ＋ 旧曲 ${pk.oldPoint.toFixed(2)}（${pk.topOld.length}/${POKKURA_OLD_COUNT}曲）</div>
             <div class="pk-note">${pk.version
                 ? `※ 旧曲は、公式データ取り込み（${escapeHtml(formatPokkuraDate(pk.version.at))}）で読んだ今作のスコアで計算しています。そのあとスコアが変わった曲は、もう一度取り込むと反映されます。`
                 : '※ 旧曲を歴代のベストスコアで計算した目安です。公式は旧曲を今作のスコアで数えます。メニューの「公式データ取り込み」で取り込むと、公式と同じ計算になります。'}
-                表示レベル・絞り込みに関係なく、新曲（HC）Lv46〜49・旧曲 Lv48〜50 から計算します。各曲の数字は、ポックラへの寄与（ポイント÷60）です。</div>
+                表示レベル・絞り込みに関係なく、新曲（${escapeHtml(pk.newVersionLabel)}）Lv49 まで・旧曲 Lv48〜50 から計算します。${pk.extraCount > 0 ? 'Lv45以下の新曲（バナーなし）は、公式データ取り込みで読んだものです。' : ''}各曲の数字は、ポックラへの寄与（ポイント÷60）です。</div>
         </div>`;
 
     const section = (label, sub, color, list) => {
@@ -1193,7 +1215,22 @@ function renderPokkuraGrid() {
         const ordered = [];
         for (let i = 0; i < list.length; i += COLS) ordered.push(...list.slice(i, i + COLS).reverse());
         let cells = '';
-        ordered.forEach(({ song, point, score, isVersion }) => {
+        ordered.forEach(({ song, extra, point, score, isVersion }) => {
+            const pointHtml = `<span class="pk-point" title="ポイント ${point.toFixed(2)}">${pkFloor(point / 60, 3).toFixed(3)}</span>`;
+            if (extra) {
+                // Lv45 以下の新曲：アプリの曲ではないので、バナーなし・変更なし（表示だけ）
+                cells += `
+                <div class="dg-cell">
+                    <span class="dg-medal pk-medal-static${extra.medal ? '' : ' dg-medal-empty'}">${buildGridMedalInner(extra.medal)}</span>
+                    <div class="dg-banner-wrap">
+                        <div class="dg-banner pk-extra" title="${escapeHtml(extra.title)}（Lv${escapeHtml(extra.level)}）"><span class="pk-extra-title">${escapeHtml(extra.title)}</span><span class="pk-extra-genre">${escapeHtml(extra.genre)}</span></div>
+                        <span class="pk-lv">${escapeHtml(extra.level)}</span>
+                        <span class="dg-score pk-score">${score}</span>
+                        ${pointHtml}
+                    </div>
+                </div>`;
+                return;
+            }
             const medalKey = clearRecords[song.id] || '';
             const medalClass = medalKey === '' ? ' dg-medal-empty' : '';
             const bannerSrc = safeUrl(song.bannerUrl, true);
@@ -1208,7 +1245,7 @@ function renderPokkuraGrid() {
                         <a class="dg-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（Lv${escapeHtml(song.level)}・攻略wikiを開く）">${bannerInner}</a>
                         <span class="pk-lv">${escapeHtml(song.level)}</span>
                         <button type="button" class="dg-score pk-score${isVersion ? ' pk-score-version' : ''}" onclick="openScoreModal('${safeId}')" title="${isVersion ? `今作のスコア（歴代ベスト ${escapeHtml(scoreRecords[song.id] || '-')}）。押すと歴代ベストを変更` : 'スコアを変更'}">${score}</button>
-                        <span class="pk-point" title="ポイント ${point.toFixed(2)}">${pkFloor(point / 60, 3).toFixed(3)}</span>
+                        ${pointHtml}
                     </div>
                 </div>`;
         });

@@ -44,6 +44,7 @@ pop'n music のクリア状況を管理する静的サイトです（GitHub Page
 - リンクや画像の URL は `safeUrl()` を通す。
 - localStorage は直接触らず、`storageGet` / `storageSet` / `storageRemove` を使う。
 - 画像出力の中身は、インラインスタイルで組み立てる。ページの CSS（特にスマホ用）の影響を受けないようにするため。
+- 新しいバージョンが出たら、`js/table.js` の `VERSION_ORDER_AC_NAMED` に略称を追加する。ポックラの新曲枠は、データ中で一番新しいアーケードのバージョンになる（`getPokkuraNewVersion`）。
 - スマホかどうかの判定は、`isNarrowScreen()`（画面幅）か `isMobileDevice()`（端末）を使う。
 
 ## 動作確認

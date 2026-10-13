@@ -126,7 +126,15 @@ function parseEagatePayload(text) {
         }
         charts.push(chart);
     });
-    return { charts, at: typeof data.at === 'string' ? data.at : '' };
+    // ポックラ用：Lv45 以下の今作の新曲（アプリには曲として入れず、ポックラの計算だけに使う）
+    const extraNew = [];
+    (Array.isArray(data.extraNew) ? data.extraNew : []).forEach(c => {
+        if (!c || typeof c.t !== 'string' || !c.t.trim()) return;
+        if (!Number.isInteger(c.l) || c.l < 1 || c.l >= EAGATE_MIN_LEVEL) return;
+        if (!Number.isInteger(c.s) || c.s < 0 || c.s > 100000) return;
+        extraNew.push({ t: c.t.slice(0, 300), g: typeof c.g === 'string' ? c.g.slice(0, 300) : '', l: c.l, s: c.s, m: typeof c.m === 'string' && MEDAL_TYPES[c.m] ? c.m : '' });
+    });
+    return { charts, extraNew, at: typeof data.at === 'string' ? data.at : '' };
 }
 
 // ---------- 曲の突き合わせ ----------
@@ -291,7 +299,8 @@ function openEagateImportPreview(text) {
         if (chart.versionScore !== undefined) versionRecords[song.id] = { s: chart.versionScore, m: chart.versionMedal };
     });
     const versionCount = Object.keys(versionRecords).length;
-    pendingEagateImport = { user: currentUser, changes, versionRecords, at: parsed.at };
+    const extraCount = parsed.extraNew.length;
+    pendingEagateImport = { user: currentUser, changes, versionRecords, extraNew: parsed.extraNew, at: parsed.at };
 
     const medalCount = changes.filter(c => c.newMedal !== null).length;
     const scoreCount = changes.filter(c => c.newScore !== null).length;
@@ -304,6 +313,7 @@ function openEagateImportPreview(text) {
         <div>メダル更新 <b>${medalCount}</b> 件 / スコア更新 <b>${scoreCount}</b> 件</div>
         <div style="font-size:0.85em;color:#666;">※ メダルは上がるときだけ、スコアは高いときだけ更新します。</div>
         ${versionCount > 0 ? `<div style="font-size:0.85em;color:#666;">ポックラ用に、旧曲 <b>${versionCount}</b> 曲の今作スコアも保存します（この端末に保存）。</div>` : ''}
+        ${extraCount > 0 ? `<div style="font-size:0.85em;color:#666;">ポックラ用に、Lv45以下の新曲 <b>${extraCount}</b> 曲も保存します（この端末に保存）。</div>` : ''}
     </div>`;
 
     if (changes.length > 0) {
@@ -332,7 +342,7 @@ function openEagateImportPreview(text) {
     document.getElementById('eagate-import-body').innerHTML = html;
     const applyBtn = document.getElementById('eagate-import-apply');
     applyBtn.textContent = `${currentUser} さんに反映`;
-    applyBtn.disabled = changes.length === 0 && versionCount === 0;
+    applyBtn.disabled = changes.length === 0 && versionCount === 0 && extraCount === 0;
     document.getElementById('eagate-import-modal').style.display = 'flex';
     return true;
 }
@@ -359,29 +369,34 @@ function applyEagateImport() {
     if (!allUsersData[currentUser]) allUsersData[currentUser] = emptyUser();
     allUsersData[currentUser].clearRecords = clearRecords;
     allUsersData[currentUser].scoreRecords = scoreRecords;
-    if (Object.keys(pending.versionRecords).length > 0) savePokkuraVersionRecords(currentUser, pending.versionRecords, pending.at);
+    if (Object.keys(pending.versionRecords).length > 0 || pending.extraNew.length > 0) {
+        savePokkuraVersionRecords(currentUser, pending.versionRecords, pending.at, pending.extraNew);
+    }
     closeEagateImportModal();
     if (pending.changes.length > 0) scheduleAutoSave();
     renderTable();
     showToast('toast-eagate', `公式データを反映しました（${pending.changes.length}曲）`, '#4caf50', 3000);
 }
 
-// ---------- ポックラ用の今作スコア（旧曲）：この端末に、ユーザーごとに保存 ----------
-//   公式のポックラは旧曲を今作のスコアで数えるため、取り込んだときに保存しておく。
+// ---------- ポックラ用のデータ：この端末に、ユーザーごとに保存 ----------
+//   records：旧曲の今作スコア（公式のポックラは旧曲を今作のスコアで数えるため）
+//   extraNew：Lv45 以下の今作の新曲（アプリには Lv46 以上しかないが、新バージョン直後は新曲枠に入るため）
 //   クラウドには送らない（保存先の形を変えずに済むように、端末ごとの保存にしている）
 function pokkuraVersionKey(user) {
     return 'popn_pokkura_version_' + user;
 }
 
-function savePokkuraVersionRecords(user, records, at) {
-    storageSet(pokkuraVersionKey(user), JSON.stringify({ at: at || new Date().toISOString(), records }));
+function savePokkuraVersionRecords(user, records, at, extraNew) {
+    storageSet(pokkuraVersionKey(user), JSON.stringify({ at: at || new Date().toISOString(), records, extraNew: extraNew || [] }));
 }
 
-// { at, records: { 曲ID: { s, m } } } か、なければ null
+// { at, records: { 曲ID: { s, m } }, extraNew: [{ t, g, l, s, m }] } か、なければ null
 function loadPokkuraVersionRecords(user) {
     try {
         const data = JSON.parse(storageGet(pokkuraVersionKey(user)) || 'null');
-        return data && typeof data.records === 'object' && data.records ? data : null;
+        if (!data || typeof data.records !== 'object' || !data.records) return null;
+        if (!Array.isArray(data.extraNew)) data.extraNew = [];
+        return data;
     } catch (e) {
         return null;
     }

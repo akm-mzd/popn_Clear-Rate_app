@@ -384,6 +384,7 @@ function buildPokkuraRoot(pk) {
     const note = pk.version
         ? `旧曲は公式データ取り込み（${formatPokkuraDate(pk.version.at)}）の今作スコアで計算`
         : '旧曲は歴代ベストスコアで計算した目安';
+    const extraNote = pk.extraCount > 0 ? '・Lv45以下の新曲（バナーなし）は公式データ取り込みで読んだもの' : '';
 
     let html = `
         <div style="display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 14px;">
@@ -393,8 +394,8 @@ function buildPokkuraRoot(pk) {
             </div>
             <div style="flex: 1; text-align: center;">
                 <div style="font-size: 28px; line-height: 1.2; font-weight: bold; color: #d82f66;">pop'n music ポックラ対象曲</div>
-                <div style="font-size: 15px; line-height: 1.4; color: #555; margin-top: 4px;">新曲 ${pk.newPoint.toFixed(2)}（${pk.topNew.length}/${POKKURA_NEW_COUNT}曲） ＋ 旧曲 ${pk.oldPoint.toFixed(2)}（${pk.topOld.length}/${POKKURA_OLD_COUNT}曲）</div>
-                <div style="font-size: 12px; line-height: 1.4; color: #888;">${escapeHtml(note)}</div>
+                <div style="font-size: 15px; line-height: 1.4; color: #555; margin-top: 4px;">新曲（${escapeHtml(pk.newVersionLabel)}） ${pk.newPoint.toFixed(2)}（${pk.topNew.length}/${POKKURA_NEW_COUNT}曲） ＋ 旧曲 ${pk.oldPoint.toFixed(2)}（${pk.topOld.length}/${POKKURA_OLD_COUNT}曲）</div>
+                <div style="font-size: 12px; line-height: 1.4; color: #888;">${escapeHtml(note + extraNote)}</div>
             </div>
             <div style="text-align: right; color: #555; font-size: 14px; line-height: 1.6; flex-shrink: 0;">
                 <div>作成日 ${dateText}</div>
@@ -412,12 +413,19 @@ function buildPokkuraRoot(pk) {
         const ordered = [];
         for (let i = 0; i < list.length; i += COLS) ordered.push(...list.slice(i, i + COLS).reverse());
         let cells = '';
-        ordered.forEach(({ song, point, score, isVersion }) => {
+        ordered.forEach(({ song, extra, point, score, isVersion }) => {
+            // Lv45 以下の新曲（アプリの曲ではない）は、バナーの代わりに曲名・ジャンルの文字の枠
+            const bannerHtml = extra
+                ? `<div style="width: 168px; height: 42px; border-radius: 3px; box-sizing: border-box; background: #5d4037; color: #fff; padding: 2px 6px 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; overflow: hidden;">
+                        <div style="font-size: 11px; line-height: 1.15; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;">${escapeHtml(extra.title)}</div>
+                        <div style="font-size: 9px; line-height: 1.15; opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;">${escapeHtml(extra.genre)}</div>
+                   </div>`
+                : buildBannerBoxHtml(song, 168, 42);
             cells += `<div style="display: flex; align-items: center; gap: 6px;">
-                ${buildMedalBoxHtml(clearRecords[song.id] || '')}
+                ${buildMedalBoxHtml(extra ? extra.medal : (clearRecords[song.id] || ''))}
                 <div style="position: relative; width: 168px; height: 42px; flex-shrink: 0;">
-                    ${buildBannerBoxHtml(song, 168, 42)}
-                    ${badge('left: 2px; top: 2px;', 'rgba(255,255,255,0.88)', '#333', 10, escapeHtml(song.level))}
+                    ${bannerHtml}
+                    ${badge('left: 2px; top: 2px;', 'rgba(255,255,255,0.88)', '#333', 10, escapeHtml(extra ? extra.level : song.level))}
                     ${badge('left: 2px; bottom: 2px;', isVersion ? 'rgba(123,31,162,0.88)' : 'rgba(0,0,0,0.72)', '#fff', 11, score)}
                     ${badge('right: 2px; bottom: 2px;', '#d82f66', '#fff', 12, pkFloor(point / 60, 3).toFixed(3))}
                 </div>
