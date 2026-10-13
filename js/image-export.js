@@ -373,6 +373,82 @@ async function generateDiffTableImage() {
     await outputExportImage(root, `popn_difftable_${currentUser}_Lv${fileLevel}_${exportDateStr()}.png`, btn, originalText);
 }
 
+// ==========================================
+// ★ ポックラ画像（ポックラの計算に入っている曲だけ：新曲 上位20・旧曲 上位40）
+// ==========================================
+function buildPokkuraRoot(pk) {
+    const COLS = 5;
+    const root = createExportRoot();
+    const now = new Date();
+    const dateText = `${now.getFullYear()}.${now.getMonth() + 1}.${now.getDate()}`;
+    const note = pk.version
+        ? `旧曲は公式データ取り込み（${formatPokkuraDate(pk.version.at)}）の今作スコアで計算`
+        : '旧曲は歴代ベストスコアで計算した目安';
+
+    let html = `
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 14px;">
+            <div style="background: #fff; border: 3px solid #d82f66; border-radius: 12px; padding: 8px 16px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0;">
+                <div style="font-size: 14px; line-height: 1; font-weight: bold; color: #d82f66; letter-spacing: 1px;">ポックラ</div>
+                <div style="font-size: 38px; line-height: 1; font-weight: bold; color: #333; margin-top: 6px;">${pk.total.toFixed(2)}</div>
+            </div>
+            <div style="flex: 1; text-align: center;">
+                <div style="font-size: 28px; line-height: 1.2; font-weight: bold; color: #d82f66;">pop'n music ポックラ対象曲</div>
+                <div style="font-size: 15px; line-height: 1.4; color: #555; margin-top: 4px;">新曲 ${pk.newPoint.toFixed(2)}（${pk.topNew.length}/${POKKURA_NEW_COUNT}曲） ＋ 旧曲 ${pk.oldPoint.toFixed(2)}（${pk.topOld.length}/${POKKURA_OLD_COUNT}曲）</div>
+                <div style="font-size: 12px; line-height: 1.4; color: #888;">${escapeHtml(note)}</div>
+            </div>
+            <div style="text-align: right; color: #555; font-size: 14px; line-height: 1.6; flex-shrink: 0;">
+                <div>作成日 ${dateText}</div>
+                <div style="font-weight: bold;">User: ${escapeHtml(currentUser)}</div>
+            </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 10px;">`;
+
+    const badge = (pos, bg, color, size, text) =>
+        `<div style="position: absolute; ${pos} padding: 1px 5px; border-radius: 4px; background: ${bg}; color: ${color}; font-size: ${size}px; line-height: 1.3; font-weight: bold;">${text}</div>`;
+
+    const section = (label, sub, color, list) => {
+        if (list.length === 0) return '';
+        // ポイントの高い順に1行ずつ区切って左右反転する（右上が最高）
+        const ordered = [];
+        for (let i = 0; i < list.length; i += COLS) ordered.push(...list.slice(i, i + COLS).reverse());
+        let cells = '';
+        ordered.forEach(({ song, point, score, isVersion }) => {
+            cells += `<div style="display: flex; align-items: center; gap: 6px;">
+                ${buildMedalBoxHtml(clearRecords[song.id] || '')}
+                <div style="position: relative; width: 168px; height: 42px; flex-shrink: 0;">
+                    ${buildBannerBoxHtml(song, 168, 42)}
+                    ${badge('left: 2px; top: 2px;', 'rgba(255,255,255,0.88)', '#333', 10, escapeHtml(song.level))}
+                    ${badge('left: 2px; bottom: 2px;', isVersion ? 'rgba(123,31,162,0.88)' : 'rgba(0,0,0,0.72)', '#fff', 11, score)}
+                    ${badge('right: 2px; bottom: 2px;', '#d82f66', '#fff', 12, pkFloor(point / 60, 3).toFixed(3))}
+                </div>
+            </div>`;
+        });
+        return `<div style="display: flex; gap: 10px; align-items: stretch;">
+            <div style="width: 58px; flex-shrink: 0; background: ${color}; color: #fff; font-weight: bold; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.25);">
+                <div style="font-size: 14px; line-height: 1;">${label}</div><div style="font-size: 11px; line-height: 1; margin-top: 4px;">${sub}</div>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(${COLS}, 216px); gap: 8px 12px; align-content: center;">${cells}</div>
+        </div>`;
+    };
+    html += section('新曲', `上位${POKKURA_NEW_COUNT}`, '#d82f66', pk.topNew);
+    html += section('旧曲', `上位${POKKURA_OLD_COUNT}`, '#7b1fa2', pk.topOld);
+    html += `</div>`;
+    root.innerHTML = html;
+    return root;
+}
+
+async function generatePokkuraImage() {
+    const btn = document.getElementById('btn-pokkura-image');
+    const pk = calcPokkura();
+    if (pk.topNew.length + pk.topOld.length === 0) {
+        alert('ポックラの対象曲（新曲 Lv46〜49・旧曲 Lv48〜50）にスコアがありません。');
+        return;
+    }
+    const originalText = await prepareExport(btn);
+    if (originalText === null) return;
+    await outputExportImage(buildPokkuraRoot(pk), `popn_pokkura_${currentUser}_${exportDateStr()}.png`, btn, originalText);
+}
+
 // ---------- PC版：複数レベルをまとめて作成 ----------
 function openDiffLevelModal() {
     toggleMenu(false);
