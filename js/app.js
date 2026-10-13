@@ -49,4 +49,5 @@ window.onload = async () => {
             : 'データの読み込みに失敗しました。ページを再読み込みしてください。');
     }
     showLoading(false);
+    notifyEagateOpener(); // 公式サイトの「アプリに送る」から開かれたときは、データを受け取る
 };
