@@ -210,6 +210,10 @@
                                 <label class="check-label"><input type="checkbox" value="未設定" onchange="renderTable()"> 未設定(メモ無含む)</label>
                             </div>
                         </details>
+                        <details class="filter-group filter-sub-details">
+                            <summary class="filter-group-title">スコアランク<span id="filter-rank-count" class="filter-count"></span></summary>
+                            <div class="filter-checks" id="filter-rank"></div>
+                        </details>
                         <div class="filter-group-footer">
                             <span class="filter-hint">何も選ばない項目は「すべて」になります</span>
                             <button onclick="resetFilters()" style="padding: 4px 12px; background: #eee; border: 1px solid #ccc;">リセット</button>
@@ -229,6 +233,7 @@
                     <label><input type="checkbox" id="show-unreleased" onchange="renderTable()" style="margin:0;"> 未解禁を含む</label>
                     <label><input type="checkbox" id="show-diff-stats" onchange="renderTable(); toggleMenu(false);" style="margin:0;"> 難易度別</label>
                     <label><input type="checkbox" id="show-medal-stats" onchange="renderTable(); toggleMenu(false);" style="margin:0;"> メダル内訳</label>
+                    <label><input type="checkbox" id="show-score-stats" onchange="renderTable(); toggleMenu(false);" style="margin:0;"> スコア内訳</label>
                 </div>
             </section>
 
