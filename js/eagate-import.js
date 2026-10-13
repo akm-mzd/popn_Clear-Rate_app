@@ -118,7 +118,13 @@ function parseEagatePayload(text) {
         const level = Number.isInteger(c.l) ? c.l : null;
         const diff = ['E', 'N', 'H', 'EX'].includes(c.d) ? c.d : '';
         if (!medal && score === null) return;
-        charts.push({ title: c.t.slice(0, 300), genre: typeof c.g === 'string' ? c.g.slice(0, 300) : '', diff, level, medal, score });
+        const chart = { title: c.t.slice(0, 300), genre: typeof c.g === 'string' ? c.g.slice(0, 300) : '', diff, level, medal, score };
+        // ポックラ用：旧曲の今作スコア・メダル（あれば）
+        if (Number.isInteger(c.vs) && c.vs >= 0 && c.vs <= 100000) {
+            chart.versionScore = c.vs;
+            chart.versionMedal = typeof c.vm === 'string' && MEDAL_TYPES[c.vm] ? c.vm : '';
+        }
+        charts.push(chart);
     });
     return { charts, at: typeof data.at === 'string' ? data.at : '' };
 }
@@ -279,7 +285,13 @@ function openEagateImportPreview(text) {
 
     const { pairs, unmatchedSongs, unmatchedCharts } = matchEagateCharts(parsed.charts);
     const changes = buildEagateChanges(pairs);
-    pendingEagateImport = { user: currentUser, changes };
+    // ポックラ用の今作スコア（旧曲）。曲IDごとに { s: スコア, m: メダル }
+    const versionRecords = {};
+    pairs.forEach(({ song, chart }) => {
+        if (chart.versionScore !== undefined) versionRecords[song.id] = { s: chart.versionScore, m: chart.versionMedal };
+    });
+    const versionCount = Object.keys(versionRecords).length;
+    pendingEagateImport = { user: currentUser, changes, versionRecords, at: parsed.at };
 
     const medalCount = changes.filter(c => c.newMedal !== null).length;
     const scoreCount = changes.filter(c => c.newScore !== null).length;
@@ -291,6 +303,7 @@ function openEagateImportPreview(text) {
         <div>公式の譜面 <b>${parsed.charts.length}</b> 件のうち、アプリの曲（Lv${EAGATE_MIN_LEVEL}〜${EAGATE_MAX_LEVEL}）と合ったもの <b>${pairs.length}</b> 件</div>
         <div>メダル更新 <b>${medalCount}</b> 件 / スコア更新 <b>${scoreCount}</b> 件</div>
         <div style="font-size:0.85em;color:#666;">※ メダルは上がるときだけ、スコアは高いときだけ更新します。</div>
+        ${versionCount > 0 ? `<div style="font-size:0.85em;color:#666;">ポックラ用に、旧曲 <b>${versionCount}</b> 曲の今作スコアも保存します（この端末に保存）。</div>` : ''}
     </div>`;
 
     if (changes.length > 0) {
@@ -319,7 +332,7 @@ function openEagateImportPreview(text) {
     document.getElementById('eagate-import-body').innerHTML = html;
     const applyBtn = document.getElementById('eagate-import-apply');
     applyBtn.textContent = `${currentUser} さんに反映`;
-    applyBtn.disabled = changes.length === 0;
+    applyBtn.disabled = changes.length === 0 && versionCount === 0;
     document.getElementById('eagate-import-modal').style.display = 'flex';
     return true;
 }
@@ -344,8 +357,30 @@ function applyEagateImport() {
     if (!allUsersData[currentUser]) allUsersData[currentUser] = emptyUser();
     allUsersData[currentUser].clearRecords = clearRecords;
     allUsersData[currentUser].scoreRecords = scoreRecords;
+    if (Object.keys(pending.versionRecords).length > 0) savePokkuraVersionRecords(currentUser, pending.versionRecords, pending.at);
     closeEagateImportModal();
-    scheduleAutoSave();
+    if (pending.changes.length > 0) scheduleAutoSave();
     renderTable();
     showToast('toast-eagate', `公式データを反映しました（${pending.changes.length}曲）`, '#4caf50', 3000);
+}
+
+// ---------- ポックラ用の今作スコア（旧曲）：この端末に、ユーザーごとに保存 ----------
+//   公式のポックラは旧曲を今作のスコアで数えるため、取り込んだときに保存しておく。
+//   クラウドには送らない（保存先の形を変えずに済むように、端末ごとの保存にしている）
+function pokkuraVersionKey(user) {
+    return 'popn_pokkura_version_' + user;
+}
+
+function savePokkuraVersionRecords(user, records, at) {
+    storageSet(pokkuraVersionKey(user), JSON.stringify({ at: at || new Date().toISOString(), records }));
+}
+
+// { at, records: { 曲ID: { s, m } } } か、なければ null
+function loadPokkuraVersionRecords(user) {
+    try {
+        const data = JSON.parse(storageGet(pokkuraVersionKey(user)) || 'null');
+        return data && typeof data.records === 'object' && data.records ? data : null;
+    } catch (e) {
+        return null;
+    }
 }
