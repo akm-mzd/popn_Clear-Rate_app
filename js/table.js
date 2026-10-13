@@ -892,7 +892,7 @@ function setLevelButtonPlacement(onMain) {
 // ==========================================
 // ★ 表示方法（リスト / 難易度表 / スコア表）
 // ==========================================
-const VIEW_MODES = ['list', 'grid', 'score'];
+const VIEW_MODES = ['list', 'grid', 'score', 'pokkura'];
 
 // 起動時の表示方法（メニューの「起動時の表示」で設定、この端末に保存）
 //   未設定なら、以前の「最後に選んだ表示方法」を引き継ぎ、それもなければ難易度表
@@ -946,12 +946,13 @@ function saveStartupSettings() {
     if (viewSelect) storageSet('popn_startup_view', VIEW_MODES.includes(viewSelect.value) ? viewSelect.value : 'grid');
 }
 
-// スコア表のボタンは、スコアを登録している人にだけ出す
+// スコアを使う表示（スコア表・ポックラ）のボタンは、スコアを登録している人にだけ出す
+const SCORE_VIEW_MODES = ['score', 'pokkura'];
 function updateViewModeButtons() {
     const scoreOk = hasAnyScore();
     document.querySelectorAll('#view-mode-switch button').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.mode === viewMode);
-        if (btn.dataset.mode === 'score') btn.style.display = scoreOk ? '' : 'none';
+        if (SCORE_VIEW_MODES.includes(btn.dataset.mode)) btn.style.display = scoreOk ? '' : 'none';
     });
 }
 
@@ -959,7 +960,7 @@ function updateViewModeButtons() {
 //   表の行は難易度表のときも作っておく（表示曲画像がスコア・比較の文字を表の行から読むため）
 function applyViewMode(displaySongs) {
     // スコアがない人（ユーザーを切り替えたときなど）は、スコア表の代わりに難易度表にする
-    if (viewMode === 'score' && !hasAnyScore()) viewMode = 'grid';
+    if (SCORE_VIEW_MODES.includes(viewMode) && !hasAnyScore()) viewMode = 'grid';
     updateViewModeButtons();
     const capture = document.getElementById('capture-area');
     const grid = document.getElementById('diff-grid-view');
@@ -969,6 +970,7 @@ function applyViewMode(displaySongs) {
     grid.style.display = isGrid ? '' : 'none';
     if (viewMode === 'grid') renderDiffGrid(displaySongs);
     else if (viewMode === 'score') renderScoreGrid(displaySongs);
+    else if (viewMode === 'pokkura') renderPokkuraGrid();
     else grid.innerHTML = '';
 }
 
@@ -1096,6 +1098,117 @@ function renderScoreGrid(targetSongs) {
                 <div class="dg-cells" style="grid-template-columns: repeat(${COLS}, minmax(0, 1fr));">${cells}</div>
             </div>`;
     });
+    grid.innerHTML = html;
+}
+
+// ---------- ポックラ（ポップンクラス） ----------
+// 計算は ssdh233/popn-class（ポックラ一覧スクリプト）と同じ式。
+//   1曲のポイント = level × (3750 × level + メダルボーナス + (スコア − 50000)) ÷ 3881250 × 60（スコア 50000 未満は 0）
+//   ポックラ = （新曲 Lv46〜49 の上位20曲 ＋ 旧曲 Lv48〜50 の上位40曲）のポイント合計 ÷ 60
+// ※ 公式は旧曲を「今作のスコア」で数えるが、このアプリには歴代ベストしかないので目安になる
+const POKKURA_MEDAL_BONUS = {
+    '金星': 21250,
+    '銀星': 17500, '銀菱': 17500, '銀丸': 17500,
+    '銅星': 12500, '銅菱': 12500, '銅丸': 12500,
+    'ロングオフ': 10000,
+    'イージー': 6250
+};
+const POKKURA_NEW_COUNT = 20;
+const POKKURA_OLD_COUNT = 40;
+
+const pkFloor = (n, p) => Math.floor(n * 10 ** p) / 10 ** p;
+const pkRound = (n, p) => Math.round(n * 10 ** p) / 10 ** p;
+
+function calcPokkuraPoint(level, score, medalKey) {
+    const s = parseInt(score, 10);
+    if (isNaN(s) || s < 50000) return 0;
+    const bonus = POKKURA_MEDAL_BONUS[medalKey] || 0;
+    return pkFloor(pkFloor((level * (3750 * level + bonus + (s - 50000))) / 3881250, 8) * 60, 2);
+}
+
+// 新曲（今作 = HC）は Lv46〜49、旧曲は Lv48〜50 が対象
+function getPokkuraGroup(song) {
+    const lv = parseInt(song.level, 10);
+    if (getVersionSortValue(song.version) === VERSION_ORDER_HC) return (lv >= 46 && lv <= 49) ? 'new' : null;
+    return (lv >= 48 && lv <= 50) ? 'old' : null;
+}
+
+function calcPokkura() {
+    const entries = { new: [], old: [] };
+    songs.forEach(song => {
+        const group = getPokkuraGroup(song);
+        if (!group) return;
+        const point = calcPokkuraPoint(parseInt(song.level, 10), scoreRecords[song.id], clearRecords[song.id] || '');
+        if (point > 0) entries[group].push({ song, point });
+    });
+    const byPoint = (a, b) => (b.point - a.point) || (a.song.originalOrder - b.song.originalOrder);
+    entries.new.sort(byPoint);
+    entries.old.sort(byPoint);
+    const sum = list => list.reduce((acc, e) => acc + e.point, 0);
+    const topNew = entries.new.slice(0, POKKURA_NEW_COUNT);
+    const topOld = entries.old.slice(0, POKKURA_OLD_COUNT);
+    return {
+        topNew, topOld,
+        restNew: entries.new.slice(POKKURA_NEW_COUNT),
+        restOld: entries.old.slice(POKKURA_OLD_COUNT),
+        newPoint: pkFloor(pkRound(sum(topNew), 8) / 60, 2),
+        oldPoint: pkFloor(pkRound(sum(topOld), 8) / 60, 2),
+        total: pkFloor(pkRound(sum(topNew) + sum(topOld), 8) / 60, 2)
+    };
+}
+
+function renderPokkuraGrid() {
+    const grid = document.getElementById('diff-grid-view');
+    const narrow = isNarrowScreen();
+    const COLS = narrow ? 2 : 5;
+    lastGridNarrow = narrow;
+    const pk = calcPokkura();
+
+    let html = `
+        <div class="pk-summary">
+            <div class="pk-total"><span class="pk-total-label">推定ポックラ</span><span class="pk-total-value">${pk.total.toFixed(2)}</span></div>
+            <div class="pk-parts">新曲 ${pk.newPoint.toFixed(2)}（${pk.topNew.length}/${POKKURA_NEW_COUNT}曲） ＋ 旧曲 ${pk.oldPoint.toFixed(2)}（${pk.topOld.length}/${POKKURA_OLD_COUNT}曲）</div>
+            <div class="pk-note">※ 歴代のベストスコア・メダルで計算した目安です（公式は旧曲を今作のスコアで計算します）。表示レベル・絞り込みに関係なく、新曲（HC）Lv46〜49・旧曲 Lv48〜50 から計算します。各曲の数字は、ポックラへの寄与（ポイント÷60）です。</div>
+        </div>`;
+
+    const section = (label, sub, color, list) => {
+        if (list.length === 0) return '';
+        // ポイントの高い順に1行ずつ区切って左右反転する（右上が最高）
+        const ordered = [];
+        for (let i = 0; i < list.length; i += COLS) ordered.push(...list.slice(i, i + COLS).reverse());
+        let cells = '';
+        ordered.forEach(({ song, point }) => {
+            const medalKey = clearRecords[song.id] || '';
+            const medalClass = medalKey === '' ? ' dg-medal-empty' : '';
+            const score = parseInt(scoreRecords[song.id], 10) || 0;
+            const bannerSrc = safeUrl(song.bannerUrl, true);
+            const bannerInner = bannerSrc
+                ? `<img src="${escapeHtml(bannerSrc)}" alt="${escapeHtml(song.title)}" loading="lazy">`
+                : `<span class="dg-banner-text">${escapeHtml(song.title)}</span>`;
+            const safeId = jsStringAttr(song.id);
+            cells += `
+                <div class="dg-cell">
+                    <button type="button" class="dg-medal${medalClass}" onclick="openMedalModal('${safeId}')" title="メダルを変更">${buildGridMedalInner(medalKey)}</button>
+                    <div class="dg-banner-wrap">
+                        <a class="dg-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（Lv${escapeHtml(song.level)}・攻略wikiを開く）">${bannerInner}</a>
+                        <span class="pk-lv">${escapeHtml(song.level)}</span>
+                        <button type="button" class="dg-score pk-score" onclick="openScoreModal('${safeId}')" title="スコアを変更">${score}</button>
+                        <span class="pk-point" title="ポイント ${point.toFixed(2)}">${pkFloor(point / 60, 3).toFixed(3)}</span>
+                    </div>
+                </div>`;
+        });
+        return `
+            <div class="dg-row">
+                <div class="dg-label pk-label" style="background: ${color};"><span class="dg-label-cls">${label}</span><span class="pk-label-sub">${sub}</span></div>
+                <div class="dg-cells" style="grid-template-columns: repeat(${COLS}, minmax(0, 1fr));">${cells}</div>
+            </div>`;
+    };
+
+    html += section('新曲', `上位${POKKURA_NEW_COUNT}`, '#d82f66', pk.topNew);
+    html += section('旧曲', `上位${POKKURA_OLD_COUNT}`, '#7b1fa2', pk.topOld);
+    html += section('新曲', '圏外', '#c48a9b', pk.restNew);
+    html += section('旧曲', '圏外', '#a58bb3', pk.restOld);
+    if (pk.topNew.length + pk.topOld.length === 0) html += '<div class="dg-empty">対象の曲（新曲 Lv46〜49・旧曲 Lv48〜50）にスコアがありません</div>';
     grid.innerHTML = html;
 }
 
