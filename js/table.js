@@ -214,7 +214,7 @@ function updateSortHeaders() {
 }
 
 // バージョンの並び順を数値にする（小さいほど上）
-//   AC(1〜20) → sp〜jf → HC → 未登録の新しいバージョン → CS・PMP・EE（一番下に固定）
+//   AC(1〜20) → sp〜jf → HC → 未登録の新しいバージョン → 家庭用 CS・PMP・EE（一番下に固定）
 const VERSION_ORDER_AC_NAMED = { 'sp': 21, 'lt': 22, 'écl': 23, 'うさ': 24, 'pe': 25, '解': 26, 'ul': 27, 'jf': 28 };
 const VERSION_ORDER_HC = 400;
 const VERSION_ORDER_NEW = 500;     // 上の表にない新しいバージョンは HC の下
@@ -228,11 +228,12 @@ function getVersionSortValue(ver) {
     if (VERSION_ORDER_AC_NAMED[v] !== undefined) return VERSION_ORDER_AC_NAMED[v];
     if (v === 'hc') return VERSION_ORDER_HC;
 
-    // CS系（例: cs4, pmp2, ee, ee2）は番号順に一番下へ
-    const consumer = v.match(/^(cs|pmp|ee)(\d*)$/);
+    // 家庭用（CS系。例: CSBest, CS4, CS14, PMP2, ee, ee2）は番号順に一番下へ。
+    //   ポックラの新曲枠（AC の最新版）にもならない。曲データの「SC6」は CS6 の書き間違いとして扱う
+    const consumer = v.match(/^(cs|sc|pmp|ee)\s*(best|\d*)$/);
     if (consumer) {
-        const groupBase = { cs: 0, pmp: 100, ee: 200 }[consumer[1]];
-        const num = consumer[2] === '' ? 0 : parseInt(consumer[2], 10);
+        const groupBase = { cs: 0, sc: 0, pmp: 100, ee: 200 }[consumer[1]];
+        const num = consumer[2] === '' ? 0 : (consumer[2] === 'best' ? 1 : parseInt(consumer[2], 10));
         return VERSION_ORDER_CS + groupBase + num;
     }
     return VERSION_ORDER_NEW;
