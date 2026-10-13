@@ -141,6 +141,7 @@
                         <div id="view-mode-switch" role="group" aria-label="表示方法">
                             <button type="button" data-mode="list" onclick="setViewMode('list')">リスト</button>
                             <button type="button" data-mode="grid" onclick="setViewMode('grid')">難易度表</button>
+                            <button type="button" data-mode="score" onclick="setViewMode('score')" style="display: none;">スコア表</button>
                         </div>
                     </div>
                 </div>
@@ -155,6 +156,7 @@
                             <select id="startup-view-mode" onchange="saveStartupSettings()">
                                 <option value="grid">難易度表</option>
                                 <option value="list">リスト</option>
+                                <option value="score">スコア表</option>
                             </select>
                         </label>
                     </div>

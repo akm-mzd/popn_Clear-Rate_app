@@ -161,7 +161,7 @@ function setRankFilter(filterVal) {
     let d = box.closest('details');
     while (d) { d.open = true; d = d.parentElement ? d.parentElement.closest('details') : null; }
     renderTable();
-    const tableElement = document.getElementById(viewMode === 'grid' ? 'diff-grid-view' : 'song-table');
+    const tableElement = document.getElementById(viewMode === 'list' ? 'song-table' : 'diff-grid-view');
     if (tableElement) {
         const y = tableElement.getBoundingClientRect().top + window.pageYOffset - 120;
         window.scrollTo({ top: y, behavior: 'smooth' });
@@ -257,7 +257,7 @@ function getBpmSortValue(bpmStr) {
 function getScoreRankInfo(score, isCleared) {
     if (score === undefined || score === null || score === '') return { rank: '', isImage: false, color: '#999' };
     const s = parseInt(score, 10);
-    if (isNaN(s)) return { rank: '', isImage: false, color: '#999' };
+    if (isNaN(s) || s <= 0) return { rank: '', isImage: false, color: '#999' }; // 0 は「なし」
 
     let rankKey = 'E';
     if (s >= 99000 && isCleared) rankKey = 'S+';
@@ -890,21 +890,28 @@ function setLevelButtonPlacement(onMain) {
 })();
 
 // ==========================================
-// ★ 表示方法（リスト / 難易度表）
+// ★ 表示方法（リスト / 難易度表 / スコア表）
 // ==========================================
+const VIEW_MODES = ['list', 'grid', 'score'];
+
 // 起動時の表示方法（メニューの「起動時の表示」で設定、この端末に保存）
 //   未設定なら、以前の「最後に選んだ表示方法」を引き継ぎ、それもなければ難易度表
 function getStartupViewMode() {
     const saved = storageGet('popn_startup_view') || storageGet('popn_view_mode');
-    return saved === 'list' ? 'list' : 'grid';
+    return VIEW_MODES.includes(saved) ? saved : 'grid';
 }
 
 let viewMode = getStartupViewMode();
-let lastGridNarrow = null; // 難易度表を描いたときの画面幅の区分（列数の切り替え用）
+let lastGridNarrow = null; // 難易度表・スコア表を描いたときの画面幅の区分（列数の切り替え用）
+
+// 今のユーザーが、スコアを1曲でも登録しているか（0 は登録なし扱い）
+function hasAnyScore() {
+    return Object.keys(scoreRecords).some(id => parseInt(scoreRecords[id], 10) > 0);
+}
 
 // 画面での切り替えは、そのときの表示だけを変える（次の起動時は「起動時の表示」の設定に従う）
 function setViewMode(mode) {
-    viewMode = mode === 'grid' ? 'grid' : 'list';
+    viewMode = VIEW_MODES.includes(mode) ? mode : 'list';
     toggleMenu(false);
     renderTable();
 }
@@ -936,26 +943,32 @@ function saveStartupSettings() {
     const levelSelect = document.getElementById('startup-level');
     const viewSelect = document.getElementById('startup-view-mode');
     if (levelSelect) storageSet('popn_startup_level', levelSelect.value);
-    if (viewSelect) storageSet('popn_startup_view', viewSelect.value === 'list' ? 'list' : 'grid');
+    if (viewSelect) storageSet('popn_startup_view', VIEW_MODES.includes(viewSelect.value) ? viewSelect.value : 'grid');
 }
 
+// スコア表のボタンは、スコアを登録している人にだけ出す
 function updateViewModeButtons() {
+    const scoreOk = hasAnyScore();
     document.querySelectorAll('#view-mode-switch button').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.mode === viewMode);
+        if (btn.dataset.mode === 'score') btn.style.display = scoreOk ? '' : 'none';
     });
 }
 
-// renderTable の最後に呼ばれる：表と難易度表のどちらを見せるかを切り替える
+// renderTable の最後に呼ばれる：表・難易度表・スコア表のどれを見せるかを切り替える
 //   表の行は難易度表のときも作っておく（表示曲画像がスコア・比較の文字を表の行から読むため）
 function applyViewMode(displaySongs) {
+    // スコアがない人（ユーザーを切り替えたときなど）は、スコア表の代わりに難易度表にする
+    if (viewMode === 'score' && !hasAnyScore()) viewMode = 'grid';
     updateViewModeButtons();
     const capture = document.getElementById('capture-area');
     const grid = document.getElementById('diff-grid-view');
     if (!capture || !grid) return;
-    const isGrid = viewMode === 'grid';
+    const isGrid = viewMode !== 'list';
     capture.style.display = isGrid ? 'none' : '';
     grid.style.display = isGrid ? '' : 'none';
-    if (isGrid) renderDiffGrid(displaySongs);
+    if (viewMode === 'grid') renderDiffGrid(displaySongs);
+    else if (viewMode === 'score') renderScoreGrid(displaySongs);
     else grid.innerHTML = '';
 }
 
@@ -1020,10 +1033,76 @@ function renderDiffGrid(targetSongs) {
     grid.innerHTML = html;
 }
 
+// ---------- スコア表 ----------
+// スコアランクごとの行（S+ → E、最後に「なし」）。行の中は、スコアの高い曲ほど上・右に来る（右上が最高）
+const SCORE_GRID_LABEL_COLORS = {
+    'S+': '#d4a106', 'S': '#e0b31a', 'AAA': '#e65100', 'AA+': '#ef6c00', 'AA': '#f57c00',
+    'A+': '#c62828', 'A': '#d32f2f', 'B+': '#1565c0', 'B': '#1976d2', 'C': '#2e7d32', 'D': '#558b2f', 'E': '#6d4c41'
+};
+
+function renderScoreGrid(targetSongs) {
+    const grid = document.getElementById('diff-grid-view');
+    const narrow = isNarrowScreen();
+    const COLS = narrow ? 2 : 5;
+    lastGridNarrow = narrow;
+
+    if (targetSongs.length === 0) {
+        grid.innerHTML = '<div class="dg-empty">表示する曲がありません</div>';
+        return;
+    }
+
+    const groups = {};
+    SCORE_RANK_KEYS.concat(SCORE_RANK_NONE).forEach(k => { groups[k] = []; });
+    targetSongs.forEach(song => groups[getSongScoreRank(song) || SCORE_RANK_NONE].push(song));
+
+    const scoreOf = song => parseInt(scoreRecords[song.id], 10) || 0;
+    const medalRankOf = song => (MEDAL_TYPES[clearRecords[song.id] || ''] || { rank: 0 }).rank;
+
+    let html = '';
+    SCORE_RANK_KEYS.concat(SCORE_RANK_NONE).forEach(k => {
+        const list = groups[k];
+        if (list.length === 0) return;
+        // 高い順（スコアなしはメダルの良い順）に並べ、1行ずつ区切って左右反転する
+        list.sort((a, b) => (scoreOf(b) - scoreOf(a)) || (medalRankOf(b) - medalRankOf(a)) || (a.originalOrder - b.originalOrder));
+        const ordered = [];
+        for (let i = 0; i < list.length; i += COLS) ordered.push(...list.slice(i, i + COLS).reverse());
+
+        let cells = '';
+        ordered.forEach(song => {
+            const medalKey = clearRecords[song.id] || '';
+            const medalClass = medalKey === '' ? ' dg-medal-empty' : '';
+            const score = scoreOf(song);
+            const bannerSrc = safeUrl(song.bannerUrl, true);
+            const bannerInner = bannerSrc
+                ? `<img src="${escapeHtml(bannerSrc)}" alt="${escapeHtml(song.title)}" loading="lazy">`
+                : `<span class="dg-banner-text">${escapeHtml(song.title)}</span>`;
+            const safeId = jsStringAttr(song.id);
+            cells += `
+                <div class="dg-cell">
+                    <button type="button" class="dg-medal${medalClass}" onclick="openMedalModal('${safeId}')" title="メダルを変更">${buildGridMedalInner(medalKey)}</button>
+                    <div class="dg-banner-wrap">
+                        <a class="dg-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（攻略wikiを開く）">${bannerInner}</a>
+                        <button type="button" class="dg-score${score ? '' : ' dg-score-none'}" onclick="openScoreModal('${safeId}')" title="スコアを変更">${score ? score : '-'}</button>
+                    </div>
+                </div>`;
+        });
+
+        const labelHtml = k === SCORE_RANK_NONE
+            ? '<span class="dg-label-idx sg-label-none">なし</span>'
+            : `<img class="sg-rank-img" src="${escapeHtml(RANK_IMAGES[k])}" alt="${k}" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><span class="dg-label-idx" style="display:none;">${k}</span>`;
+        html += `
+            <div class="dg-row">
+                <div class="dg-label sg-label" style="background: ${SCORE_GRID_LABEL_COLORS[k] || '#9e9e9e'};">${labelHtml}<span class="sg-count">${list.length}曲</span></div>
+                <div class="dg-cells" style="grid-template-columns: repeat(${COLS}, minmax(0, 1fr));">${cells}</div>
+            </div>`;
+    });
+    grid.innerHTML = html;
+}
+
 // 画面幅がPCとスマホの境目をまたいだら、列の数が変わるので描き直す
 let gridResizeTimer = null;
 window.addEventListener('resize', () => {
-    if (viewMode !== 'grid') return;
+    if (viewMode === 'list') return;
     clearTimeout(gridResizeTimer);
     gridResizeTimer = setTimeout(() => {
         if (lastGridNarrow !== null && lastGridNarrow !== isNarrowScreen()) renderTable();
