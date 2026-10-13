@@ -85,13 +85,26 @@ function historyScoreHtml(os, ns) {
     return `<span class="hist-score">${os} → <span class="hist-diff ${diff >= 0 ? 'up' : 'down'}">(${diffText})</span> <b>${ns}</b></span>`;
 }
 
+// 履歴を1件消す（曲のメダル・スコアはそのまま）。消したことは自動保存でクラウドにも反映される
+function deleteHistoryEntry(key) {
+    const records = getHistoryRecords();
+    if (!records[key]) return;
+    if (!confirm('この履歴を削除しますか？\n（曲のメダル・スコアは変わりません）')) return;
+    delete records[key];
+    scheduleAutoSave();
+    const body = document.getElementById('history-modal-body');
+    const scrollTop = body.scrollTop;
+    renderHistoryModal();
+    body.scrollTop = scrollTop;
+}
+
 const HISTORY_WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
 function renderHistoryModal() {
     const records = getHistoryRecords();
-    const list = Object.keys(records).map(k => records[k])
-        .filter(e => e && typeof e.t === 'number')
-        .sort((a, b) => b.t - a.t);
+    const list = Object.keys(records).map(k => ({ key: k, e: records[k] }))
+        .filter(x => x.e && typeof x.e.t === 'number')
+        .sort((a, b) => b.e.t - a.e.t);
     document.getElementById('history-modal-title').textContent = `📜 ${currentUser} さんの更新履歴（${list.length}件）`;
 
     const body = document.getElementById('history-modal-body');
@@ -102,7 +115,7 @@ function renderHistoryModal() {
 
     let html = '';
     let lastDay = '';
-    list.slice(0, historyShowCount).forEach(e => {
+    list.slice(0, historyShowCount).forEach(({ key, e }) => {
         const d = new Date(e.t);
         const day = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}（${HISTORY_WEEKDAYS[d.getDay()]}）`;
         if (day !== lastDay) {
@@ -120,6 +133,7 @@ function renderHistoryModal() {
                     <span class="hist-src ${e.src === 'e' ? 'eagate' : 'manual'}">${e.src === 'e' ? '公式' : '手動'}</span>
                     <span class="level-badge">${escapeHtml(e.lv)}</span>
                     <span class="hist-title">${escapeHtml(e.ti)}</span>
+                    <button type="button" class="hist-delete" onclick="deleteHistoryEntry('${jsStringAttr(key)}')" title="この履歴を削除" aria-label="この履歴を削除">✕</button>
                 </div>
                 <div class="hist-body">${parts.join('')}</div>
             </div>`;
