@@ -144,6 +144,21 @@
                         </div>
                     </div>
                 </div>
+                <!-- 起動時の表示（メニューの中だけ。この端末に保存） -->
+                <div class="startup-view-settings">
+                    <div class="startup-view-title">起動時の表示 <span>（この端末に保存）</span></div>
+                    <div class="startup-view-fields">
+                        <label>レベル
+                            <select id="startup-level" onchange="saveStartupSettings()"></select>
+                        </label>
+                        <label>表示方法
+                            <select id="startup-view-mode" onchange="saveStartupSettings()">
+                                <option value="grid">難易度表</option>
+                                <option value="list">リスト</option>
+                            </select>
+                        </label>
+                    </div>
+                </div>
             </section>
 
             <!-- ③ 検索（検索・ランダムセレクト・絞り込み） -->

@@ -10,7 +10,7 @@
 //   小数第2位: UI・操作感の変更 / 小数第3位: バグ修正
 //   ※ 変更を加えるたびに必ず更新する（CLAUDE.md 参照）
 // ==========================================
-const APP_VERSION = '1.210';
+const APP_VERSION = '1.300';
 
 // ==========================================
 // ★ 端末の判定（スマホ表示に切り替える画面幅）
@@ -94,7 +94,7 @@ const MEDAL_COLORS = {
 let currentMedalEditId = null;
 let currentSort = isNarrowScreen() ? 'diff' : 'version';
 let sortDesc = isNarrowScreen();
-let currentViewLevel = '48';
+let currentViewLevel = storageGet('popn_startup_level') || '48'; // 起動時のレベル（メニューで設定、この端末に保存）
 let lastDisplaySongs = []; // 現在テーブルに表示中の楽曲（難易度順画像で使用）
 
 
