@@ -631,3 +631,4 @@ body.exporting-image #back-to-top { display: none !important; }
 .eagate-help-title { font-weight: bold; margin: 10px 0 4px; color: #c2185b; }
 .eagate-help textarea { display: block; width: 100%; height: 70px; box-sizing: border-box; margin: 8px 0; font-size: 11px; }
 .eagate-bookmarklet-link { display: inline-block; margin-top: 4px; padding: 6px 12px; border-radius: 16px; background: #e91e63; color: #fff !important; font-weight: bold; text-decoration: none; cursor: grab; }
+.eagate-how { font-size: 0.8em; color: #e65100; white-space: nowrap; }
