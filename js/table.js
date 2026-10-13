@@ -9,7 +9,17 @@
 //   何もチェックしていない項目は「すべて」。
 //   同じ項目の中は「どれか」（OR）、違う項目どうしは「すべて」（AND）で絞り込む。
 // ==========================================
-const FILTER_IDS = ['filter-medal', 'filter-version', 'filter-diff', 'filter-affinity'];
+const FILTER_IDS = ['filter-medal', 'filter-version', 'filter-diff', 'filter-affinity', 'filter-rank'];
+
+// スコアランク（高い順）と、スコア未登録を表す値
+const SCORE_RANK_KEYS = Object.keys(RANK_IMAGES);
+const SCORE_RANK_NONE = 'none';
+
+// 曲のスコアランク（スコア未登録なら ''）。クリアしていないと AA 以上にならない
+function getSongScoreRank(song) {
+    const medalInfo = MEDAL_TYPES[clearRecords[song.id] || ''];
+    return getScoreRankInfo(scoreRecords[song.id], !!(medalInfo && medalInfo.isEasyClear)).rank;
+}
 
 // チェックされている値の一覧
 function getFilterValues(id) {
@@ -58,6 +68,7 @@ function updateFilterSummaryCount() {
     setCount('filter-summary-count', countActiveFilters());
     setCount('filter-version-count', getFilterValues('filter-version').length);
     setCount('filter-affinity-count', getFilterValues('filter-affinity').length);
+    setCount('filter-rank-count', getFilterValues('filter-rank').length);
 }
 
 function initFilters() {
@@ -67,6 +78,10 @@ function initFilters() {
         .map(k => ({ value: k, label: MEDAL_TYPES[k].label }));
     medalItems.push({ value: 'unplayed', label: '未プレイ' });
     buildFilterChecks('filter-medal', medalItems);
+
+    const rankItems = SCORE_RANK_KEYS.map(k => ({ value: k, label: k }));
+    rankItems.push({ value: SCORE_RANK_NONE, label: 'スコアなし' });
+    buildFilterChecks('filter-rank', rankItems);
 
     updateDynamicFilters();
 }
@@ -134,6 +149,22 @@ function setMedalFilter(filterVal) {
             const y = tableElement.getBoundingClientRect().top + window.pageYOffset - 120;
             window.scrollTo({top: y, behavior: 'smooth'});
         }
+    }
+}
+
+// スコア内訳のタイルから呼ばれる：そのランクだけで絞り込む（'ALL' で解除）
+function setRankFilter(filterVal) {
+    const box = document.getElementById('filter-rank');
+    if (!box) return;
+    setFilterValues('filter-rank', filterVal === 'ALL' ? [] : [filterVal]);
+    // 絞り込みの欄と、スコアランクの折りたたみを開く
+    let d = box.closest('details');
+    while (d) { d.open = true; d = d.parentElement ? d.parentElement.closest('details') : null; }
+    renderTable();
+    const tableElement = document.getElementById(viewMode === 'grid' ? 'diff-grid-view' : 'song-table');
+    if (tableElement) {
+        const y = tableElement.getBoundingClientRect().top + window.pageYOffset - 120;
+        window.scrollTo({ top: y, behavior: 'smooth' });
     }
 }
 
@@ -266,7 +297,8 @@ function renderTable() {
     const filterVersions = getFilterValues('filter-version');
     const filterDiffs = getFilterValues('filter-diff');
     const filterAffinities = getFilterValues('filter-affinity');
-    const isFiltered = filterMedals.length + filterVersions.length + filterDiffs.length + filterAffinities.length > 0;
+    const filterRanks = getFilterValues('filter-rank');
+    const isFiltered = filterMedals.length + filterVersions.length + filterDiffs.length + filterAffinities.length + filterRanks.length > 0;
     updateFilterSummaryCount();
 
     const showUnreleased = document.getElementById('show-unreleased') ? document.getElementById('show-unreleased').checked : false;
@@ -315,6 +347,8 @@ function renderTable() {
             const aff = memo.affinity || '未設定';
             if (!filterAffinities.includes(aff)) return false;
         }
+
+        if (filterRanks.length > 0 && !filterRanks.includes(getSongScoreRank(s) || SCORE_RANK_NONE)) return false;
         return true;
     });
     if (currentSort === 'clear') {
@@ -410,6 +444,12 @@ function renderTable() {
         medalCounts[k] = 0;
     });
 
+    // スコア内訳（ランクごとの曲数・登録したスコアの合計）
+    const rankCounts = {};
+    SCORE_RANK_KEYS.forEach(k => { rankCounts[k] = 0; });
+    rankCounts[SCORE_RANK_NONE] = 0;
+    let scoreSum = 0, scoreCount = 0;
+
     let diffStats = {
         '危険': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 },
         '別格': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 },
@@ -462,6 +502,10 @@ function renderTable() {
                 normalClearCount++;
                 diffStats[dClass].normal++;
             }
+
+            const rank = getSongScoreRank(song);
+            rankCounts[rank || SCORE_RANK_NONE]++;
+            if (rank) { scoreSum += parseInt(scoreRecords[song.id], 10); scoreCount++; }
         }
     });
 
@@ -634,6 +678,7 @@ function renderTable() {
     const showNormalRate = document.getElementById('show-normal-rate') ? document.getElementById('show-normal-rate').checked : true;
     const showMedalStats = document.getElementById('show-medal-stats') ? document.getElementById('show-medal-stats').checked : false;
     const showDiffStats = document.getElementById('show-diff-stats') ? document.getElementById('show-diff-stats').checked : false;
+    const showScoreStats = document.getElementById('show-score-stats') ? document.getElementById('show-score-stats').checked : false;
 
     let statsHtml = `<div style="display: flex; flex-wrap: wrap; gap: 15px; width: 100%; justify-content: flex-end; align-items: baseline;">
         <div class="stats-level">【${escapeHtml(levelLabel)}】</div>`;
@@ -674,7 +719,7 @@ function renderTable() {
 
     let extendedStatsHtml = '';
 
-    if (showMedalStats || showDiffStats) {
+    if (showMedalStats || showDiffStats || showScoreStats) {
         extendedStatsHtml += `<div style="width: 100%; padding: 15px; background: #f1f8ff; border-radius: 6px; border: 1px solid #e3f2fd; box-sizing: border-box;">`;
         
         if (showMedalStats) {
@@ -794,6 +839,27 @@ function renderTable() {
             });
             extendedStatsHtml += `</div>`;
         }
+
+        if (showScoreStats) {
+            const avg = scoreCount > 0 ? Math.round(scoreSum / scoreCount) : null;
+            extendedStatsHtml += `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; ${showMedalStats || showDiffStats ? 'border-top: 1px dashed #ccc; padding-top: 10px; margin-top: 15px;' : ''}">
+                    <div style="font-weight: bold; color: #555; font-size: 0.9em;">🔢 スコア内訳 <span style="font-weight: normal; color: #666;">（登録 ${scoreCount} / ${rateTotal}曲${avg !== null ? `・平均 ${avg}` : ''}）</span></div>
+                    ${filterRanks.length > 0 ? `<button onclick="setRankFilter('ALL')" style="padding: 4px 10px; font-size: 0.85em; cursor: pointer; border: 1px solid #ffcdd2; background: #ffebee; color: #d32f2f; border-radius: 4px; font-weight: bold;">✖ ランク絞り込み解除</button>` : ''}
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(55px, 1fr)); gap: 6px;">`;
+            SCORE_RANK_KEYS.concat(SCORE_RANK_NONE).forEach(k => {
+                const iconHtml = k === SCORE_RANK_NONE
+                    ? `<div style="font-weight: bold; color: #888; font-size: 0.7em; height: 26px; display: flex; align-items: center;">なし</div>`
+                    : `<img src="${RANK_IMAGES[k]}" alt="${k}" style="height: 26px; max-width: 50px; object-fit: contain; margin-bottom: 2px;">`;
+                extendedStatsHtml += `
+                    <div onclick="setRankFilter('${k}')" title="クリックしてこのランクで絞り込む" style="cursor: pointer; background: #fff; padding: 6px 2px; border-radius: 4px; border: 1px solid #ddd; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05);" onmouseover="this.style.background='#f0f8ff'; this.style.borderColor='#2196F3'" onmouseout="this.style.background='#fff'; this.style.borderColor='#ddd'">
+                    ${iconHtml}
+                    <span style="color: #333; font-weight: bold; font-size: 1.1em; line-height: 1;">${rankCounts[k]}</span>
+                    </div>`;
+            });
+            extendedStatsHtml += `</div>`;
+        }
         extendedStatsHtml += `</div>`;
     }
     
@@ -905,6 +971,7 @@ function buildGridMedalInner(medalKey) {
 
 function renderDiffGrid(targetSongs) {
     const grid = document.getElementById('diff-grid-view');
+    const showScore = document.getElementById('show-score-col').checked; // スコア表示中は、メダルの上にスコアランクを重ねる
     const narrow = isNarrowScreen();
     const COLS = narrow ? 2 : 5;
     lastGridNarrow = narrow;
@@ -931,13 +998,15 @@ function renderDiffGrid(targetSongs) {
         ordered.forEach(song => {
             const medalKey = clearRecords[song.id] || '';
             const medalClass = medalKey === '' ? ' dg-medal-empty' : '';
+            const rank = showScore ? getSongScoreRank(song) : '';
+            const rankHtml = rank ? `<img class="dg-rank" src="${escapeHtml(RANK_IMAGES[rank])}" alt="${escapeHtml(rank)}" loading="lazy">` : '';
             const bannerSrc = safeUrl(song.bannerUrl, true);
             const bannerInner = bannerSrc
                 ? `<img src="${escapeHtml(bannerSrc)}" alt="${escapeHtml(song.title)}" loading="lazy">`
                 : `<span class="dg-banner-text">${escapeHtml(song.title)}</span>`;
             cells += `
                 <div class="dg-cell">
-                    <button type="button" class="dg-medal${medalClass}" onclick="openMedalModal('${jsStringAttr(song.id)}')" title="メダルを変更">${buildGridMedalInner(medalKey)}</button>
+                    <button type="button" class="dg-medal${medalClass}" onclick="openMedalModal('${jsStringAttr(song.id)}')" title="メダルを変更">${buildGridMedalInner(medalKey)}${rankHtml}</button>
                     <a class="dg-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（攻略wikiを開く）">${bannerInner}</a>
                 </div>`;
         });
