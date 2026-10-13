@@ -76,6 +76,8 @@ function updateDynamicFilters() {
         .sort((a, b) => getVersionSortValue(a) - getVersionSortValue(b));
     buildFilterChecks('filter-version', versions.map(v => ({ value: v, label: v })));
 
+    updateStartupSettingsUI();
+
     const viewLevelContainer = document.getElementById('view-level-buttons');
     if (viewLevelContainer) {
         viewLevelContainer.innerHTML = '';
@@ -88,7 +90,8 @@ function updateDynamicFilters() {
         
         const levels = getSortedLevels();
         
-        if (currentViewLevel !== 'ALL' && !levels.includes(currentViewLevel)) {
+        // データにないレベルなら「すべて」にする（曲データが届く前の空の状態では戻さない）
+        if (levels.length > 0 && currentViewLevel !== 'ALL' && !levels.includes(currentViewLevel)) {
             currentViewLevel = 'ALL';
             allBtn.classList.add('active');
         }
@@ -823,14 +826,51 @@ function setLevelButtonPlacement(onMain) {
 // ==========================================
 // ★ 表示方法（リスト / 難易度表）
 // ==========================================
-let viewMode = storageGet('popn_view_mode') === 'list' ? 'list' : 'grid'; // 最初は「難易度表」
+// 起動時の表示方法（メニューの「起動時の表示」で設定、この端末に保存）
+//   未設定なら、以前の「最後に選んだ表示方法」を引き継ぎ、それもなければ難易度表
+function getStartupViewMode() {
+    const saved = storageGet('popn_startup_view') || storageGet('popn_view_mode');
+    return saved === 'list' ? 'list' : 'grid';
+}
+
+let viewMode = getStartupViewMode();
 let lastGridNarrow = null; // 難易度表を描いたときの画面幅の区分（列数の切り替え用）
 
+// 画面での切り替えは、そのときの表示だけを変える（次の起動時は「起動時の表示」の設定に従う）
 function setViewMode(mode) {
     viewMode = mode === 'grid' ? 'grid' : 'list';
-    storageSet('popn_view_mode', viewMode);
     toggleMenu(false);
     renderTable();
+}
+
+// ---------- 起動時の表示（メニューの中だけにある設定） ----------
+function updateStartupSettingsUI() {
+    const levelSelect = document.getElementById('startup-level');
+    const viewSelect = document.getElementById('startup-view-mode');
+    if (!levelSelect || !viewSelect) return;
+
+    const savedLevel = storageGet('popn_startup_level') || '48';
+    const levels = getSortedLevels();
+    levelSelect.innerHTML = '';
+    const addOption = (value, text) => {
+        const opt = document.createElement('option');
+        opt.value = value;
+        opt.text = text;
+        levelSelect.appendChild(opt);
+    };
+    addOption('ALL', 'すべて');
+    levels.forEach(l => addOption(l, isNaN(parseInt(l, 10)) ? l : `Lv${l}`));
+    // データにないレベルが保存されていたら「すべて」を見せる（保存値はそのまま残す）
+    levelSelect.value = (savedLevel === 'ALL' || levels.includes(savedLevel)) ? savedLevel : 'ALL';
+
+    viewSelect.value = getStartupViewMode();
+}
+
+function saveStartupSettings() {
+    const levelSelect = document.getElementById('startup-level');
+    const viewSelect = document.getElementById('startup-view-mode');
+    if (levelSelect) storageSet('popn_startup_level', levelSelect.value);
+    if (viewSelect) storageSet('popn_startup_view', viewSelect.value === 'list' ? 'list' : 'grid');
 }
 
 function updateViewModeButtons() {

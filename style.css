@@ -594,3 +594,17 @@ body.exporting-image #back-to-top { display: none !important; }
     .dg-banner-text { font-size: 10px; }
 }
 
+/* =========================================
+    🚀 起動時の表示（メニューの「表示レベル・方法」の枠の中）
+    ========================================= */
+.startup-view-settings { border-top: 1px dashed #e0e0e0; padding-top: 8px; }
+.startup-view-title { font-size: 0.85em; font-weight: bold; color: #555; margin-bottom: 6px; }
+.startup-view-title span { font-weight: normal; color: #999; }
+.startup-view-fields { display: flex; flex-wrap: wrap; gap: 8px 14px; }
+.startup-view-fields label {
+    display: flex; align-items: center; gap: 6px; font-size: 0.85em; color: #555; flex: 1 1 140px;
+}
+.startup-view-fields select {
+    flex: 1; min-width: 0; padding: 4px 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.95em;
+}
+
