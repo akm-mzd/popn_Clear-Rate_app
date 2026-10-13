@@ -126,7 +126,7 @@ function parseEagatePayload(text) {
 function normalizeSongText(s) {
     return String(s || '').normalize('NFKC').toLowerCase()
         .replace(/[\s　]+/g, '')
-        .replace(/[~〜～∼˜]/g, '~')
+        .replace(/[~〜～∼˜\\＼]/g, '') // 波線は消す。公式で「～」が「＼」に化けている曲がある
         .replace(/[‐-―−－]/g, '-')
         .replace(/[‘’`´]/g, "'")
         .replace(/[“”]/g, '"');
@@ -137,7 +137,7 @@ function isEagateTargetSong(song) {
     return lv >= EAGATE_MIN_LEVEL && lv <= EAGATE_MAX_LEVEL;
 }
 
-// 公式の譜面を、アプリの曲に割り当てる。返り値 { pairs: [{ song, chart }], unmatchedSongs }
+// 公式の譜面を、アプリの曲に割り当てる。返り値 { pairs: [{ song, chart }], unmatchedSongs, unmatchedCharts }
 function matchEagateCharts(charts) {
     const targets = songs.filter(isEagateTargetSong);
     const byTitle = new Map();
@@ -189,7 +189,9 @@ function matchEagateCharts(charts) {
     const pairs = [];
     targets.forEach(s => { if (assigned.has(s.id)) pairs.push({ song: s, chart: assigned.get(s.id) }); });
     const unmatchedSongs = targets.filter(s => !assigned.has(s.id));
-    return { pairs, unmatchedSongs };
+    const usedCharts = new Set(assigned.values());
+    const unmatchedCharts = charts.filter(c => !usedCharts.has(c));
+    return { pairs, unmatchedSongs, unmatchedCharts };
 }
 
 // 「良くなったときだけ」の変更を作る
@@ -226,7 +228,7 @@ function openEagateImportPreview(text) {
         return false;
     }
 
-    const { pairs, unmatchedSongs } = matchEagateCharts(parsed.charts);
+    const { pairs, unmatchedSongs, unmatchedCharts } = matchEagateCharts(parsed.charts);
     const changes = buildEagateChanges(pairs);
     pendingEagateImport = { user: currentUser, changes };
 
@@ -257,6 +259,12 @@ function openEagateImportPreview(text) {
         const items = unmatchedSongs.map(s => `<li><span class="level-badge">${escapeHtml(s.level)}</span> ${escapeHtml(s.title)}</li>`).join('');
         html += `<details class="eagate-unmatched"><summary>公式データに見つからなかった曲（${unmatchedSongs.length}曲）</summary>
             <div style="font-size:0.8em;color:#666;">未プレイの曲か、公式と曲名の書き方が違う曲です。</div><ul>${items}</ul></details>`;
+    }
+
+    if (unmatchedCharts.length > 0) {
+        const items = unmatchedCharts.map(c => `<li>${c.level !== null ? `<span class="level-badge">${c.level}</span> ` : ''}${escapeHtml(c.title)} <span style="color:#888;">(${escapeHtml(c.genre)})</span></li>`).join('');
+        html += `<details class="eagate-unmatched"><summary>アプリの曲と合わなかった公式の譜面（${unmatchedCharts.length}件）</summary>
+            <div style="font-size:0.8em;color:#666;">アプリにない曲か、曲名・ジャンルの書き方が違う曲です。</div><ul>${items}</ul></details>`;
     }
 
     document.getElementById('eagate-import-body').innerHTML = html;

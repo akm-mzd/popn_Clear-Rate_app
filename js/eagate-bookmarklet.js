@@ -22,9 +22,10 @@
         a: '金星',
         b: '銀星', c: '銀菱', d: '銀丸',
         e: '銅星', f: '銅菱', g: '銅丸',
-        h: 'イージー',
-        i: '黒星', j: '黒菱', k: '黒丸',
-        l: '', none: ''
+        h: '黒星', i: '黒菱', j: '黒丸',
+        k: 'イージー',    // 緑
+        l: 'ロングオフ',  // オレンジ
+        none: ''
     };
     const MEDAL_IMG_RE = /meda_([a-z0-9]+)\.(?:png|gif|jpe?g|webp)/i;
 
@@ -117,7 +118,7 @@
         if (!charset) {
             // <meta charset> を見る（先頭だけを仮に読む）
             const head = new TextDecoder('ascii').decode(buf.slice(0, 2048));
-            charset = (head.match(/charset=["']?([\w-]+)/i) || [])[1] || document.characterSet || 'utf-8';
+            charset = (head.match(/charset=["']?([\w-]+)/i) || [])[1] || 'shift_jis'; // 公式は UTF-8 でなければ Shift_JIS
         }
         let text;
         try { text = new TextDecoder(charset).decode(buf); } catch (e) { text = new TextDecoder('utf-8').decode(buf); }
@@ -125,6 +126,50 @@
     }
 
     // ---------- 1ページ分の読み取り ----------
+    // レベル別一覧（mu_lv.html）の決まった形を読む。形が違えば null（汎用の parsePage に切り替える）
+    //   .mu_list_lv_table > li（見出しは li.st_th）
+    //   1列目：a = 曲名、1つ目の p = ジャンル / 4列目：p = スコア、1つ目の img = メダル、2つ目の img = ランク
+    function parseLevelPage(doc, diag, lv) {
+        const tables = doc.querySelectorAll('.mu_list_lv_table');
+        if (tables.length !== 1) return null;
+        const rows = Array.from(tables[0].querySelectorAll('li')).filter(li => !li.classList.contains('st_th'));
+        const charts = [];
+        let bad = 0;
+        rows.forEach(li => {
+            const music = li.children[0];
+            const result = li.children[3];
+            const link = music ? music.querySelector('a') : null;
+            const title = link ? clean(link.textContent) : '';
+            if (!title || !result) { bad++; return; }
+            const genreEl = music.querySelector('p');
+            const scoreEl = result.querySelector('p');
+            const medalImg = result.querySelector('img');
+            const score = scoreEl ? scoreFromText(scoreEl.textContent) : null;
+            let medal = '';
+            if (medalImg) {
+                const m = (medalImg.getAttribute('src') || '').match(MEDAL_IMG_RE);
+                const code = m ? m[1].toLowerCase() : '';
+                if (!(code in MEDAL_FILES)) {
+                    diag.unknownMedals[code || '?'] = (diag.unknownMedals[code || '?'] || 0) + 1;
+                    return;
+                }
+                medal = MEDAL_FILES[code];
+            }
+            if (!medal && score === null) return; // 未プレイ
+            const chart = { t: title, g: genreEl ? clean(genreEl.textContent) : '', d: '', m: medal, l: lv };
+            if (score !== null) chart.s = score;
+            charts.push(chart);
+        });
+        diag.badRows += bad;
+        return { rows: rows.length, bad, charts, firstTitle: rows.length ? clean(rows[0].textContent).slice(0, 80) : '' };
+    }
+
+    // ページ数（ページ送りの #s_page の数）。分からなければ null
+    function getPageCount(doc) {
+        const pager = doc.getElementById('s_page');
+        return pager && pager.children.length > 0 ? pager.children.length : null;
+    }
+
     // 行の中で、el を含む「列」（行の直接の子）を返す
     function cellOf(row, el) {
         let cur = el;
@@ -295,25 +340,30 @@
 
         const diag = { unknownMedals: {}, positional: 0, badRows: 0, multiInLevelPage: 0 };
         const charts = [];
-        const levelCounts = {};
+        const levelCounts = {}; // Lv → { rows: 行の数, bad: 読めなかった行, played: プレー済みの譜面 }
         let firstDoc = null, firstUrl = '', pages = 0;
         try {
-            // Lv46〜50 のレベル別一覧だけを、レベルごとに最後のページまで読む
+            // Lv46〜50 のレベル別一覧だけを、レベルごとに全ページ読む
             for (let lv = MIN_LEVEL; lv <= MAX_LEVEL; lv++) {
                 let lastSig = null;
-                levelCounts[lv] = 0;
+                let pageCount = null; // 0ページ目の #s_page で決まる
+                levelCounts[lv] = { rows: 0, bad: 0, played: 0 };
                 for (let page = 0; page < MAX_PAGES; page++) {
-                    setStatus(`読み取り中… Lv${lv} の ${page + 1}ページ目（全部で ${charts.length}譜面）`);
+                    if (pageCount !== null && page >= pageCount) break;
+                    setStatus(`読み取り中… Lv${lv} の ${page + 1}${pageCount ? '/' + pageCount : ''}ページ目（全部で ${charts.length}譜面）`);
                     const url = getLevelUrl(lv, page);
                     const doc = await fetchDoc(url);
                     if (!firstDoc) { firstDoc = doc; firstUrl = url; }
-                    const result = parsePage(doc, diag, lv);
+                    if (page === 0) pageCount = getPageCount(doc);
+                    const result = parseLevelPage(doc, diag, lv) || parsePage(doc, diag, lv);
                     if (result.rows === 0) break;
                     const sig = result.rows + ':' + result.firstTitle;
-                    if (sig === lastSig) break; // 最後のページを過ぎて、同じページが返ってきた
+                    if (pageCount === null && sig === lastSig) break; // ページ数が分からないとき：最後を過ぎて同じページが返ってきた
                     lastSig = sig;
                     charts.push(...result.charts);
-                    levelCounts[lv] += result.charts.length;
+                    levelCounts[lv].rows += result.rows;
+                    levelCounts[lv].bad += result.bad || 0;
+                    levelCounts[lv].played += result.charts.length;
                     pages++;
                     await sleep(PAGE_INTERVAL_MS);
                 }
@@ -341,7 +391,7 @@
         const json = JSON.stringify({ type: 'popn-eagate', v: 1, at: new Date().toISOString(), pages, charts });
 
         setStatus(`Lv${MIN_LEVEL}〜${MAX_LEVEL} の ${pages}ページから、${charts.length}譜面を読み取りました。`);
-        addNote('レベル別：' + Object.keys(levelCounts).map(lv => `Lv${lv} ${levelCounts[lv]}`).join(' / '));
+        addNote('レベル別（プレー済み / 全曲）：' + Object.keys(levelCounts).map(lv => `Lv${lv} ${levelCounts[lv].played}/${levelCounts[lv].rows}`).join('　'));
         addNote('内訳：' + summary);
         addButton('アプリに送る（新しいタブで開く）', '#e91e63', () => sendToApp(json));
         const box = addTextBox(json);
@@ -350,7 +400,9 @@
         });
 
         const unknown = Object.keys(diag.unknownMedals);
-        if (unknown.length) {
+        if (diag.badRows > 0) {
+            showDiag(buildDiag(firstDoc, firstUrl, diag, 'bad rows'), `読めなかった行が ${diag.badRows} 行ありました。その曲は取り込みません。`);
+        } else if (unknown.length) {
             showDiag(buildDiag(firstDoc, firstUrl, diag, 'unknown medals'), `知らないメダル画像がありました（${unknown.join(', ')}）。その譜面は取り込みません。`);
         }
         addCloseButton();
