@@ -4,16 +4,34 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pop’n Clear Rate app</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <!-- 新しいデザイン（ver 3）の上部バーとナビ。以前の見た目では隠れる（js/ui-new.js） -->
+    <header id="nu-topbar" class="nu-only">
+        <div class="nu-brand">Pop'n Clear Rate</div>
+        <span id="nu-save-chip" class="nu-save-chip is-saved" role="status" title="✓ 保存済み"><span>✓</span><span class="nu-save-label"> 保存済み</span></span>
+        <button type="button" id="nu-user-chip" class="nu-user-chip" onclick="openNewUiSheet('more')" aria-label="ユーザー・設定を開く">
+            <span id="nu-user-avatar" class="nu-avatar"></span><span id="nu-user-name"></span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+    </header>
+    <nav id="nu-nav" class="nu-only" aria-label="メイン">
+        <button type="button" data-nav="home" class="active" onclick="closeNewUiSheet()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>一覧</span></button>
+        <button type="button" data-nav="filter" onclick="openNewUiSheet('filter')"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg><span>検索・絞込</span></button>
+        <button type="button" data-nav="stats" onclick="openNewUiSheet('stats')"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M5 20V11M12 20V5M19 20v-6"/></svg><span>統計</span></button>
+        <button type="button" data-nav="image" onclick="openNewUiSheet('image')"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg><span>画像</span></button>
+        <button type="button" data-nav="more" onclick="openNewUiSheet('more')"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg><span>その他</span></button>
+    </nav>
 
     <div id="loading" class="loading-overlay">
         <div class="spinner"></div>
         <div id="loading-text">クラウドと通信中...</div>
     </div>
 
-    <div style="padding: 20px;">
+    <div id="app-main" style="padding: 20px;">
         <h1>Pop’n Clear Rate app</h1>
         <div id="current-user-label" class="current-user-label">👤 ユーザー: -</div>
 
@@ -118,8 +136,20 @@
         <div id="menu-backdrop" onclick="toggleMenu(false)"></div>
         <div class="view-header" id="menu-panel">
             <div class="menu-title">メニュー</div>
+            <div id="nu-sheet-head" class="nu-only">
+                <div id="nu-sheet-title">その他</div>
+                <button type="button" onclick="closeNewUiSheet()" aria-label="閉じる"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+            </div>
+            <!-- 見た目の切り替え（この端末に保存） -->
+            <section class="menu-card ui-switch-card" data-sheet="more">
+                <div class="menu-card-title">🎨 見た目</div>
+                <div class="ui-switch-row">
+                    <span id="ui-switch-text" class="ui-switch-text"></span>
+                    <button type="button" id="ui-switch-btn" class="ui-switch-btn" onclick="toggleUiMode()"></button>
+                </div>
+            </section>
             <!-- ① ユーザー -->
-            <section class="menu-card menu-user-section">
+            <section class="menu-card menu-user-section" data-sheet="more">
                 <div class="menu-card-title">👤 ユーザー</div>
                 <div class="menu-user-controls">
                     <select id="current-user-select" onchange="switchUser()"></select>
@@ -129,7 +159,7 @@
             </section>
 
             <!-- ② 表示レベル -->
-            <section class="menu-card menu-level-row">
+            <section class="menu-card menu-level-row" data-sheet="more">
                 <div class="menu-card-title">
                     <span>表示レベル・方法</span>
                     <label class="check-label" style="font-size: 0.85em; font-weight: normal; cursor: pointer;"><input type="checkbox" id="level-btn-on-main" onchange="setLevelButtonPlacement(this.checked)" checked> メイン画面に表示</label>
@@ -139,10 +169,10 @@
                     <div id="level-view-panel">
                         <div id="view-level-buttons"></div>
                         <div id="view-mode-switch" role="group" aria-label="表示方法">
-                            <button type="button" data-mode="list" onclick="setViewMode('list')">リスト</button>
-                            <button type="button" data-mode="grid" onclick="setViewMode('grid')">難易度表</button>
-                            <button type="button" data-mode="score" onclick="setViewMode('score')" style="display: none;">スコア表</button>
-                            <button type="button" data-mode="pokkura" onclick="setViewMode('pokkura')" style="display: none;">ポックラ</button>
+                            <button type="button" data-mode="list" onclick="setViewMode('list')"><svg class="nu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg><span>リスト</span></button>
+                            <button type="button" data-mode="grid" onclick="setViewMode('grid')"><svg class="nu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>難易度表</span></button>
+                            <button type="button" data-mode="score" onclick="setViewMode('score')" style="display: none;"><svg class="nu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span>スコア表</span></button>
+                            <button type="button" data-mode="pokkura" onclick="setViewMode('pokkura')" style="display: none;"><svg class="nu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/></svg><span>ポックラ</span></button>
                         </div>
                     </div>
                 </div>
@@ -167,7 +197,7 @@
             </section>
 
             <!-- ③ 検索（検索・ランダムセレクト・絞り込み） -->
-            <section class="menu-card">
+            <section class="menu-card" data-sheet="filter">
                 <div class="menu-card-title">🔍 検索</div>
                 <div class="menu-search-row">
                     <span class="menu-row-label">検索</span>
@@ -228,7 +258,7 @@
             </section>
 
             <!-- ④ 統計表示 -->
-            <section class="menu-card">
+            <section class="menu-card" data-sheet="stats">
                 <div class="menu-card-title">📊 統計表示</div>
                 <div class="stats-toggles">
                     <label><input type="checkbox" id="show-kurohishi-rate" onchange="renderTable()" style="margin:0;"> 黒菱</label>
@@ -236,14 +266,14 @@
                     <label><input type="checkbox" id="show-easy-rate" onchange="renderTable()" style="margin:0;"> イージー</label>
                     <label><input type="checkbox" id="show-normal-rate" checked onchange="renderTable()" style="margin:0;"> ノーマル</label>
                     <label><input type="checkbox" id="show-unreleased" onchange="renderTable()" style="margin:0;"> 未解禁を含む</label>
-                    <label><input type="checkbox" id="show-diff-stats" onchange="renderTable(); toggleMenu(false);" style="margin:0;"> 難易度別</label>
-                    <label><input type="checkbox" id="show-medal-stats" onchange="renderTable(); toggleMenu(false);" style="margin:0;"> メダル内訳</label>
-                    <label><input type="checkbox" id="show-score-stats" onchange="renderTable(); toggleMenu(false);" style="margin:0;"> スコア内訳</label>
+                    <label><input type="checkbox" id="show-diff-stats" onchange="renderTable(); closeMenuInClassic();" style="margin:0;"> 難易度別</label>
+                    <label><input type="checkbox" id="show-medal-stats" onchange="renderTable(); closeMenuInClassic();" style="margin:0;"> メダル内訳</label>
+                    <label><input type="checkbox" id="show-score-stats" onchange="renderTable(); closeMenuInClassic();" style="margin:0;"> スコア内訳</label>
                 </div>
             </section>
 
             <!-- ⑤ スコア -->
-            <section class="menu-card">
+            <section class="menu-card" data-sheet="more">
                 <div class="menu-card-title">🔢 スコア</div>
                 <div class="stats-toggles">
                     <label><input type="checkbox" id="show-score-col" onchange="handleScoreToggle()" style="margin:0;"> スコア表示</label>
@@ -254,7 +284,7 @@
             </section>
 
             <!-- ⑥ 公式データ取り込み -->
-            <section class="menu-card">
+            <section class="menu-card" data-sheet="more">
                 <div class="menu-card-title">📥 公式データ取り込み</div>
                 <div class="eagate-import-actions">
                     <button onclick="importEagateFromClipboard()" class="btn-eagate">クリップボードから取り込む</button>
@@ -268,7 +298,7 @@
             </section>
 
             <!-- ⑦ 画像 -->
-            <section class="menu-card menu-image-section">
+            <section class="menu-card menu-image-section" data-sheet="image">
                 <div class="menu-card-title">🖼️ 画像</div>
                 <div id="image-export-area" class="controls" style="margin: 0; padding: 0; box-shadow: none; background: transparent; display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 8px;">
                     <button id="btn-overview-image" onclick="generateOverviewImage()" class="btn-image">全体統計画像</button>
@@ -294,10 +324,19 @@
                     </details>
                 </div>
             </section>
-            <div class="app-version" id="app-version"></div>
+            <!-- 新しいデザインでは、統計（クリア率・内訳）をこの中に移して見せる -->
+            <div id="nu-stats-slot" class="nu-only" data-sheet="stats"></div>
+            <div class="app-version" id="app-version" data-sheet="more"></div>
+            <div id="nu-sheet-foot" class="nu-only" data-sheet="filter">
+                <button type="button" onclick="resetFilters()" class="nu-foot-reset">リセット</button>
+                <button type="button" onclick="closeNewUiSheet()" class="nu-foot-show" id="nu-show-count">曲を表示</button>
+            </div>
         </div>
 
         <div id="main-level-slot"></div>
+        <div id="nu-filterbar" class="nu-only" aria-label="絞り込みの条件"></div>
+        <button type="button" id="nu-stat-card" class="nu-only" onclick="openNewUiSheet('stats')"></button>
+        <div id="main-stats-anchor"></div>
         <div class="stats-container" id="stats-display"></div>
         <div id="extended-stats-display"></div>
 
@@ -582,6 +621,7 @@
     <script src="js/image-export.js"></script>
     <script src="js/eagate-import.js"></script>
     <script src="js/menu.js"></script>
+    <script src="js/ui-new.js"></script>
     <script src="js/app.js"></script>
 
 </body>
