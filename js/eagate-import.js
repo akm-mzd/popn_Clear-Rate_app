@@ -12,6 +12,8 @@ const EAGATE_MAX_LEVEL = 50;
 const EAGATE_MAX_TEXT_LENGTH = 3000000;
 const EAGATE_DIFF_ORDER = { E: 0, N: 1, H: 2, EX: 3, '': 3 };
 
+const EAGATE_HOW_LABELS = { guess: '(推定)', fuzzy: '(似た曲名)' };
+
 let pendingEagateImport = null; // 確認画面で表示中の変更 { user, changes }
 
 // ---------- ブックマークレット ----------
@@ -122,14 +124,19 @@ function parseEagatePayload(text) {
 }
 
 // ---------- 曲の突き合わせ ----------
-// 公式と攻略wikiで表記が少し違っても合うように、文字をそろえる
+const UPPER_RE = /\s*\(upper\)/gi;
+
+// 公式と攻略wikiで表記が違っても合うように、文字をそろえる。
+// 「(UPPER)」を消したあと、文字と数字以外（空白・記号・波線・「＼」・見えない制御文字）をすべて消す
 function normalizeSongText(s) {
     return String(s || '').normalize('NFKC').toLowerCase()
-        .replace(/[\s　]+/g, '')
-        .replace(/[~〜～∼˜\\＼]/g, '') // 波線は消す。公式で「～」が「＼」に化けている曲がある
-        .replace(/[‐-―−－]/g, '-')
-        .replace(/[‘’`´]/g, "'")
-        .replace(/[“”]/g, '"');
+        .replace(UPPER_RE, '')
+        .replace(/[^\p{L}\p{N}]/gu, '');
+}
+
+// 「(UPPER)」が付いているか（公式は UPPER 譜面の曲名とジャンルに付ける）
+function isUpperText(s) {
+    return /\(upper\)/i.test(String(s || '').normalize('NFKC'));
 }
 
 function isEagateTargetSong(song) {
@@ -137,67 +144,109 @@ function isEagateTargetSong(song) {
     return lv >= EAGATE_MIN_LEVEL && lv <= EAGATE_MAX_LEVEL;
 }
 
-// 公式の譜面を、アプリの曲に割り当てる。返り値 { pairs: [{ song, chart }], unmatchedSongs, unmatchedCharts }
+// 文字の入れ替えの数（編集距離）
+function editDistance(a, b) {
+    const x = Array.from(a), y = Array.from(b);
+    let prev = Array.from({ length: y.length + 1 }, (_, j) => j);
+    for (let i = 1; i <= x.length; i++) {
+        const cur = [i];
+        for (let j = 1; j <= y.length; j++) {
+            cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (x[i - 1] === y[j - 1] ? 0 : 1));
+        }
+        prev = cur;
+    }
+    return prev[y.length];
+}
+
+// 公式の譜面を、アプリの曲に割り当てる。
+// 返り値 { pairs: [{ song, chart, how }], unmatchedSongs, unmatchedCharts }
+//   how：'' = 曲名で一致 / 'guess' = 同じ曲名が複数あり推定（UPPERはノーツの多い方） / 'fuzzy' = 似た曲名
 function matchEagateCharts(charts) {
     const targets = songs.filter(isEagateTargetSong);
-    const byTitle = new Map();
-    targets.forEach(s => {
-        const k = normalizeSongText(s.title);
-        if (!byTitle.has(k)) byTitle.set(k, []);
-        byTitle.get(k).push(s);
-    });
+    const assigned = new Map(); // 曲ID → { chart, how }
+    const used = new Set();     // 割り当て済みの公式の譜面
+    const assign = (song, chart, how) => { assigned.set(song.id, { chart, how }); used.add(chart); };
+    const songLv = s => parseInt(s.level, 10);
+    const appSaysUpper = s => /upper/i.test(`${s.genre || ''} ${s.version || ''} ${s.diffRaw || ''}`);
 
-    // 公式側を「曲名＋ジャンル」でまとめる
+    // ① レベルが分かる譜面：同じレベル・同じ曲名で合わせる（ジャンルは、同じ曲名が複数あるときだけ使う）
     const groups = new Map();
-    charts.forEach(c => {
-        const k = normalizeSongText(c.title) + '\n' + normalizeSongText(c.genre);
+    charts.filter(c => c.level !== null).forEach(c => {
+        const k = c.level + '\n' + normalizeSongText(c.title);
         if (!groups.has(k)) groups.set(k, []);
         groups.get(k).push(c);
     });
-
-    const assigned = new Map(); // 曲ID → 公式の譜面
     groups.forEach(group => {
-        let cands = byTitle.get(normalizeSongText(group[0].title)) || [];
+        const title = normalizeSongText(group[0].title);
+        let cands = targets.filter(s => songLv(s) === group[0].level && normalizeSongText(s.title) === title && !assigned.has(s.id));
         if (cands.length === 0) return;
-        const genre = normalizeSongText(group[0].genre);
-        const sameGenre = genre ? cands.filter(s => normalizeSongText(s.genre) === genre) : [];
-        if (sameGenre.length > 0) {
-            cands = sameGenre;
-        } else if (new Set(cands.map(s => normalizeSongText(s.genre))).size > 1) {
-            return; // 同じ曲名の別の曲があり、どれか決められない
-        }
-        cands = cands.filter(s => !assigned.has(s.id));
+        if (cands.length === 1 && group.length === 1) { assign(cands[0], group[0], ''); return; }
 
-        // レベルが分かる譜面は、レベルで合わせる
-        const rest = [];
-        group.forEach(c => {
-            if (c.level === null) { rest.push(c); return; }
-            const hit = cands.find(s => parseInt(s.level, 10) === c.level && !assigned.has(s.id));
-            if (hit) assigned.set(hit.id, c);
+        let rest = group.slice();
+        // ジャンルが同じ曲、アプリ側に UPPER と書いてある曲は、それで決める
+        const pickBy = test => {
+            rest = rest.filter(c => {
+                const hit = cands.filter(s => test(s, c));
+                if (hit.length !== 1) return true;
+                assign(hit[0], c, '');
+                cands = cands.filter(s => s !== hit[0]);
+                return false;
+            });
+        };
+        pickBy((s, c) => normalizeSongText(s.genre) === normalizeSongText(c.genre));
+        pickBy((s, c) => appSaysUpper(s) === isUpperText(c.title) && cands.some(o => appSaysUpper(o) !== appSaysUpper(s)));
+
+        // 残りは、通常 → UPPER の順に、ノーツの少ない曲 → 多い曲へ割り当てる
+        if (rest.length === 0 || cands.length === 0) return;
+        const how = rest.length === 1 && cands.length === 1 ? '' : 'guess';
+        rest.sort((a, b) => isUpperText(a.title) - isUpperText(b.title));
+        cands.sort((a, b) => (a.notes || 0) - (b.notes || 0));
+        if (rest.length < cands.length) cands = rest.every(c => isUpperText(c.title)) ? cands.slice(-rest.length) : cands.slice(0, rest.length);
+        rest.slice(0, cands.length).forEach((c, i) => assign(cands[i], c, how));
+    });
+
+    // ② まだ合っていない譜面：同じレベルの、まだ合っていない曲から、曲名が似ている曲を1つだけ選ぶ
+    charts.filter(c => c.level !== null && !used.has(c)).forEach(c => {
+        const t = normalizeSongText(c.title);
+        if (!t) return;
+        const limit = Array.from(t).length >= 8 ? 2 : 1;
+        let best = null, bestD = Infinity, tie = false;
+        targets.forEach(s => {
+            if (songLv(s) !== c.level || assigned.has(s.id)) return;
+            const d = editDistance(t, normalizeSongText(s.title));
+            if (d < bestD) { best = s; bestD = d; tie = false; } else if (d === bestD) tie = true;
         });
+        if (best && bestD <= limit && !tie) assign(best, c, 'fuzzy');
+    });
 
-        // レベルが分からない譜面は、難しい譜面ほどレベルの高い曲に合わせる（ハイパー → EX の順）
-        const left = cands.filter(s => !assigned.has(s.id))
-            .sort((a, b) => (parseInt(a.level, 10) - parseInt(b.level, 10)) || ((a.notes || 0) - (b.notes || 0)));
-        if (left.length === 0 || rest.length === 0) return;
-        const ordered = rest.sort((a, b) => EAGATE_DIFF_ORDER[a.diff] - EAGATE_DIFF_ORDER[b.diff]);
+    // ③ レベルが分からない譜面（古い形のデータ）：曲名で探し、難しい譜面ほどレベルの高い曲に合わせる
+    const noLevel = new Map();
+    charts.filter(c => c.level === null).forEach(c => {
+        const k = normalizeSongText(c.title);
+        if (!noLevel.has(k)) noLevel.set(k, []);
+        noLevel.get(k).push(c);
+    });
+    noLevel.forEach((group, title) => {
+        const left = targets.filter(s => normalizeSongText(s.title) === title && !assigned.has(s.id))
+            .sort((a, b) => (songLv(a) - songLv(b)) || ((a.notes || 0) - (b.notes || 0)));
+        if (left.length === 0) return;
+        const ordered = group.sort((a, b) => EAGATE_DIFF_ORDER[a.diff] - EAGATE_DIFF_ORDER[b.diff]);
         const use = ordered.slice(-left.length);
         const offset = left.length - use.length;
-        use.forEach((c, i) => assigned.set(left[offset + i].id, c));
+        use.forEach((c, i) => assign(left[offset + i], c, left.length > 1 ? 'guess' : ''));
     });
 
     const pairs = [];
-    targets.forEach(s => { if (assigned.has(s.id)) pairs.push({ song: s, chart: assigned.get(s.id) }); });
+    targets.forEach(s => { if (assigned.has(s.id)) pairs.push({ song: s, chart: assigned.get(s.id).chart, how: assigned.get(s.id).how }); });
     const unmatchedSongs = targets.filter(s => !assigned.has(s.id));
-    const usedCharts = new Set(assigned.values());
-    const unmatchedCharts = charts.filter(c => !usedCharts.has(c));
+    const unmatchedCharts = charts.filter(c => !used.has(c));
     return { pairs, unmatchedSongs, unmatchedCharts };
 }
 
 // 「良くなったときだけ」の変更を作る
 function buildEagateChanges(pairs) {
     const changes = [];
-    pairs.forEach(({ song, chart }) => {
+    pairs.forEach(({ song, chart, how }) => {
         const curMedal = clearRecords[song.id] || '';
         const curRank = MEDAL_TYPES[curMedal] ? MEDAL_TYPES[curMedal].rank : 0;
         const newMedal = chart.medal && MEDAL_TYPES[chart.medal].rank > curRank ? chart.medal : null;
@@ -206,7 +255,7 @@ function buildEagateChanges(pairs) {
         const newScore = chart.score !== null && (isNaN(curScoreNum) || chart.score > curScoreNum) ? chart.score : null;
 
         if (newMedal !== null || newScore !== null) {
-            changes.push({ song, oldMedal: curMedal, newMedal, oldScore: isNaN(curScoreNum) ? null : curScoreNum, newScore });
+            changes.push({ song, how, oldMedal: curMedal, newMedal, oldScore: isNaN(curScoreNum) ? null : curScoreNum, newScore });
         }
     });
     return changes;
@@ -246,7 +295,7 @@ function openEagateImportPreview(text) {
 
     if (changes.length > 0) {
         const rows = changes.map(c => `<tr>
-            <td><span class="level-badge">${escapeHtml(c.song.level)}</span> ${escapeHtml(c.song.title)}</td>
+            <td><span class="level-badge">${escapeHtml(c.song.level)}</span> ${escapeHtml(c.song.title)}${EAGATE_HOW_LABELS[c.how] ? ` <span class="eagate-how">${EAGATE_HOW_LABELS[c.how]}</span>` : ''}</td>
             <td>${c.newMedal !== null ? `${medalLabelHtml(c.oldMedal)} → ${medalLabelHtml(c.newMedal)}` : '<span style="color:#bbb;">-</span>'}</td>
             <td>${c.newScore !== null ? `${c.oldScore === null ? '-' : c.oldScore} → <b>${c.newScore}</b>` : '<span style="color:#bbb;">-</span>'}</td>
         </tr>`).join('');
