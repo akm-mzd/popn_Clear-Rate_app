@@ -369,29 +369,52 @@ function applyEagateImport() {
     if (!allUsersData[currentUser]) allUsersData[currentUser] = emptyUser();
     allUsersData[currentUser].clearRecords = clearRecords;
     allUsersData[currentUser].scoreRecords = scoreRecords;
-    if (Object.keys(pending.versionRecords).length > 0 || pending.extraNew.length > 0) {
+    const hasPokkuraData = Object.keys(pending.versionRecords).length > 0 || pending.extraNew.length > 0;
+    if (hasPokkuraData) {
         savePokkuraVersionRecords(currentUser, pending.versionRecords, pending.at, pending.extraNew);
     }
     closeEagateImportModal();
-    if (pending.changes.length > 0) scheduleAutoSave();
+    if (pending.changes.length > 0 || hasPokkuraData) scheduleAutoSave();
     renderTable();
     showToast('toast-eagate', `公式データを反映しました（${pending.changes.length}曲）`, '#4caf50', 3000);
 }
 
-// ---------- ポックラ用のデータ：この端末に、ユーザーごとに保存 ----------
+// ---------- ポックラ用のデータ：ユーザーごとにクラウドに保存（pokkuraRecords） ----------
 //   records：旧曲の今作スコア（公式のポックラは旧曲を今作のスコアで数えるため）
 //   extraNew：Lv45 以下の今作の新曲（アプリには Lv46 以上しかないが、新バージョン直後は新曲枠に入るため）
-//   クラウドには送らない（保存先の形を変えずに済むように、端末ごとの保存にしている）
+//   クラウドの形：{ 曲ID: { s, m }, _at: 取り込んだ日時, _extra: [...] }
+//     （曲ID は「ジャンル_曲名_ノーツ数」で必ず _ が2つ以上あるので、_at・_extra と重ならない）
+//   ver 3.1.1.0 までは端末だけに保存していた（popn_pokkura_version_ユーザー名）。
+//   その端末のデータは、クラウドに入ったと確認できるまで残しておく（GAS が古いときの保険）
+const POKKURA_AT_KEY = '_at';
+const POKKURA_EXTRA_KEY = '_extra';
+
 function pokkuraVersionKey(user) {
     return 'popn_pokkura_version_' + user;
 }
 
 function savePokkuraVersionRecords(user, records, at, extraNew) {
-    storageSet(pokkuraVersionKey(user), JSON.stringify({ at: at || new Date().toISOString(), records, extraNew: extraNew || [] }));
+    const data = { at: at || new Date().toISOString(), records, extraNew: extraNew || [] };
+    if (!allUsersData[user]) allUsersData[user] = emptyUser();
+    // 前回の取り込み分は丸ごと置き換える
+    allUsersData[user].pokkuraRecords = toPokkuraCloudRecords(data);
+    storageSet(pokkuraVersionKey(user), JSON.stringify(data));
 }
 
-// { at, records: { 曲ID: { s, m } }, extraNew: [{ t, g, l, s, m }] } か、なければ null
-function loadPokkuraVersionRecords(user) {
+function toPokkuraCloudRecords(data) {
+    return Object.assign({}, data.records, { [POKKURA_AT_KEY]: data.at, [POKKURA_EXTRA_KEY]: data.extraNew || [] });
+}
+
+function fromPokkuraCloudRecords(rec) {
+    if (!rec || typeof rec !== 'object' || !rec[POKKURA_AT_KEY]) return null;
+    const records = {};
+    for (const id in rec) {
+        if (id !== POKKURA_AT_KEY && id !== POKKURA_EXTRA_KEY) records[id] = rec[id];
+    }
+    return { at: rec[POKKURA_AT_KEY], records, extraNew: Array.isArray(rec[POKKURA_EXTRA_KEY]) ? rec[POKKURA_EXTRA_KEY] : [] };
+}
+
+function loadLocalPokkuraVersionRecords(user) {
     try {
         const data = JSON.parse(storageGet(pokkuraVersionKey(user)) || 'null');
         if (!data || typeof data.records !== 'object' || !data.records) return null;
@@ -399,5 +422,30 @@ function loadPokkuraVersionRecords(user) {
         return data;
     } catch (e) {
         return null;
+    }
+}
+
+// { at, records: { 曲ID: { s, m } }, extraNew: [{ t, g, l, s, m }] } か、なければ null
+//   クラウドと端末の両方にあれば、新しく取り込んだほう
+function loadPokkuraVersionRecords(user) {
+    const cloud = fromPokkuraCloudRecords(allUsersData[user] && allUsersData[user].pokkuraRecords);
+    const local = loadLocalPokkuraVersionRecords(user);
+    if (cloud && local) return new Date(local.at) > new Date(cloud.at) ? local : cloud;
+    return cloud || local;
+}
+
+// 起動時：端末にだけあるデータをクラウドへ移す。クラウドに同じか新しいデータがあれば、端末のものは消す
+function migrateLocalPokkuraRecords() {
+    for (const user in allUsersData) {
+        const local = loadLocalPokkuraVersionRecords(user);
+        if (!local) continue;
+        const cloud = fromPokkuraCloudRecords(allUsersData[user].pokkuraRecords);
+        if (cloud && new Date(cloud.at) >= new Date(local.at)) {
+            storageRemove(pokkuraVersionKey(user));
+        } else {
+            allUsersData[user].pokkuraRecords = toPokkuraCloudRecords(local);
+            localChangeSeq++;
+            dirtyUsers.add(user);
+        }
     }
 }
