@@ -409,9 +409,8 @@ function buildPokkuraRoot(pk) {
 
     const section = (label, sub, color, list) => {
         if (list.length === 0) return '';
-        // ポイントの高い順に1行ずつ区切って左右反転する（右上が最高）
-        const ordered = [];
-        for (let i = 0; i < list.length; i += COLS) ordered.push(...list.slice(i, i + COLS).reverse());
+        // ポイントの高い順に、左上から並べる（左上が1位）
+        const ordered = list;
         let cells = '';
         ordered.forEach(({ song, extra, point, score, isVersion }) => {
             // Lv45 以下の新曲（アプリの曲ではない）は、バナーの代わりに曲名・ジャンルの文字の枠

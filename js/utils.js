@@ -64,7 +64,7 @@ function generatePieChartBase64(data, size = 240) {
 
     data.forEach(d => {
         let sliceAngle = (d.count / total) * 2 * Math.PI;
-        ctx.fillStyle = d.color;
+        ctx.fillStyle = d.gradient ? makeSliceGradient(ctx, d.gradient, centerX, centerY, radius, currentAngle, sliceAngle) : d.color;
         ctx.beginPath();
         ctx.moveTo(centerX, centerY);
         ctx.arc(centerX, centerY, radius, currentAngle, currentAngle + sliceAngle);
@@ -74,6 +74,28 @@ function generatePieChartBase64(data, size = 240) {
     });
 
     return canvas.toDataURL();
+}
+
+// 円グラフの1切れを虹色などのグラデーションで塗る（d.gradient = 色の配列）。
+//   切れの角度の範囲に色を並べるので、小さい切れでも全色が入る
+function makeSliceGradient(ctx, colors, cx, cy, radius, start, angle) {
+    const stops = colors.length - 1;
+    if (ctx.createConicGradient && angle < 2 * Math.PI - 1e-6) {
+        // 円錐グラデーションは1周（0〜1）で指定する。切れの範囲だけに色を割り当て、外側は端の色で埋める
+        const g = ctx.createConicGradient(start, cx, cy);
+        const span = angle / (2 * Math.PI);
+        colors.forEach((c, i) => g.addColorStop(span * i / stops, c));
+        g.addColorStop(Math.min(1, span + 1e-4), colors[stops]);
+        return g;
+    }
+    if (ctx.createConicGradient) {
+        const g = ctx.createConicGradient(start, cx, cy);
+        colors.forEach((c, i) => g.addColorStop(i / stops, c));
+        return g;
+    }
+    const g = ctx.createLinearGradient(cx - radius, cy, cx + radius, cy);
+    colors.forEach((c, i) => g.addColorStop(i / stops, c));
+    return g;
 }
 
 // html2canvas は画像出力ボタンを使う時だけ必要なので、
