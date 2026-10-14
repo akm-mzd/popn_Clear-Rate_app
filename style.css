@@ -606,7 +606,28 @@ body.exporting-image #back-to-top { display: none !important; }
 .pk-total-label { font-weight: bold; color: #d82f66; }
 .pk-total-value { font-size: 28px; font-weight: bold; color: #333; font-variant-numeric: tabular-nums; }
 .pk-parts { font-size: 13px; color: #555; margin-top: 2px; }
-.pk-note { font-size: 11px; color: #888; margin-top: 6px; line-height: 1.4; text-align: left; }
+.pk-source { display: inline-block; font-size: 11px; color: #7b1fa2; background: #f3e5f5; border-radius: 10px; padding: 1px 10px; margin-top: 6px; }
+.pk-source-none { color: #8d6e63; background: #efebe9; }
+/* 対象曲 / 圏外 のタブ（横スライドでも切り替わる） */
+.pk-tabs { display: flex; gap: 4px; background: rgba(0,0,0,0.06); padding: 3px; border-radius: 10px; }
+.pk-tabs button {
+    flex: 1; height: 38px; border: none; border-radius: 8px; background: transparent; color: #666;
+    font-size: 14px; font-weight: bold; cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.pk-tabs button.active { background: #fff; color: #d82f66; box-shadow: 0 1px 3px rgba(0,0,0,0.18); }
+#pk-tab-rest.active { color: #7a6a80; }
+.pk-tab-count { font-size: 11px; min-width: 20px; padding: 0 6px; border-radius: 9px; background: #eee; color: #666; line-height: 18px; }
+.pk-tabs button.active .pk-tab-count { background: #d82f66; color: #fff; }
+#pk-tab-rest.active .pk-tab-count { background: #a58bb3; }
+.pk-slider {
+    display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none;
+    align-items: flex-start; overscroll-behavior-x: contain; transition: height 0.15s;
+}
+.pk-slider::-webkit-scrollbar { display: none; }
+.pk-panel { flex: 0 0 100%; min-width: 0; scroll-snap-align: start; scroll-snap-stop: always; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box; }
+.pk-panel-rest { background: repeating-linear-gradient(-45deg, transparent 0 10px, rgba(0,0,0,0.025) 10px 20px); border-radius: 6px; }
+.pk-panel-rest .dg-cells { opacity: 0.82; }
+.pk-lv-custom { background: #ffeb3b; color: #5d4037; outline: 1px solid #f9a825; }
 .pk-label-sub { font-size: 11px; line-height: 1; margin-top: 4px; }
 #diff-grid-view .dg-score.pk-score { right: auto; left: 2px; font-weight: normal; }
 #diff-grid-view .dg-score.pk-score-version { background: rgba(123,31,162,0.85); }
@@ -636,6 +657,7 @@ body.exporting-image #back-to-top { display: none !important; }
     .pk-point { font-size: 10px; padding: 0 4px; }
     .pk-lv { font-size: 9px; }
     .pk-total-value { font-size: 24px; }
+    .pk-panel { gap: 6px; }
 }
 
 /* =========================================

@@ -101,6 +101,8 @@ async function processImportText(text, targetLevel) {
 
             if (song.level !== targetLevel) {
                 song.level = targetLevel;
+                // ポックラ反映時のレベルが新しい Lv と同じになったら、もう要らないので消す
+                if (song.pokkuraLevel === targetLevel) delete song.pokkuraLevel;
                 hasChanged = true;
             }
             

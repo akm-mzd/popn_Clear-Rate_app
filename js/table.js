@@ -320,8 +320,9 @@ function renderTable() {
     if (showCompare) table.classList.add('has-compare'); else table.classList.remove('has-compare');
 
     // 1. 表示レベル・検索キーワードだけを当てた楽曲（絞り込みがないときの統計にも使う）
+    //    検索中は、表示レベルに関係なく全曲から探す
     let baseSongs = songs.filter(s => {
-        if (currentViewLevel !== 'ALL' && s.level !== currentViewLevel) return false;
+        if (!searchQuery && currentViewLevel !== 'ALL' && s.level !== currentViewLevel) return false;
         if (searchQuery && !(s.genre.toLowerCase().includes(searchQuery) || s.title.toLowerCase().includes(searchQuery))) return false;
         return true;
     });
@@ -1144,9 +1145,15 @@ function getPokkuraNewVersion() {
     return best || { value: VERSION_ORDER_HC, label: 'HC' };
 }
 
+// ポックラで使うレベル。難易度が変わってもポックラは前のレベルのまま、という曲だけ
+//   曲データに pokkuraLevel が入っている（Lv と同じなら入れない）
+function getPokkuraLevel(song) {
+    return song.pokkuraLevel || song.level;
+}
+
 // 新曲（今作）は Lv49 まで（アプリにあるのは Lv46 以上）、旧曲は Lv48〜50 が対象
 function getPokkuraGroup(song, newVersionValue) {
-    const lv = parseInt(song.level, 10);
+    const lv = parseInt(getPokkuraLevel(song), 10);
     if (getVersionSortValue(song.version) === newVersionValue && lv <= 49) return 'new';
     return (lv >= 48 && lv <= 50) ? 'old' : null;
 }
@@ -1162,7 +1169,7 @@ function calcPokkura() {
         const vr = group === 'old' && version ? version.records[song.id] : null;
         const score = vr ? vr.s : scoreRecords[song.id];
         const medal = vr ? vr.m : (clearRecords[song.id] || '');
-        const point = calcPokkuraPoint(parseInt(song.level, 10), score, medal);
+        const point = calcPokkuraPoint(parseInt(getPokkuraLevel(song), 10), score, medal);
         if (point > 0) entries[group].push({ song, point, score: parseInt(score, 10) || 0, isVersion: !!vr });
     });
     // Lv45 以下の今作の新曲（公式データ取り込みで保存したもの。アプリには曲として入っていない）
@@ -1196,6 +1203,9 @@ function formatPokkuraDate(iso) {
     return isNaN(d) ? '' : `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+// ポックラ画面のタブ（'top' = 対象曲 / 'rest' = 圏外）。描き直しても選んだタブのまま
+let pokkuraTab = 'top';
+
 function renderPokkuraGrid() {
     const grid = document.getElementById('diff-grid-view');
     const narrow = isNarrowScreen();
@@ -1203,14 +1213,21 @@ function renderPokkuraGrid() {
     lastGridNarrow = narrow;
     const pk = calcPokkura();
 
+    const sourceText = pk.version
+        ? `公式データ ${formatPokkuraDate(pk.version.at)} 時点`
+        : '歴代ベストで計算（公式データ未取り込み）';
+    const topCount = pk.topNew.length + pk.topOld.length;
+    const restCount = pk.restNew.length + pk.restOld.length;
+
     let html = `
         <div class="pk-summary">
             <div class="pk-total"><span class="pk-total-label">推定ポックラ</span><span class="pk-total-value">${pk.total.toFixed(2)}</span></div>
             <div class="pk-parts">新曲（${escapeHtml(pk.newVersionLabel)}） ${pk.newPoint.toFixed(2)}（${pk.topNew.length}/${POKKURA_NEW_COUNT}曲） ＋ 旧曲 ${pk.oldPoint.toFixed(2)}（${pk.topOld.length}/${POKKURA_OLD_COUNT}曲）</div>
-            <div class="pk-note">${pk.version
-                ? `※ 旧曲は、公式データ取り込み（${escapeHtml(formatPokkuraDate(pk.version.at))}）で読んだ今作のスコアで計算しています。そのあとスコアが変わった曲は、もう一度取り込むと反映されます。`
-                : '※ 旧曲を歴代のベストスコアで計算した目安です。公式は旧曲を今作のスコアで数えます。メニューの「公式データ取り込み」で取り込むと、公式と同じ計算になります。'}
-                表示レベル・絞り込みに関係なく、新曲（${escapeHtml(pk.newVersionLabel)}）Lv49 まで・旧曲 Lv48〜50 から計算します。${pk.extraCount > 0 ? 'Lv45以下の新曲（バナーなし）は、公式データ取り込みで読んだものです。' : ''}各曲の数字は、ポックラへの寄与（ポイント÷60）です。</div>
+            <div class="pk-source${pk.version ? '' : ' pk-source-none'}">${escapeHtml(sourceText)}</div>
+        </div>
+        <div class="pk-tabs" role="tablist" aria-label="ポックラの曲">
+            <button type="button" role="tab" id="pk-tab-top" aria-controls="pk-panel-top" onclick="setPokkuraTab('top', true)">対象曲<span class="pk-tab-count">${topCount}</span></button>
+            <button type="button" role="tab" id="pk-tab-rest" aria-controls="pk-panel-rest" onclick="setPokkuraTab('rest', true)">圏外<span class="pk-tab-count">${restCount}</span></button>
         </div>`;
 
     const section = (label, sub, color, list) => {
@@ -1242,12 +1259,17 @@ function renderPokkuraGrid() {
                 ? `<img src="${escapeHtml(bannerSrc)}" alt="${escapeHtml(song.title)}" loading="lazy">`
                 : `<span class="dg-banner-text">${escapeHtml(song.title)}</span>`;
             const safeId = jsStringAttr(song.id);
+            // ポックラ反映時のレベルが Lv と違う曲は、印を付けて両方を見せる
+            const pkLevel = getPokkuraLevel(song);
+            const lvHtml = pkLevel !== song.level
+                ? `<span class="pk-lv pk-lv-custom" title="ポックラはLv${escapeHtml(pkLevel)}で計算（今のLvは${escapeHtml(song.level)}）">${escapeHtml(pkLevel)}</span>`
+                : `<span class="pk-lv">${escapeHtml(song.level)}</span>`;
             cells += `
                 <div class="dg-cell">
                     <button type="button" class="dg-medal${medalClass}" onclick="openMedalModal('${safeId}')" title="メダルを変更">${buildGridMedalInner(medalKey)}</button>
                     <div class="dg-banner-wrap">
                         <a class="dg-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（Lv${escapeHtml(song.level)}・攻略wikiを開く）">${bannerInner}</a>
-                        <span class="pk-lv">${escapeHtml(song.level)}</span>
+                        ${lvHtml}
                         <button type="button" class="dg-score pk-score${isVersion ? ' pk-score-version' : ''}" onclick="openScoreModal('${safeId}')" title="${isVersion ? `今作のスコア（歴代ベスト ${escapeHtml(scoreRecords[song.id] || '-')}）。押すと歴代ベストを変更` : 'スコアを変更'}">${score}</button>
                         ${pointHtml}
                     </div>
@@ -1260,12 +1282,65 @@ function renderPokkuraGrid() {
             </div>`;
     };
 
-    html += section('新曲', `上位${POKKURA_NEW_COUNT}`, '#d82f66', pk.topNew);
-    html += section('旧曲', `上位${POKKURA_OLD_COUNT}`, '#7b1fa2', pk.topOld);
-    html += section('新曲', '圏外', '#c48a9b', pk.restNew);
-    html += section('旧曲', '圏外', '#a58bb3', pk.restOld);
-    if (pk.topNew.length + pk.topOld.length === 0) html += '<div class="dg-empty">対象の曲（新曲 Lv46〜49・旧曲 Lv48〜50）にスコアがありません</div>';
+    // 対象曲と圏外を横に並べ、タブか横スライドで切り替える
+    const topHtml = topCount > 0
+        ? section('新曲', `上位${POKKURA_NEW_COUNT}`, '#d82f66', pk.topNew) + section('旧曲', `上位${POKKURA_OLD_COUNT}`, '#7b1fa2', pk.topOld)
+        : '<div class="dg-empty">対象の曲（新曲 Lv46〜49・旧曲 Lv48〜50）にスコアがありません</div>';
+    const restHtml = restCount > 0
+        ? section('新曲', '圏外', '#c48a9b', pk.restNew) + section('旧曲', '圏外', '#a58bb3', pk.restOld)
+        : '<div class="dg-empty">圏外の曲はありません</div>';
+    html += `
+        <div class="pk-slider" id="pk-slider">
+            <div class="pk-panel" id="pk-panel-top" role="tabpanel" aria-labelledby="pk-tab-top">${topHtml}</div>
+            <div class="pk-panel pk-panel-rest" id="pk-panel-rest" role="tabpanel" aria-labelledby="pk-tab-rest">${restHtml}</div>
+        </div>`;
     grid.innerHTML = html;
+
+    const slider = document.getElementById('pk-slider');
+    let scrollTimer = null;
+    slider.addEventListener('scroll', () => {
+        // スライドが止まったら、見えているほうのタブにする
+        clearTimeout(scrollTimer);
+        scrollTimer = setTimeout(() => {
+            const tab = slider.scrollLeft > slider.clientWidth / 2 ? 'rest' : 'top';
+            if (tab !== pokkuraTab) setPokkuraTab(tab, false);
+        }, 80);
+    }, { passive: true });
+    // 画像の読み込みや画面幅でパネルの高さが変わったら合わせ直す
+    if (window.ResizeObserver) {
+        const ro = new ResizeObserver(() => {
+            if (!slider.isConnected) { ro.disconnect(); return; }
+            fitPokkuraSliderHeight();
+        });
+        slider.querySelectorAll('.pk-panel').forEach(p => ro.observe(p));
+    }
+    setPokkuraTab(pokkuraTab, false, true);
+}
+
+function fitPokkuraSliderHeight() {
+    const slider = document.getElementById('pk-slider');
+    const panel = document.getElementById(`pk-panel-${pokkuraTab}`);
+    if (slider && panel) slider.style.height = panel.offsetHeight + 'px';
+}
+
+// タブを切り替える（scroll = true ならそのパネルまでスライドする）
+function setPokkuraTab(tab, scroll, instant) {
+    pokkuraTab = tab;
+    const slider = document.getElementById('pk-slider');
+    if (!slider) return;
+    ['top', 'rest'].forEach(key => {
+        const active = key === tab;
+        const btn = document.getElementById(`pk-tab-${key}`);
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-selected', active ? 'true' : 'false');
+        btn.tabIndex = active ? 0 : -1;
+        document.getElementById(`pk-panel-${key}`).classList.toggle('pk-panel-active', active);
+    });
+    // 高さは見えているパネルに合わせる（もう片方の長さで下に空白ができないように）
+    fitPokkuraSliderHeight();
+    const left = tab === 'rest' ? slider.clientWidth : 0;
+    if (instant) slider.scrollLeft = left;
+    else if (scroll) slider.scrollTo({ left, behavior: 'smooth' });
 }
 
 // 画面幅がPCとスマホの境目をまたいだら、列の数が変わるので描き直す
