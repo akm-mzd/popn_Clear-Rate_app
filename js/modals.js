@@ -256,6 +256,7 @@ function openAddModal() {
     document.getElementById('edit-genre').value = "";
     document.getElementById('edit-title').value = "";
     document.getElementById('edit-level').value = document.getElementById('import-level').value || "48";
+    document.getElementById('edit-pokkura-level').value = "";
     document.getElementById('edit-version').value = "";
     document.getElementById('edit-bpm').value = "";
     document.getElementById('edit-notes').value = "";
@@ -279,6 +280,7 @@ function openEditModal(id) {
     document.getElementById('edit-genre').value = song.genre;
     document.getElementById('edit-title').value = song.title;
     document.getElementById('edit-level').value = song.level || "";
+    document.getElementById('edit-pokkura-level').value = song.pokkuraLevel || "";
     document.getElementById('edit-version').value = song.version || "";
     document.getElementById('edit-bpm').value = song.bpm || "";
     document.getElementById('edit-notes').value = song.notes || 0;
@@ -338,6 +340,16 @@ async function saveEditModal() {
     const newWikiUrl = document.getElementById('edit-wiki-url').value.trim();
     const newDiffRaw = document.getElementById('edit-diff').value.trim();
     const parsed = parseDifficulty(newDiffRaw);
+    // ポックラ反映時のレベル：Lv と違うときだけ曲データに入れる（空欄・同じなら消す）
+    const newPokkuraLevel = document.getElementById('edit-pokkura-level').value.trim().replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+    if (newPokkuraLevel !== '' && !(/^\d+$/.test(newPokkuraLevel) && +newPokkuraLevel >= 1 && +newPokkuraLevel <= 50)) {
+        alert("ポックラ反映時のレベルは 1〜50 の数字で入力してください（Lvと同じなら空欄）。");
+        return;
+    }
+    const applyPokkuraLevel = (song) => {
+        if (newPokkuraLevel === '' || newPokkuraLevel === String(song.level)) delete song.pokkuraLevel;
+        else song.pokkuraLevel = newPokkuraLevel;
+    };
 
     if (isNew) {
         if (songs.some(s => s.id === newId)) {
@@ -359,6 +371,7 @@ async function saveEditModal() {
             wikiUrl: newWikiUrl,
             originalOrder: songs.length
         });
+        applyPokkuraLevel(songs[songs.length - 1]);
         alert("楽曲を新規追加しました！");
     } else {
         const songIndex = songs.findIndex(s => s.id === originalId);
@@ -396,6 +409,7 @@ async function saveEditModal() {
         songs[songIndex].diffRaw = newDiffRaw;
         songs[songIndex].diffClass = parsed.diffClass;
         songs[songIndex].diffIndex = parsed.diffIndex;
+        applyPokkuraLevel(songs[songIndex]);
     }
 
     updateDynamicFilters();

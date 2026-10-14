@@ -425,7 +425,7 @@ function buildPokkuraRoot(pk) {
                 ${buildMedalBoxHtml(extra ? extra.medal : (clearRecords[song.id] || ''))}
                 <div style="position: relative; width: 168px; height: 42px; flex-shrink: 0;">
                     ${bannerHtml}
-                    ${badge('left: 2px; top: 2px;', 'rgba(255,255,255,0.88)', '#333', 10, escapeHtml(extra ? extra.level : song.level))}
+                    ${badge('left: 2px; top: 2px;', 'rgba(255,255,255,0.88)', '#333', 10, escapeHtml(extra ? extra.level : getPokkuraLevel(song)))}
                     ${badge('left: 2px; bottom: 2px;', isVersion ? 'rgba(123,31,162,0.88)' : 'rgba(0,0,0,0.72)', '#fff', 11, score)}
                     ${badge('right: 2px; bottom: 2px;', '#d82f66', '#fff', 12, pkFloor(point / 60, 3).toFixed(3))}
                 </div>
