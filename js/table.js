@@ -15,6 +15,16 @@ const FILTER_IDS = ['filter-medal', 'filter-version', 'filter-diff', 'filter-aff
 const SCORE_RANK_KEYS = Object.keys(RANK_IMAGES);
 const SCORE_RANK_NONE = 'none';
 
+// スコア内訳の円グラフの色（S+・S は虹色。S は淡くして S+ と見分ける）
+const SCORE_RANK_COLORS = {
+    'S+': { gradient: ['#ff1744', '#ff9100', '#ffea00', '#00e676', '#2979ff', '#d500f9', '#ff1744'] },
+    'S':  { gradient: ['#ffcdd2', '#ffe0b2', '#fff9c4', '#c8e6c9', '#bbdefb', '#e1bee7', '#ffcdd2'] },
+    'AAA': '#b71c1c', 'AA+': '#d32f2f', 'AA': '#e53935', 'A+': '#ef5350', 'A': '#ef9a9a',
+    'B+': '#ef6c00', 'B': '#ffa726',
+    'C': '#43a047', 'D': '#1e88e5', 'E': '#8e24aa',
+    [SCORE_RANK_NONE]: '#212121'
+};
+
 // 曲のスコアランク（スコア未登録なら ''）。クリアしていないと AA 以上にならない
 function getSongScoreRank(song) {
     const medalInfo = MEDAL_TYPES[clearRecords[song.id] || ''];
@@ -852,6 +862,7 @@ function renderTable() {
                     <div style="font-weight: bold; color: #555; font-size: 0.9em;">🔢 スコア内訳 <span style="font-weight: normal; color: #666;">（登録 ${scoreCount} / ${rateTotal}曲${avg !== null ? `・平均 ${avg}` : ''}）</span></div>
                     ${filterRanks.length > 0 ? `<button onclick="setRankFilter('ALL')" style="padding: 4px 10px; font-size: 0.85em; cursor: pointer; border: 1px solid #ffcdd2; background: #ffebee; color: #d32f2f; border-radius: 4px; font-weight: bold;">✖ ランク絞り込み解除</button>` : ''}
                 </div>
+                ${buildScoreRankChartHtml(rankCounts)}
                 <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(55px, 1fr)); gap: 6px;">`;
             SCORE_RANK_KEYS.concat(SCORE_RANK_NONE).forEach(k => {
                 const iconHtml = k === SCORE_RANK_NONE
@@ -870,6 +881,32 @@ function renderTable() {
     
     document.getElementById('stats-display').innerHTML = statsHtml;
     document.getElementById('extended-stats-display').innerHTML = extendedStatsHtml;
+}
+
+// スコア内訳の円グラフと凡例（割合は「なし」を含めた全曲に対して）
+function buildScoreRankChartHtml(rankCounts) {
+    const chartData = [];
+    SCORE_RANK_KEYS.concat(SCORE_RANK_NONE).forEach(k => {
+        if (rankCounts[k] <= 0) return;
+        const c = SCORE_RANK_COLORS[k];
+        chartData.push(typeof c === 'string' ? { key: k, count: rankCounts[k], color: c } : { key: k, count: rankCounts[k], gradient: c.gradient });
+    });
+    const total = chartData.reduce((sum, d) => sum + d.count, 0);
+    if (total === 0) return '';
+    const legendHtml = chartData.map(d => {
+        const swatch = d.gradient ? `linear-gradient(90deg, ${d.gradient.join(', ')})` : d.color;
+        const label = d.key === SCORE_RANK_NONE ? 'なし' : d.key;
+        return `
+            <div style="display: flex; align-items: center; font-size: 0.85em; white-space: nowrap;">
+                <span style="display: inline-block; width: 12px; height: 12px; background: ${swatch}; border: 1px solid #aaa; margin-right: 4px; border-radius: 2px;"></span>
+                <span style="color: #333;">${escapeHtml(label)}: <span style="font-weight:bold;">${(d.count / total * 100).toFixed(1)}%</span></span>
+            </div>`;
+    }).join('');
+    return `
+        <div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: center; margin-bottom: 15px; padding: 15px; background: #fff; border-radius: 6px; border: 1px solid #e0e0e0; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+            <img src="${generatePieChartBase64(chartData, 200)}" style="width: 120px; height: 120px; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.1); flex-shrink: 0;" alt="スコアランクの円グラフ">
+            <div style="flex: 1; display: flex; flex-wrap: wrap; gap: 8px 12px; align-content: center;">${legendHtml}</div>
+        </div>`;
 }
 
 // ==========================================
@@ -1071,10 +1108,9 @@ function renderScoreGrid(targetSongs) {
     SCORE_RANK_KEYS.concat(SCORE_RANK_NONE).forEach(k => {
         const list = groups[k];
         if (list.length === 0) return;
-        // 高い順（スコアなしはメダルの良い順）に並べ、1行ずつ区切って左右反転する
+        // 高い順（スコアなしはメダルの良い順）に、左上から並べる（左が強い）
         list.sort((a, b) => (scoreOf(b) - scoreOf(a)) || (medalRankOf(b) - medalRankOf(a)) || (a.originalOrder - b.originalOrder));
-        const ordered = [];
-        for (let i = 0; i < list.length; i += COLS) ordered.push(...list.slice(i, i + COLS).reverse());
+        const ordered = list;
 
         let cells = '';
         ordered.forEach(song => {
@@ -1232,9 +1268,8 @@ function renderPokkuraGrid() {
 
     const section = (label, sub, color, list) => {
         if (list.length === 0) return '';
-        // ポイントの高い順に1行ずつ区切って左右反転する（右上が最高）
-        const ordered = [];
-        for (let i = 0; i < list.length; i += COLS) ordered.push(...list.slice(i, i + COLS).reverse());
+        // ポイントの高い順に、左上から並べる（左上が1位）
+        const ordered = list;
         let cells = '';
         ordered.forEach(({ song, extra, point, score, isVersion }) => {
             const pointHtml = `<span class="pk-point" title="ポイント ${point.toFixed(2)}">${pkFloor(point / 60, 3).toFixed(3)}</span>`;
