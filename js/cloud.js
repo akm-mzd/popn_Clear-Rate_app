@@ -13,6 +13,7 @@ function applyFetchedData(data) {
         if (!allUsersData[u].scoreRecords) allUsersData[u].scoreRecords = {};
         if (!allUsersData[u].memoRecords) allUsersData[u].memoRecords = {};
         if (!allUsersData[u].historyRecords) allUsersData[u].historyRecords = {};
+        if (!allUsersData[u].pokkuraRecords) allUsersData[u].pokkuraRecords = {};
     }
     if (!allUsersData[currentUser]) {
         currentUser = "Guest";
@@ -65,7 +66,8 @@ function saveCache(data) {
 // ==========================================
 const SYNC_INTERVAL_MS = 10000;   // 他端末の変更を確認する間隔（10秒）
 const AUTOSAVE_DELAY_MS = 800;    // 変更してから保存を始めるまでの時間（0.8秒）
-const RECORD_TYPES = ['clearRecords', 'scoreRecords', 'memoRecords', 'historyRecords'];
+// pokkuraRecords = ポックラ用の公式データ（旧曲の今作スコアなど。eagate-import.js）
+const RECORD_TYPES = ['clearRecords', 'scoreRecords', 'memoRecords', 'historyRecords', 'pokkuraRecords'];
 
 let cloudReady = false;          // 最初のクラウド読み込みが成功したか
 const dirtyUsers = new Set();    // 未保存の変更があるユーザー
@@ -232,7 +234,7 @@ function stableStr(v) {
 }
 function userRecordsStr(u) {
     u = u || {};
-    return stableStr([u.clearRecords || {}, u.scoreRecords || {}, u.memoRecords || {}, u.historyRecords || {}]);
+    return stableStr(RECORD_TYPES.map(type => u[type] || {}));
 }
 
 // 版番号だけを取得する（とても軽い）
@@ -386,6 +388,7 @@ async function saveToCloud(isSongUpdate = false, targetUserName = currentUser, c
         const targetScore = allUsersData[targetUserName]?.scoreRecords || {};
         const targetMemo = allUsersData[targetUserName]?.memoRecords || {};
         const targetHistory = allUsersData[targetUserName]?.historyRecords || {};
+        const targetPokkura = allUsersData[targetUserName]?.pokkuraRecords || {};
 
         const payload = {
             type: isSongUpdate ? "updateSongs" : "updateClears",
@@ -394,7 +397,8 @@ async function saveToCloud(isSongUpdate = false, targetUserName = currentUser, c
             clearRecords: targetClear,
             scoreRecords: targetScore,
             memoRecords: targetMemo,
-            historyRecords: targetHistory
+            historyRecords: targetHistory,
+            pokkuraRecords: targetPokkura
         };
 
         if (isSongUpdate) {

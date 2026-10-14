@@ -40,6 +40,7 @@ window.onload = async () => {
         }
         saveCache(fresh);
         cloudReady = true;
+        migrateLocalPokkuraRecords(); // 端末にだけあるポックラ用データをクラウドへ
         runAutoSave();      // 待っている間の編集があれば保存
         startRemoteSync();  // 他端末の変更の確認を開始
     } catch (e) {
