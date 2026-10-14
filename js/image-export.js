@@ -332,11 +332,8 @@ function buildDiffTableRoot(targetSongs, levelText) {
         html += `<div style="display: flex; gap: 10px; align-items: stretch;">
             <div style="width: 58px; min-height: 42px; flex-shrink: 0; background: ${color}; color: #fff; font-weight: bold; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 4px 0; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.25); ${textShadow}">${labelHtml}</div>
             <div style="display: grid; grid-template-columns: repeat(${COLS}, 216px); gap: 8px 12px; align-content: center;">`;
-        // 強い曲ほど上・右に来るよう、強い順に1行ずつ区切ってから各行を左右反転する（右上が最強）
-        const orderedSongs = [];
-        for (let i = 0; i < g.songs.length; i += COLS) {
-            orderedSongs.push(...g.songs.slice(i, i + COLS).reverse());
-        }
+        // 画面の難易度表と同じ向き（最初は右上が最強）で並べる
+        const orderedSongs = orderForDirection(g.songs, COLS, getGridDirection('grid'));
         orderedSongs.forEach(song => {
             html += `<div style="display: flex; align-items: center; gap: 6px;">
                 ${buildMedalBoxHtml(clearRecords[song.id] || '')}${buildBannerBoxHtml(song, 168, 42)}
@@ -409,8 +406,8 @@ function buildPokkuraRoot(pk) {
 
     const section = (label, sub, color, list) => {
         if (list.length === 0) return '';
-        // ポイントの高い順に、左上から並べる（左上が1位）
-        const ordered = list;
+        // 画面のポックラと同じ向き（最初は左上が1位）で並べる
+        const ordered = orderForDirection(list, COLS, getGridDirection('pokkura'));
         let cells = '';
         ordered.forEach(({ song, extra, point, score, isVersion }) => {
             // Lv45 以下の新曲（アプリの曲ではない）は、バナーの代わりに曲名・ジャンルの文字の枠

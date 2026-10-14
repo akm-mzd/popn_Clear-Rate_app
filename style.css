@@ -538,11 +538,39 @@ body.exporting-image #back-to-top { display: none !important; }
 }
 #view-mode-switch button + button { border-left: 1px solid #2196F3; }
 #view-mode-switch button.active { background: #2196F3; color: #fff; }
+/* 表示方法の切り替えと「左右入れ替え」を1行に */
+.view-mode-row { display: flex; align-items: stretch; gap: 6px; flex-shrink: 0; }
+.grid-dir-btn {
+    width: auto; margin: 0; padding: 6px 10px; display: inline-flex; align-items: center; gap: 4px;
+    border: 1px solid #2196F3; border-radius: 6px; background: #fff; color: #0056b3;
+    font-weight: bold; font-size: 0.85em; cursor: pointer; white-space: nowrap; font-family: inherit;
+}
+.grid-dir-btn:hover { background: #e3f2fd; }
 @media screen and (max-width: 768px) {
     /* スマホではレベルボタンの下に置く */
     #level-view-panel { flex-direction: column; align-items: stretch; gap: 8px; }
-    #view-mode-switch button { flex: 1 1 0; padding: 9px 4px; font-size: 15px; }
+    #view-mode-switch { flex: 1 1 auto; min-width: 0; }
+    #view-mode-switch button { flex: 1 1 0; padding: 9px 2px; font-size: 13px; min-width: 0; }
+    /* 「左右入れ替え」は矢印だけ */
+    .grid-dir-btn { padding: 0 8px; }
+    .grid-dir-btn span { display: none; }
 }
+/* 表の上の向きの矢印（矢印の先が強い・高いほう） */
+.dg-dir { display: flex; align-items: center; gap: 8px; padding: 0 4px 0 68px; font-size: 12px; font-weight: bold; color: #888; }
+.dg-dir-word { flex-shrink: 0; }
+.dg-dir-strong { color: #d82f66; }
+.dg-dir-arrow { flex: 1; height: 2px; position: relative; }
+.dg-dir-to-right { background: linear-gradient(90deg, #ddd, #d82f66); }
+.dg-dir-to-left { background: linear-gradient(90deg, #d82f66, #ddd); }
+.dg-dir-arrow::after { content: ''; position: absolute; top: -4px; border: 5px solid transparent; }
+.dg-dir-to-right::after { right: -2px; border-left: 8px solid #d82f66; border-right: none; }
+.dg-dir-to-left::after { left: -2px; border-right: 8px solid #d82f66; border-left: none; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* メダル表の行ラベル（メダル画像＋曲数） */
+.mg-label { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.55); }
+.mg-label-icon { margin-bottom: 3px; }
+.mg-label-icon img { width: 30px; height: 30px; object-fit: contain; display: block; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.35)); }
+.mg-label-text { font-size: 11px; }
 
 /* =========================================
     🧱 表示方法「難易度表」
@@ -803,6 +831,8 @@ body.ui-new #view-mode-switch button {
     background: transparent; color: var(--nu-muted); font-size: 13px; padding: 7px 12px;
 }
 body.ui-new #view-mode-switch button.active { background: var(--nu-surface); color: var(--nu-purple); box-shadow: 0 1px 3px rgba(34, 28, 41, 0.15); }
+body.ui-new .grid-dir-btn { border: none; border-radius: 10px; background: var(--nu-bg); color: var(--nu-purple); font-size: 12px; }
+body.ui-new .grid-dir-btn:hover { background: var(--nu-purple-soft); }
 body.ui-new .nu-icon { display: block; flex-shrink: 0; }
 
 /* 絞り込みのチップ */
@@ -874,7 +904,9 @@ body.ui-new #back-to-top { background-color: var(--nu-purple) !important; }
 
 @media screen and (max-width: 768px) {
     body.ui-new #main-level-slot #level-view-panel { flex-direction: column; align-items: stretch; }
-    body.ui-new #view-mode-switch { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    body.ui-new #view-mode-switch { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+    body.ui-new .grid-dir-btn { flex-direction: column; justify-content: center; }
+    .dg-dir { padding-left: 50px; }
     body.ui-new #view-mode-switch button { flex-direction: column; gap: 1px; font-size: 10px; padding: 5px 2px; }
     body.ui-new #save-btn { bottom: 150px !important; }
     body.ui-new .nu-save-label { display: none; }
