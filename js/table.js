@@ -299,6 +299,20 @@ function handleScoreToggle() {
     renderTable();
 }
 
+// 難易度の強さを数にする（指数があれば指数、なければ難易度の種類から。不明は -999）
+function getDiffSortValue(song) {
+    if (song.diffIndex !== null && song.diffIndex !== undefined && !isNaN(song.diffIndex)) return parseFloat(song.diffIndex);
+    if (song.diffClass === '危険') return 2.5;
+    if (song.diffClass === '別格') return 2.0;
+    if (song.diffClass === '詐称') return 1.5;
+    if (song.diffClass === '強') return 1.0;
+    if (song.diffClass === '中') return 0.0;
+    if (song.diffClass === '弱') return -1.0;
+    if (song.diffClass === '逆詐称') return -1.5;
+    if (song.diffClass === '入門') return -2.0;
+    return -999;
+}
+
 function renderTable() {
     const searchInput = document.getElementById('search-input');
     const searchQuery = searchInput ? searchInput.value.trim().toLowerCase() : "";
@@ -392,20 +406,8 @@ function renderTable() {
         displaySongs.sort((a, b) => sortDesc ? b.notes - a.notes : a.notes - b.notes);
     } else if (currentSort === 'diff') {
         displaySongs.sort((a, b) => {
-            const getVal = (song) => {
-                if (song.diffIndex !== null && !isNaN(song.diffIndex)) return parseFloat(song.diffIndex);
-                if (song.diffClass === '危険') return 2.5; 
-                if (song.diffClass === '別格') return 2.0;
-                if (song.diffClass === '詐称') return 1.5;
-                if (song.diffClass === '強') return 1.0;
-                if (song.diffClass === '中') return 0.0;
-                if (song.diffClass === '弱') return -1.0;
-                if (song.diffClass === '逆詐称') return -1.5;
-                if (song.diffClass === '入門') return -2.0; 
-                return -999;
-            };
-            let valA = getVal(a);
-            let valB = getVal(b);
+            let valA = getDiffSortValue(a);
+            let valB = getDiffSortValue(b);
             if (valA === valB) return a.originalOrder - b.originalOrder;
             return sortDesc ? valB - valA : valA - valB;
         });
@@ -934,7 +936,45 @@ function setLevelButtonPlacement(onMain) {
 // ==========================================
 // ★ 表示方法（リスト / 難易度表 / スコア表）
 // ==========================================
-const VIEW_MODES = ['list', 'grid', 'score', 'pokkura'];
+const VIEW_MODES = ['list', 'grid', 'medal', 'score', 'pokkura'];
+
+// ---------- 表の向き（強い曲を右に置くか左に置くか。表ごとに、この端末に保存） ----------
+//   'right' = 右が強い（強い順に1行ずつ区切って各行を左右反転。右上が最強）
+//   'left'  = 左が強い（強い順に左上から並べる）
+const GRID_DIR_DEFAULTS = { grid: 'right', medal: 'right', score: 'left', pokkura: 'left' };
+const GRID_DIR_WORDS = { grid: ['弱', '強'], medal: ['弱', '強'], score: ['低', '高'], pokkura: ['低', '高'] };
+
+function getGridDirection(mode) {
+    const saved = storageGet('popn_dir_' + mode);
+    return (saved === 'left' || saved === 'right') ? saved : (GRID_DIR_DEFAULTS[mode] || 'right');
+}
+
+// 今見ている表の向きだけを入れ替える（表示レベル・方法の枠のボタン）
+function toggleGridDirection() {
+    if (!GRID_DIR_DEFAULTS[viewMode]) return;
+    storageSet('popn_dir_' + viewMode, getGridDirection(viewMode) === 'right' ? 'left' : 'right');
+    renderTable();
+}
+
+// 強い順の配列を、向きに合わせて並べ替える
+function orderForDirection(list, cols, dir) {
+    if (dir !== 'right') return list.slice();
+    const ordered = [];
+    for (let i = 0; i < list.length; i += cols) ordered.push(...list.slice(i, i + cols).reverse());
+    return ordered;
+}
+
+// 表の上に出す向きの矢印（矢印の先が強い・高いほう）
+function buildDirectionBar(mode) {
+    const [weak, strong] = GRID_DIR_WORDS[mode] || ['弱', '強'];
+    const right = getGridDirection(mode) === 'right';
+    const weakHtml = `<span class="dg-dir-word">${weak}</span>`;
+    const strongHtml = `<span class="dg-dir-word dg-dir-strong">${strong}</span>`;
+    return `<div class="dg-dir" title="「表示レベル・方法」の「左右入れ替え」で向きを変えられます">
+        ${right ? weakHtml : strongHtml}<span class="dg-dir-arrow ${right ? 'dg-dir-to-right' : 'dg-dir-to-left'}" aria-hidden="true"></span>${right ? strongHtml : weakHtml}
+        <span class="sr-only">${right ? `右ほど${strong}い` : `左ほど${strong}い`}</span>
+    </div>`;
+}
 
 // 起動時の表示方法（メニューの「起動時の表示」で設定、この端末に保存）
 //   未設定なら、以前の「最後に選んだ表示方法」を引き継ぎ、それもなければ難易度表
@@ -998,6 +1038,8 @@ function updateViewModeButtons() {
     });
     const pkImageBtn = document.getElementById('btn-pokkura-image');
     if (pkImageBtn) pkImageBtn.style.display = scoreOk ? '' : 'none';
+    const dirBtn = document.getElementById('grid-dir-btn');
+    if (dirBtn) dirBtn.style.display = GRID_DIR_DEFAULTS[viewMode] ? '' : 'none';
 }
 
 // renderTable の最後に呼ばれる：表・難易度表・スコア表のどれを見せるかを切り替える
@@ -1013,6 +1055,7 @@ function applyViewMode(displaySongs) {
     capture.style.display = isGrid ? 'none' : '';
     grid.style.display = isGrid ? '' : 'none';
     if (viewMode === 'grid') renderDiffGrid(displaySongs);
+    else if (viewMode === 'medal') renderMedalGrid(displaySongs);
     else if (viewMode === 'score') renderScoreGrid(displaySongs);
     else if (viewMode === 'pokkura') renderPokkuraGrid();
     else grid.innerHTML = '';
@@ -1040,18 +1083,15 @@ function renderDiffGrid(targetSongs) {
         return;
     }
 
-    let html = '';
+    let html = buildDirectionBar('grid');
     buildDiffTableGroups(targetSongs).forEach(g => {
         const labelHtml = g.cls === '未定'
             ? '<span class="dg-label-cls">未定</span>'
             : `<span class="dg-label-cls">${escapeHtml(g.cls)}</span><span class="dg-label-idx">${escapeHtml(g.label)}</span>`;
         const lightLabel = (g.cls === '弱' || (g.cls === '中' && g.label.startsWith('-'))) ? ' dg-label-light' : '';
 
-        // 強い曲ほど上・右に来るよう、強い順に1行ずつ区切ってから各行を左右反転する（右上が最強）
-        const ordered = [];
-        for (let i = 0; i < g.songs.length; i += COLS) {
-            ordered.push(...g.songs.slice(i, i + COLS).reverse());
-        }
+        // 強い順の曲を、表の向き（最初は右が強い）に合わせて並べる
+        const ordered = orderForDirection(g.songs, COLS, getGridDirection('grid'));
 
         let cells = '';
         ordered.forEach(song => {
@@ -1079,8 +1119,71 @@ function renderDiffGrid(targetSongs) {
     grid.innerHTML = html;
 }
 
+// ---------- メダル表 ----------
+// メダルごとの行（金星 → … → 黒丸 → 未プレイ → 未解禁）。行の中は、難易度指数の強い順（向きは表ごとの設定）
+const DIFF_CLASS_RANK = { '危険': 8, '別格': 7, '詐称': 6, '強': 5, '中': 4, '弱': 3, '逆詐称': 2, '入門': 1 };
+
+function renderMedalGrid(targetSongs) {
+    const grid = document.getElementById('diff-grid-view');
+    const showScore = document.getElementById('show-score-col').checked; // スコア表示中は、メダルの上にスコアランクを重ねる
+    const narrow = isNarrowScreen();
+    const COLS = narrow ? 2 : 5;
+    lastGridNarrow = narrow;
+
+    if (targetSongs.length === 0) {
+        grid.innerHTML = '<div class="dg-empty">表示する曲がありません</div>';
+        return;
+    }
+
+    const groups = {};
+    targetSongs.forEach(song => {
+        const key = MEDAL_TYPES[clearRecords[song.id] || ''] ? (clearRecords[song.id] || '') : '';
+        (groups[key] = groups[key] || []).push(song);
+    });
+    const medalKeys = Object.keys(MEDAL_TYPES).sort((a, b) => MEDAL_TYPES[b].rank - MEDAL_TYPES[a].rank);
+    const strongerFirst = (a, b) => (getDiffSortValue(b) - getDiffSortValue(a))
+        || ((DIFF_CLASS_RANK[b.diffClass] || 0) - (DIFF_CLASS_RANK[a.diffClass] || 0))
+        || (a.originalOrder - b.originalOrder);
+
+    let html = buildDirectionBar('medal');
+    medalKeys.forEach(k => {
+        const list = groups[k];
+        if (!list || list.length === 0) return;
+        list.sort(strongerFirst);
+        const ordered = orderForDirection(list, COLS, getGridDirection('medal'));
+
+        let cells = '';
+        ordered.forEach(song => {
+            const rank = showScore ? getSongScoreRank(song) : '';
+            const rankHtml = rank ? `<img class="dg-rank" src="${escapeHtml(RANK_IMAGES[rank])}" alt="${escapeHtml(rank)}" loading="lazy">` : '';
+            const bannerSrc = safeUrl(song.bannerUrl, true);
+            const bannerInner = bannerSrc
+                ? `<img src="${escapeHtml(bannerSrc)}" alt="${escapeHtml(song.title)}" loading="lazy">`
+                : `<span class="dg-banner-text">${escapeHtml(song.title)}</span>`;
+            const diffText = song.diffRaw ? `・${song.diffRaw}` : '';
+            cells += `
+                <div class="dg-cell">
+                    <button type="button" class="dg-medal${k === '' ? ' dg-medal-empty' : ''}" onclick="openMedalModal('${jsStringAttr(song.id)}')" title="メダルを変更">${buildGridMedalInner(k)}${rankHtml}</button>
+                    <a class="dg-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（Lv${escapeHtml(song.level)}${escapeHtml(diffText)}・攻略wikiを開く）">${bannerInner}</a>
+                </div>`;
+        });
+
+        const m = MEDAL_TYPES[k];
+        const icon = buildGridMedalInner(k);
+        const labelHtml = icon && k !== '未解禁'
+            ? `<span class="mg-label-icon">${icon}</span>`
+            : `<span class="dg-label-cls mg-label-text">${escapeHtml(m.label)}</span>`;
+        html += `
+            <div class="dg-row">
+                <div class="dg-label mg-label" style="background: ${k === '' ? '#9e9e9e' : (MEDAL_COLORS[k] || '#9e9e9e')};" title="${escapeHtml(m.label)}">${labelHtml}<span class="sg-count">${list.length}曲</span></div>
+                <div class="dg-cells" style="grid-template-columns: repeat(${COLS}, minmax(0, 1fr));">${cells}</div>
+            </div>`;
+    });
+    grid.innerHTML = html;
+}
+
 // ---------- スコア表 ----------
-// スコアランクごとの行（S+ → E、最後に「なし」）。行の中は、スコアの高い曲ほど上・右に来る（右上が最高）
+// スコアランクごとの行（S+ → E、最後に「なし」）。行の中は、スコアの高い順（向きは表ごとの設定）
 const SCORE_GRID_LABEL_COLORS = {
     'S+': '#d4a106', 'S': '#e0b31a', 'AAA': '#e65100', 'AA+': '#ef6c00', 'AA': '#f57c00',
     'A+': '#c62828', 'A': '#d32f2f', 'B+': '#1565c0', 'B': '#1976d2', 'C': '#2e7d32', 'D': '#558b2f', 'E': '#6d4c41'
@@ -1104,13 +1207,13 @@ function renderScoreGrid(targetSongs) {
     const scoreOf = song => parseInt(scoreRecords[song.id], 10) || 0;
     const medalRankOf = song => (MEDAL_TYPES[clearRecords[song.id] || ''] || { rank: 0 }).rank;
 
-    let html = '';
+    let html = buildDirectionBar('score');
     SCORE_RANK_KEYS.concat(SCORE_RANK_NONE).forEach(k => {
         const list = groups[k];
         if (list.length === 0) return;
-        // 高い順（スコアなしはメダルの良い順）に、左上から並べる（左が強い）
+        // 高い順（スコアなしはメダルの良い順）に、表の向き（最初は左が高い）に合わせて並べる
         list.sort((a, b) => (scoreOf(b) - scoreOf(a)) || (medalRankOf(b) - medalRankOf(a)) || (a.originalOrder - b.originalOrder));
-        const ordered = list;
+        const ordered = orderForDirection(list, COLS, getGridDirection('score'));
 
         let cells = '';
         ordered.forEach(song => {
@@ -1268,8 +1371,8 @@ function renderPokkuraGrid() {
 
     const section = (label, sub, color, list) => {
         if (list.length === 0) return '';
-        // ポイントの高い順に、左上から並べる（左上が1位）
-        const ordered = list;
+        // ポイントの高い順に、表の向き（最初は左上が1位）に合わせて並べる
+        const ordered = orderForDirection(list, COLS, getGridDirection('pokkura'));
         let cells = '';
         ordered.forEach(({ song, extra, point, score, isVersion }) => {
             const pointHtml = `<span class="pk-point" title="ポイント ${point.toFixed(2)}">${pkFloor(point / 60, 3).toFixed(3)}</span>`;
@@ -1325,6 +1428,7 @@ function renderPokkuraGrid() {
         ? section('新曲', '圏外', '#c48a9b', pk.restNew) + section('旧曲', '圏外', '#a58bb3', pk.restOld)
         : '<div class="dg-empty">圏外の曲はありません</div>';
     html += `
+        ${buildDirectionBar('pokkura')}
         <div class="pk-slider" id="pk-slider">
             <div class="pk-panel" id="pk-panel-top" role="tabpanel" aria-labelledby="pk-tab-top">${topHtml}</div>
             <div class="pk-panel pk-panel-rest" id="pk-panel-rest" role="tabpanel" aria-labelledby="pk-tab-rest">${restHtml}</div>

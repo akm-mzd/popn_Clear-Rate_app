@@ -28,7 +28,7 @@ pop'n music のクリア状況を管理する静的サイトです（GitHub Page
 | `js/utils.js` | 共通の道具：HTMLエスケープ、URLの安全確認、クリア率の表示形式、難易度の解釈、レベル一覧、難易度表の行分け（`buildDiffTableGroups`）、攻略wikiのURL |
 | `js/cloud.js` | クラウドとのやり取り：読み込み、自動保存、他端末の変更の反映、手動保存 |
 | `js/users.js` | ユーザーの切替・追加 |
-| `js/table.js` | 絞り込み・並び替え・統計・表の描画・表示レベルボタン・表示方法（リスト / 難易度表 / スコア表 / ポックラ）・起動時の表示設定（`popn_startup_level` / `popn_startup_view`）。フリーワード検索は表示レベルに関係なく全曲から探す。ポックラは曲の `pokkuraLevel`（ポックラ反映時のレベル）があればそのレベルで計算する（`getPokkuraLevel`） |
+| `js/table.js` | 絞り込み・並び替え・統計・表の描画・表示レベルボタン・表示方法（リスト / 難易度表 / メダル表 / スコア表 / ポックラ）・起動時の表示設定（`popn_startup_level` / `popn_startup_view`）。フリーワード検索は表示レベルに関係なく全曲から探す。ポックラは曲の `pokkuraLevel`（ポックラ反映時のレベル）があればそのレベルで計算する（`getPokkuraLevel`） |
 | `js/modals.js` | メダル・スコア・メモ・ランダムセレクト・楽曲編集のモーダル。楽曲編集の「ポックラ反映時のLv」は、Lv と違うときだけ曲データに `pokkuraLevel` として入れる（空欄・Lv と同じなら消す） |
 | `js/history.js` | メダル・スコアの更新履歴（手動・公式取り込みの両方を記録、`historyRecords` としてクラウドに保存）と、履歴を見る画面（1件ずつ削除できる） |
 | `js/admin.js` | 管理者向け：データ取り込み、バックアップ/復元、バナー登録、難易度の一括割り当て |
@@ -47,7 +47,7 @@ pop'n music のクリア状況を管理する静的サイトです（GitHub Page
 - localStorage は直接触らず、`storageGet` / `storageSet` / `storageRemove` を使う。
 - 画像出力の中身は、インラインスタイルで組み立てる。ページの CSS（特にスマホ用）の影響を受けないようにするため。
 - 新しいバージョンが出たら、`js/table.js` の `VERSION_ORDER_AC_NAMED` に略称を追加する。ポックラの新曲枠は、データ中で一番新しいアーケードのバージョンになる（`getPokkuraNewVersion`）。
-- 曲を並べる向き：難易度表は右が強い（行ごとに左右反転）。スコア表・ポックラは左上が一番強い（順位どおり左から右へ）。
+- 曲を並べる向き：表ごとに「右が強い（行ごとに左右反転）」か「左が強い（順位どおり左から右へ）」を選べる（`getGridDirection` / `orderForDirection`、この端末に `popn_dir_表の名前` で保存）。最初は難易度表・メダル表が右が強い、スコア表・ポックラが左が強い。画像出力も同じ向きにする。表の上には向きの矢印（`buildDirectionBar`）を出す。
 - スマホかどうかの判定は、`isNarrowScreen()`（画面幅）か `isMobileDevice()`（端末）を使う。
 
 ## 動作確認
