@@ -11,6 +11,7 @@ const HISTORY_MAX = 5000;      // これより多くなったら古いものか�
 const HISTORY_PAGE_SIZE = 200; // 画面に一度に出す件数
 
 let historyShowCount = HISTORY_PAGE_SIZE;
+let historyOpenDays = null; // 開いている日付（null = まだ決めていない → 一番新しい日だけ開く）
 
 function getHistoryRecords(user = currentUser) {
     if (!allUsersData[user]) allUsersData[user] = emptyUser();
@@ -54,6 +55,7 @@ function addHistoryEntry(song, change, src) {
 function openHistoryModal() {
     toggleMenu(false);
     historyShowCount = HISTORY_PAGE_SIZE;
+    historyOpenDays = null;
     renderHistoryModal();
     document.getElementById('history-modal').style.display = 'flex';
 }
@@ -85,10 +87,11 @@ function historyScoreHtml(os, ns) {
     return `<span class="hist-score">${os} → <span class="hist-diff ${diff >= 0 ? 'up' : 'down'}">(${diffText})</span> <b>${ns}</b></span>`;
 }
 
-// 履歴を1件消す（曲のメダル・スコアはそのまま）。消したことは自動保存でクラウドにも反映される
+// 履歴を1件消す（管理者だけ。曲のメダル・スコアはそのまま）。消したことは自動保存でクラウドにも反映される
 function deleteHistoryEntry(key) {
     const records = getHistoryRecords();
     if (!records[key]) return;
+    if (!checkAdminAuth()) return;
     if (!confirm('この履歴を削除しますか？\n（曲のメダル・スコアは変わりません）')) return;
     delete records[key];
     scheduleAutoSave();
@@ -113,33 +116,47 @@ function renderHistoryModal() {
         return;
     }
 
-    let html = '';
-    let lastDay = '';
+    // 日付ごとにまとめる（新しい日が上）
+    const days = [];
     list.slice(0, historyShowCount).forEach(({ key, e }) => {
         const d = new Date(e.t);
         const day = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}（${HISTORY_WEEKDAYS[d.getDay()]}）`;
-        if (day !== lastDay) {
-            html += `<div class="hist-day">${day}</div>`;
-            lastDay = day;
-        }
-        const time = `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
-        const parts = [];
-        if ('nm' in e) parts.push(`<span class="hist-change">${historyMedalHtml(e.om)}<span class="hist-arrow">→</span>${historyMedalHtml(e.nm)}</span>`);
-        if ('ns' in e) parts.push(historyScoreHtml(e.os, e.ns));
-        html += `
+        if (days.length === 0 || days[days.length - 1].day !== day) days.push({ day, items: [] });
+        days[days.length - 1].items.push({ key, e, d });
+    });
+    // 最初は一番新しい日だけ開く。そのあとは開いた・閉じた状態を画面を閉じるまで覚えておく
+    if (historyOpenDays === null) historyOpenDays = new Set(days.length > 0 ? [days[0].day] : []);
+
+    let html = '';
+    days.forEach(({ day, items }) => {
+        html += `<details class="hist-day-group" data-day="${escapeHtml(day)}"${historyOpenDays.has(day) ? ' open' : ''} ontoggle="onHistoryDayToggle(this)">
+            <summary class="hist-day"><span>${day}</span><span class="hist-day-count">${items.length}件</span></summary>`;
+        items.forEach(({ key, e, d }) => {
+            const time = `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
+            const parts = [];
+            if ('nm' in e) parts.push(`<span class="hist-change">${historyMedalHtml(e.om)}<span class="hist-arrow">→</span>${historyMedalHtml(e.nm)}</span>`);
+            if ('ns' in e) parts.push(historyScoreHtml(e.os, e.ns));
+            html += `
             <div class="hist-item">
                 <div class="hist-head">
                     <span class="hist-time">${time}</span>
                     <span class="hist-src ${e.src === 'e' ? 'eagate' : 'manual'}">${e.src === 'e' ? '公式' : '手動'}</span>
                     <span class="level-badge">${escapeHtml(e.lv)}</span>
                     <span class="hist-title">${escapeHtml(e.ti)}</span>
-                    <button type="button" class="hist-delete" onclick="deleteHistoryEntry('${jsStringAttr(key)}')" title="この履歴を削除" aria-label="この履歴を削除">✕</button>
+                    <button type="button" class="hist-delete" onclick="deleteHistoryEntry('${jsStringAttr(key)}')" title="この履歴を削除（管理者のみ）" aria-label="この履歴を削除（管理者のみ）">✕</button>
                 </div>
                 <div class="hist-body">${parts.join('')}</div>
             </div>`;
+        });
+        html += `</details>`;
     });
     if (list.length > historyShowCount) {
         html += `<button class="hist-more" onclick="showMoreHistory()">さらに表示（残り ${list.length - historyShowCount}件）</button>`;
     }
     body.innerHTML = html;
+}
+
+function onHistoryDayToggle(el) {
+    if (!historyOpenDays) historyOpenDays = new Set();
+    if (el.open) historyOpenDays.add(el.dataset.day); else historyOpenDays.delete(el.dataset.day);
 }

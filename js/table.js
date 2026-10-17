@@ -1307,9 +1307,14 @@ function calcPokkura() {
         if (!group) return;
         const vr = group === 'old' && version ? version.records[song.id] : null;
         const score = vr ? vr.s : scoreRecords[song.id];
-        const medal = vr ? vr.m : (clearRecords[song.id] || '');
+        let medal = vr ? vr.m : (clearRecords[song.id] || '');
+        // 今作のメダルはプレイ回数からの推測で、イージークリアは黒星になる。
+        //   歴代イージー・今作黒星の曲は、自分で「今作EC」の印を付けた曲だけイージーで数える
+        const ecCandidate = !!vr && vr.m === '黒星' && clearRecords[song.id] === 'イージー';
+        const ecOn = ecCandidate && !!version.ecMarks[song.id];
+        if (ecOn) medal = 'イージー';
         const point = calcPokkuraPoint(parseInt(getPokkuraLevel(song), 10), score, medal);
-        if (point > 0) entries[group].push({ song, point, score: parseInt(score, 10) || 0, isVersion: !!vr });
+        if (point > 0) entries[group].push({ song, point, score: parseInt(score, 10) || 0, isVersion: !!vr, ecCandidate, ecOn });
     });
     // Lv45 以下の今作の新曲（公式データ取り込みで保存したもの。アプリには曲として入っていない）
     const extraNew = version ? version.extraNew : [];
@@ -1335,6 +1340,17 @@ function calcPokkura() {
         oldPoint: pkFloor(pkRound(sum(topOld), 8) / 60, 2),
         total: pkFloor(pkRound(sum(topNew) + sum(topOld), 8) / 60, 2)
     };
+}
+
+// 「今作EC」の印を付ける・外す（ポックラ用の公式データと一緒にクラウドに保存）
+function togglePokkuraEasyMark(songId) {
+    const version = loadPokkuraVersionRecords(currentUser);
+    if (!version) return;
+    const marks = Object.assign({}, version.ecMarks);
+    if (marks[songId]) delete marks[songId]; else marks[songId] = true;
+    setPokkuraEasyMarks(currentUser, marks);
+    scheduleAutoSave();
+    renderTable();
 }
 
 function formatPokkuraDate(iso) {
@@ -1374,7 +1390,7 @@ function renderPokkuraGrid() {
         // ポイントの高い順に、表の向き（最初は左上が1位）に合わせて並べる
         const ordered = orderForDirection(list, COLS, getGridDirection('pokkura'));
         let cells = '';
-        ordered.forEach(({ song, extra, point, score, isVersion }) => {
+        ordered.forEach(({ song, extra, point, score, isVersion, ecCandidate, ecOn }) => {
             const pointHtml = `<span class="pk-point" title="ポイント ${point.toFixed(2)}">${pkFloor(point / 60, 3).toFixed(3)}</span>`;
             if (extra) {
                 // Lv45 以下の新曲：アプリの曲ではないので、バナーなし・変更なし（表示だけ）
@@ -1408,6 +1424,7 @@ function renderPokkuraGrid() {
                     <div class="dg-banner-wrap">
                         <a class="dg-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（Lv${escapeHtml(song.level)}・攻略wikiを開く）">${bannerInner}</a>
                         ${lvHtml}
+                        ${ecCandidate ? `<button type="button" class="pk-ec${ecOn ? ' on' : ''}" onclick="togglePokkuraEasyMark('${safeId}')" aria-pressed="${ecOn}" title="歴代イージー・今作は黒星の曲です。今作でイージークリアしていたら押してください（イージーで計算します）">今作EC</button>` : ''}
                         <button type="button" class="dg-score pk-score${isVersion ? ' pk-score-version' : ''}" onclick="openScoreModal('${safeId}')" title="${isVersion ? `今作のスコア（歴代ベスト ${escapeHtml(scoreRecords[song.id] || '-')}）。押すと歴代ベストを変更` : 'スコアを変更'}">${score}</button>
                         ${pointHtml}
                     </div>
