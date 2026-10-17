@@ -655,12 +655,6 @@ body.exporting-image #back-to-top { display: none !important; }
 .pk-panel { flex: 0 0 100%; min-width: 0; scroll-snap-align: start; scroll-snap-stop: always; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box; }
 .pk-panel-rest { background: repeating-linear-gradient(-45deg, transparent 0 10px, rgba(0,0,0,0.025) 10px 20px); border-radius: 6px; }
 .pk-panel-rest .dg-cells { opacity: 0.82; }
-.pk-vm {
-    position: absolute; right: 2px; top: 2px; height: 18px; padding: 0 2px; border-radius: 4px; cursor: pointer;
-    border: 1px solid #9e9e9e; background: rgba(255,255,255,0.92); color: #424242;
-    font-size: 10px; font-weight: bold; font-family: inherit; max-width: 70%;
-}
-.pk-vm.changed { border-color: #2e7d32; background: #43a047; color: #fff; }
 .pk-lv-custom { background: #ffeb3b; color: #5d4037; outline: 1px solid #f9a825; }
 .pk-label-sub { font-size: 11px; line-height: 1; margin-top: 4px; }
 #diff-grid-view .dg-score.pk-score { right: auto; left: 2px; font-weight: normal; }
@@ -690,7 +684,6 @@ body.exporting-image #back-to-top { display: none !important; }
     .sg-rank-img { max-width: 40px; max-height: 20px; }
     .pk-point { font-size: 10px; padding: 0 4px; }
     .pk-lv { font-size: 9px; }
-    .pk-vm { font-size: 9px; height: 16px; max-width: 56px; }
     .pk-total-value { font-size: 24px; }
     .pk-panel { gap: 6px; }
 }

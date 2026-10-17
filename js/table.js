@@ -1307,13 +1307,9 @@ function calcPokkura() {
         if (!group) return;
         const vr = group === 'old' && version ? version.records[song.id] : null;
         const score = vr ? vr.s : scoreRecords[song.id];
-        let medal = vr ? vr.m : (clearRecords[song.id] || '');
-        // 今作のメダルはプレイ回数からの推測で、イージー・黒菱・黒丸もすべて黒星になる。
-        //   歴代イージー・今作黒星の曲は、新ポックラ以降のメダルを自分で選べる（最初は黒星）
-        const vmSelectable = !!vr && vr.m === '黒星' && clearRecords[song.id] === 'イージー';
-        if (vmSelectable) medal = version.vmChoices[song.id] || '黒星';
+        const medal = vr ? vr.m : (clearRecords[song.id] || '');
         const point = calcPokkuraPoint(parseInt(getPokkuraLevel(song), 10), score, medal);
-        if (point > 0) entries[group].push({ song, point, score: parseInt(score, 10) || 0, isVersion: !!vr, vmSelectable, calcMedal: medal });
+        if (point > 0) entries[group].push({ song, point, score: parseInt(score, 10) || 0, isVersion: !!vr });
     });
     // Lv45 以下の今作の新曲（公式データ取り込みで保存したもの。アプリには曲として入っていない）
     const extraNew = version ? version.extraNew : [];
@@ -1339,17 +1335,6 @@ function calcPokkura() {
         oldPoint: pkFloor(pkRound(sum(topOld), 8) / 60, 2),
         total: pkFloor(pkRound(sum(topNew) + sum(topOld), 8) / 60, 2)
     };
-}
-
-// 新ポックラ以降のメダルを選ぶ（ポックラ用の公式データと一緒にクラウドに保存。黒星は保存しない）
-function setPokkuraVersionMedal(songId, medal) {
-    const version = loadPokkuraVersionRecords(currentUser);
-    if (!version || !POKKURA_VM_CHOICES.includes(medal)) return;
-    const choices = Object.assign({}, version.vmChoices);
-    if (medal === '黒星') delete choices[songId]; else choices[songId] = medal;
-    setPokkuraVmChoices(currentUser, choices);
-    scheduleAutoSave();
-    renderTable();
 }
 
 function formatPokkuraDate(iso) {
@@ -1389,7 +1374,7 @@ function renderPokkuraGrid() {
         // ポイントの高い順に、表の向き（最初は左上が1位）に合わせて並べる
         const ordered = orderForDirection(list, COLS, getGridDirection('pokkura'));
         let cells = '';
-        ordered.forEach(({ song, extra, point, score, isVersion, vmSelectable, calcMedal }) => {
+        ordered.forEach(({ song, extra, point, score, isVersion }) => {
             const pointHtml = `<span class="pk-point" title="ポイント ${point.toFixed(2)}">${pkFloor(point / 60, 3).toFixed(3)}</span>`;
             if (extra) {
                 // Lv45 以下の新曲：アプリの曲ではないので、バナーなし・変更なし（表示だけ）
@@ -1405,9 +1390,7 @@ function renderPokkuraGrid() {
                 </div>`;
                 return;
             }
-            // メダルを選べる曲は、計算に使っているメダルを出す（押すと開くのは歴代メダルの変更）
-            const medalKey = vmSelectable ? calcMedal : (clearRecords[song.id] || '');
-            const medalTitle = vmSelectable ? `新ポックラ以降は${calcMedal}として計算（押すと歴代メダルを変更）` : 'メダルを変更';
+            const medalKey = clearRecords[song.id] || '';
             const medalClass = medalKey === '' ? ' dg-medal-empty' : '';
             const bannerSrc = safeUrl(song.bannerUrl, true);
             const bannerInner = bannerSrc
@@ -1421,11 +1404,10 @@ function renderPokkuraGrid() {
                 : `<span class="pk-lv">${escapeHtml(song.level)}</span>`;
             cells += `
                 <div class="dg-cell">
-                    <button type="button" class="dg-medal${medalClass}" onclick="openMedalModal('${safeId}')" title="${escapeHtml(medalTitle)}">${buildGridMedalInner(medalKey)}</button>
+                    <button type="button" class="dg-medal${medalClass}" onclick="openMedalModal('${safeId}')" title="メダルを変更">${buildGridMedalInner(medalKey)}</button>
                     <div class="dg-banner-wrap">
                         <a class="dg-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（Lv${escapeHtml(song.level)}・攻略wikiを開く）">${bannerInner}</a>
                         ${lvHtml}
-                        ${vmSelectable ? `<select class="pk-vm${calcMedal !== '黒星' ? ' changed' : ''}" onchange="setPokkuraVersionMedal('${safeId}', this.value)" aria-label="${escapeHtml(song.title)}の新ポックラ以降のメダル" title="歴代はイージー・今作の記録は未クリア（黒星）の曲です。新ポックラ以降のメダルを選んでください（イージーならボーナスが付きます）">${POKKURA_VM_CHOICES.map(m => `<option value="${m}"${m === calcMedal ? ' selected' : ''}>${m}</option>`).join('')}</select>` : ''}
                         <button type="button" class="dg-score pk-score${isVersion ? ' pk-score-version' : ''}" onclick="openScoreModal('${safeId}')" title="${isVersion ? `今作のスコア（歴代ベスト ${escapeHtml(scoreRecords[song.id] || '-')}）。押すと歴代ベストを変更` : 'スコアを変更'}">${score}</button>
                         ${pointHtml}
                     </div>

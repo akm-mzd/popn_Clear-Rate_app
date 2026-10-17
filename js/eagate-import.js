@@ -388,19 +388,13 @@ function applyEagateImport() {
 //   その端末のデータは、クラウドに入ったと確認できるまで残しておく（GAS が古いときの保険）
 const POKKURA_AT_KEY = '_at';
 const POKKURA_EXTRA_KEY = '_extra';
-const POKKURA_VM_KEY = '_vm'; // 新ポックラ以降のメダルを自分で選んだもの { 曲ID: 'イージー' | '黒菱' | '黒丸' }（取り込み直しても残す）
-const POKKURA_EC_KEY = '_ec'; // ver 3.3.0.0 の「今作EC」の印 { 曲ID: true }。読むときにイージーとして引き継ぐ
-const POKKURA_META_KEYS = [POKKURA_AT_KEY, POKKURA_EXTRA_KEY, POKKURA_VM_KEY, POKKURA_EC_KEY];
-// 今作のメダルが黒星（クリア回数 0）のとき、選べるメダル（黒星は最初の値なので保存しない）
-const POKKURA_VM_CHOICES = ['黒星', '黒菱', '黒丸', 'イージー'];
 
 function pokkuraVersionKey(user) {
     return 'popn_pokkura_version_' + user;
 }
 
 function savePokkuraVersionRecords(user, records, at, extraNew) {
-    const prev = loadPokkuraVersionRecords(user);
-    const data = { at: at || new Date().toISOString(), records, extraNew: extraNew || [], vmChoices: prev ? prev.vmChoices : {} };
+    const data = { at: at || new Date().toISOString(), records, extraNew: extraNew || [] };
     if (!allUsersData[user]) allUsersData[user] = emptyUser();
     // 前回の取り込み分は丸ごと置き換える
     allUsersData[user].pokkuraRecords = toPokkuraCloudRecords(data);
@@ -408,40 +402,16 @@ function savePokkuraVersionRecords(user, records, at, extraNew) {
 }
 
 function toPokkuraCloudRecords(data) {
-    const rec = Object.assign({}, data.records, { [POKKURA_AT_KEY]: data.at, [POKKURA_EXTRA_KEY]: data.extraNew || [] });
-    if (data.vmChoices && Object.keys(data.vmChoices).length > 0) rec[POKKURA_VM_KEY] = data.vmChoices;
-    return rec;
-}
-
-// 選んだメダルだけを書き換える
-function setPokkuraVmChoices(user, choices) {
-    const data = loadPokkuraVersionRecords(user);
-    if (!data) return;
-    data.vmChoices = choices;
-    allUsersData[user].pokkuraRecords = toPokkuraCloudRecords(data);
-    if (loadLocalPokkuraVersionRecords(user)) storageSet(pokkuraVersionKey(user), JSON.stringify(data));
+    return Object.assign({}, data.records, { [POKKURA_AT_KEY]: data.at, [POKKURA_EXTRA_KEY]: data.extraNew || [] });
 }
 
 function fromPokkuraCloudRecords(rec) {
     if (!rec || typeof rec !== 'object' || !rec[POKKURA_AT_KEY]) return null;
     const records = {};
     for (const id in rec) {
-        if (!POKKURA_META_KEYS.includes(id)) records[id] = rec[id];
+        if (id !== POKKURA_AT_KEY && id !== POKKURA_EXTRA_KEY) records[id] = rec[id];
     }
-    return {
-        at: rec[POKKURA_AT_KEY], records,
-        extraNew: Array.isArray(rec[POKKURA_EXTRA_KEY]) ? rec[POKKURA_EXTRA_KEY] : [],
-        vmChoices: readVmChoices(rec[POKKURA_VM_KEY], rec[POKKURA_EC_KEY])
-    };
-}
-
-// 選んだメダルを読む（ver 3.3.0.0 の _ec はイージーとして引き継ぐ。知らない値は捨てる）
-function readVmChoices(vm, ec) {
-    const out = {};
-    const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
-    if (isObj(ec)) for (const id in ec) if (ec[id]) out[id] = 'イージー';
-    if (isObj(vm)) for (const id in vm) if (POKKURA_VM_CHOICES.includes(vm[id]) && vm[id] !== '黒星') out[id] = vm[id];
-    return out;
+    return { at: rec[POKKURA_AT_KEY], records, extraNew: Array.isArray(rec[POKKURA_EXTRA_KEY]) ? rec[POKKURA_EXTRA_KEY] : [] };
 }
 
 function loadLocalPokkuraVersionRecords(user) {
@@ -449,8 +419,6 @@ function loadLocalPokkuraVersionRecords(user) {
         const data = JSON.parse(storageGet(pokkuraVersionKey(user)) || 'null');
         if (!data || typeof data.records !== 'object' || !data.records) return null;
         if (!Array.isArray(data.extraNew)) data.extraNew = [];
-        data.vmChoices = readVmChoices(data.vmChoices, data.ecMarks);
-        delete data.ecMarks;
         return data;
     } catch (e) {
         return null;
@@ -475,8 +443,6 @@ function migrateLocalPokkuraRecords() {
         if (cloud && new Date(cloud.at) >= new Date(local.at)) {
             storageRemove(pokkuraVersionKey(user));
         } else {
-            // 端末のデータで置き換えるときも、クラウドにある選んだメダルは残す
-            if (cloud && Object.keys(local.vmChoices).length === 0) local.vmChoices = cloud.vmChoices;
             allUsersData[user].pokkuraRecords = toPokkuraCloudRecords(local);
             localChangeSeq++;
             dirtyUsers.add(user);
