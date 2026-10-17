@@ -388,13 +388,16 @@ function applyEagateImport() {
 //   その端末のデータは、クラウドに入ったと確認できるまで残しておく（GAS が古いときの保険）
 const POKKURA_AT_KEY = '_at';
 const POKKURA_EXTRA_KEY = '_extra';
+const POKKURA_EC_KEY = '_ec'; // 「今作EC」の印 { 曲ID: true }（取り込み直しても残す）
+const POKKURA_META_KEYS = [POKKURA_AT_KEY, POKKURA_EXTRA_KEY, POKKURA_EC_KEY];
 
 function pokkuraVersionKey(user) {
     return 'popn_pokkura_version_' + user;
 }
 
 function savePokkuraVersionRecords(user, records, at, extraNew) {
-    const data = { at: at || new Date().toISOString(), records, extraNew: extraNew || [] };
+    const prev = loadPokkuraVersionRecords(user);
+    const data = { at: at || new Date().toISOString(), records, extraNew: extraNew || [], ecMarks: prev ? prev.ecMarks : {} };
     if (!allUsersData[user]) allUsersData[user] = emptyUser();
     // 前回の取り込み分は丸ごと置き換える
     allUsersData[user].pokkuraRecords = toPokkuraCloudRecords(data);
@@ -402,16 +405,32 @@ function savePokkuraVersionRecords(user, records, at, extraNew) {
 }
 
 function toPokkuraCloudRecords(data) {
-    return Object.assign({}, data.records, { [POKKURA_AT_KEY]: data.at, [POKKURA_EXTRA_KEY]: data.extraNew || [] });
+    const rec = Object.assign({}, data.records, { [POKKURA_AT_KEY]: data.at, [POKKURA_EXTRA_KEY]: data.extraNew || [] });
+    if (data.ecMarks && Object.keys(data.ecMarks).length > 0) rec[POKKURA_EC_KEY] = data.ecMarks;
+    return rec;
+}
+
+// 「今作EC」の印だけを書き換える
+function setPokkuraEasyMarks(user, marks) {
+    const data = loadPokkuraVersionRecords(user);
+    if (!data) return;
+    data.ecMarks = marks;
+    allUsersData[user].pokkuraRecords = toPokkuraCloudRecords(data);
+    if (loadLocalPokkuraVersionRecords(user)) storageSet(pokkuraVersionKey(user), JSON.stringify(data));
 }
 
 function fromPokkuraCloudRecords(rec) {
     if (!rec || typeof rec !== 'object' || !rec[POKKURA_AT_KEY]) return null;
     const records = {};
     for (const id in rec) {
-        if (id !== POKKURA_AT_KEY && id !== POKKURA_EXTRA_KEY) records[id] = rec[id];
+        if (!POKKURA_META_KEYS.includes(id)) records[id] = rec[id];
     }
-    return { at: rec[POKKURA_AT_KEY], records, extraNew: Array.isArray(rec[POKKURA_EXTRA_KEY]) ? rec[POKKURA_EXTRA_KEY] : [] };
+    const ec = rec[POKKURA_EC_KEY];
+    return {
+        at: rec[POKKURA_AT_KEY], records,
+        extraNew: Array.isArray(rec[POKKURA_EXTRA_KEY]) ? rec[POKKURA_EXTRA_KEY] : [],
+        ecMarks: ec && typeof ec === 'object' && !Array.isArray(ec) ? ec : {}
+    };
 }
 
 function loadLocalPokkuraVersionRecords(user) {
@@ -419,6 +438,7 @@ function loadLocalPokkuraVersionRecords(user) {
         const data = JSON.parse(storageGet(pokkuraVersionKey(user)) || 'null');
         if (!data || typeof data.records !== 'object' || !data.records) return null;
         if (!Array.isArray(data.extraNew)) data.extraNew = [];
+        if (!data.ecMarks || typeof data.ecMarks !== 'object') data.ecMarks = {};
         return data;
     } catch (e) {
         return null;
@@ -443,6 +463,8 @@ function migrateLocalPokkuraRecords() {
         if (cloud && new Date(cloud.at) >= new Date(local.at)) {
             storageRemove(pokkuraVersionKey(user));
         } else {
+            // 端末のデータで置き換えるときも、クラウドにある「今作EC」の印は残す
+            if (cloud && Object.keys(local.ecMarks).length === 0) local.ecMarks = cloud.ecMarks;
             allUsersData[user].pokkuraRecords = toPokkuraCloudRecords(local);
             localChangeSeq++;
             dirtyUsers.add(user);
