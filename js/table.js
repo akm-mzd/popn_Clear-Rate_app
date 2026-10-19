@@ -688,6 +688,7 @@ function renderTable() {
     if (typeof updateNewUiChrome === 'function') {
         updateNewUiChrome({ levelLabel, cleared: normalClearCount, total: rateTotal, shown: displaySongs.length });
     }
+    if (typeof updateGoalsAfterRender === 'function') updateGoalsAfterRender();
     
     const showKuroHishiRate = document.getElementById('show-kurohishi-rate') ? document.getElementById('show-kurohishi-rate').checked : false;
     const showKuroBoshiRate = document.getElementById('show-kuroboshi-rate') ? document.getElementById('show-kuroboshi-rate').checked : false;

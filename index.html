@@ -21,6 +21,7 @@
     <nav id="nu-nav" class="nu-only" aria-label="メイン">
         <button type="button" data-nav="home" class="active" onclick="closeNewUiSheet()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>一覧</span></button>
         <button type="button" data-nav="filter" onclick="openNewUiSheet('filter')"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg><span>検索・絞込</span></button>
+        <button type="button" data-nav="goal" onclick="openNewUiSheet('goal')"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="0.8" fill="currentColor"/></svg><span>目標</span></button>
         <button type="button" data-nav="stats" onclick="openNewUiSheet('stats')"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M5 20V11M12 20V5M19 20v-6"/></svg><span>統計</span></button>
         <button type="button" data-nav="image" onclick="openNewUiSheet('image')"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg><span>画像</span></button>
         <button type="button" data-nav="more" onclick="openNewUiSheet('more')"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg><span>その他</span></button>
@@ -263,6 +264,13 @@
             </section>
 
             <!-- ④ 統計表示 -->
+            <section class="menu-card goal-card" id="goal-card" data-sheet="goal">
+                <div class="menu-card-title">🎯 目標</div>
+                <div id="goal-list"></div>
+                <button type="button" id="goal-add-btn" class="goal-add-btn" onclick="openGoalForm()">＋ 目標を追加</button>
+                <div id="goal-form" class="goal-form" style="display: none;"></div>
+            </section>
+
             <section class="menu-card" data-sheet="stats">
                 <div class="menu-card-title">📊 統計表示</div>
                 <div class="stats-toggles">
@@ -342,6 +350,7 @@
         <div id="nu-filterbar" class="nu-only" aria-label="絞り込みの条件"></div>
         <button type="button" id="nu-stat-card" class="nu-only" onclick="openNewUiSheet('stats')"></button>
         <div id="main-stats-anchor"></div>
+        <div id="goal-strip" class="goal-strip" style="display: none;"></div>
         <div class="stats-container" id="stats-display"></div>
         <div id="extended-stats-display"></div>
 
@@ -627,6 +636,7 @@
     <script src="js/table.js"></script>
     <script src="js/modals.js"></script>
     <script src="js/history.js"></script>
+    <script src="js/goals.js"></script>
     <script src="js/admin.js"></script>
     <script src="js/image-export.js"></script>
     <script src="js/eagate-import.js"></script>

@@ -8,7 +8,7 @@
 // ==========================================
 
 const UI_MODE_KEY = 'popn_ui_mode';
-const NEW_UI_SHEET_TITLES = { filter: '検索・絞り込み', stats: '統計', image: '画像を作る', more: 'その他' };
+const NEW_UI_SHEET_TITLES = { filter: '検索・絞り込み', stats: '統計', image: '画像を作る', goal: '目標', more: 'その他' };
 
 function getUiMode() {
     return storageGet(UI_MODE_KEY) === 'classic' ? 'classic' : 'new';
