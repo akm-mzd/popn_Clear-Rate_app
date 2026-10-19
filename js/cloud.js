@@ -14,6 +14,7 @@ function applyFetchedData(data) {
         if (!allUsersData[u].memoRecords) allUsersData[u].memoRecords = {};
         if (!allUsersData[u].historyRecords) allUsersData[u].historyRecords = {};
         if (!allUsersData[u].pokkuraRecords) allUsersData[u].pokkuraRecords = {};
+        if (!allUsersData[u].goalRecords) allUsersData[u].goalRecords = {};
     }
     if (!allUsersData[currentUser]) {
         currentUser = "Guest";
@@ -67,7 +68,8 @@ function saveCache(data) {
 const SYNC_INTERVAL_MS = 10000;   // 他端末の変更を確認する間隔（10秒）
 const AUTOSAVE_DELAY_MS = 800;    // 変更してから保存を始めるまでの時間（0.8秒）
 // pokkuraRecords = ポックラ用の公式データ（旧曲の今作スコアなど。eagate-import.js）
-const RECORD_TYPES = ['clearRecords', 'scoreRecords', 'memoRecords', 'historyRecords', 'pokkuraRecords'];
+// goalRecords = 目標（goals.js）
+const RECORD_TYPES = ['clearRecords', 'scoreRecords', 'memoRecords', 'historyRecords', 'pokkuraRecords', 'goalRecords'];
 
 let cloudReady = false;          // 最初のクラウド読み込みが成功したか
 const dirtyUsers = new Set();    // 未保存の変更があるユーザー
@@ -398,7 +400,8 @@ async function saveToCloud(isSongUpdate = false, targetUserName = currentUser, c
             scoreRecords: targetScore,
             memoRecords: targetMemo,
             historyRecords: targetHistory,
-            pokkuraRecords: targetPokkura
+            pokkuraRecords: targetPokkura,
+            goalRecords: allUsersData[targetUserName]?.goalRecords || {}
         };
 
         if (isSongUpdate) {
