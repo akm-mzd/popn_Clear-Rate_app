@@ -966,7 +966,8 @@ body.ui-new #back-to-top { background-color: var(--nu-purple) !important; }
 .goal-warn { font-size: 0.8em; color: #e65100; }
 .goal-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .goal-actions button { width: auto; margin: 0; padding: 5px 12px; border: 1px solid #ccc; border-radius: 6px; background: #fff; color: #333; font-size: 0.85em; cursor: pointer; font-family: inherit; }
-.goal-actions button:first-child { border-color: #ab47bc; color: #7b1fa2; font-weight: bold; }
+.goal-actions .goal-see { border-color: #ab47bc; color: #7b1fa2; font-weight: bold; }
+.goal-actions .goal-move { padding: 5px 10px; color: #666; }
 .goal-actions .goal-delete { margin-left: auto; color: #c62828; border-color: #ef9a9a; }
 .goal-section { font-size: 0.85em; font-weight: bold; color: #2e7d32; margin: 10px 2px 6px; }
 .goal-add-btn { width: 100%; margin: 4px 0 0; padding: 10px; border: 1px dashed #ab47bc; border-radius: 10px; background: #faf5fc; color: #7b1fa2; font-weight: bold; cursor: pointer; font-family: inherit; }
@@ -990,8 +991,8 @@ body.ui-new #back-to-top { background-color: var(--nu-purple) !important; }
 .goal-form-actions button { width: auto; margin: 0; padding: 7px 16px; border: 1px solid #ccc; border-radius: 6px; background: #eee; cursor: pointer; font-family: inherit; }
 .goal-form-actions .goal-save { background: #d82f66; border-color: #d82f66; color: #fff; font-weight: bold; }
 /* 一覧の上の小さな目標 */
-.goal-strip { display: flex; gap: 8px; margin: 0 0 10px; overflow-x: auto; }
-.goal-chip { flex: 1 1 0; min-width: 160px; margin: 0; padding: 8px 10px; border: 1px solid #e3dbe7; border-radius: 12px; background: #fff; cursor: pointer; text-align: left; display: flex; flex-direction: column; gap: 5px; font-family: inherit; color: #333; }
+.goal-strip { display: flex; gap: 8px; margin: 0 0 10px; overflow-x: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; padding-bottom: 2px; }
+.goal-chip { flex: 0 0 auto; width: 240px; max-width: 72vw; scroll-snap-align: start; margin: 0; padding: 8px 10px; border: 1px solid #e3dbe7; border-radius: 12px; background: #fff; cursor: pointer; text-align: left; display: flex; flex-direction: column; gap: 5px; font-family: inherit; color: #333; }
 .goal-chip:hover { border-color: #ab47bc; }
 .goal-chip-head { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
 .goal-chip-name { font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
