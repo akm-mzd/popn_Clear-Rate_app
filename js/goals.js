@@ -3,7 +3,8 @@
 // 目標（例：Lv49 の弱を全部ノーマルクリア、Lv47 で銅菱以上を100曲）と、その進み具合。
 // 目標はユーザーごとに goalRecords（{ 目標ID: 目標 }）としてクラウドに保存する。
 //   目標 = { name, lv: [レベル], df: [難易度], af: [相性], kind: 'medal'|'score'|'rank',
-//           medal: 条件キー, score: 点数, rank: ランク, n: 曲数（null = 全曲）, t: 作った日時, done: 初めて達成した日時 }
+//           medal: 条件キー, score: 点数, rank: ランク, n: 曲数（null = 全曲）, t: 作った日時, done: 初めて達成した日時,
+//           o: 並び順（小さいほど上。↑↓で並べ替えたときに付く） }
 // 進み具合は renderTable のたびに数え直す（updateGoalsAfterRender）。
 // ==========================================
 
@@ -19,7 +20,8 @@ const GOAL_MEDAL_OPTIONS = [
 ];
 const GOAL_DIFF_VALUES = ['危険', '別格', '詐称', '強', '中(+)', '中(-)', '弱', '逆詐称', '入門', '未分類'];
 const GOAL_AFFINITY_VALUES = ['得意', '苦手', '噛み合い待ち', '敵', '💩', '未設定'];
-const GOAL_STRIP_MAX = 3;
+// 目標の控え（この端末）。GAS が古くてクラウドに保存されなかったときに戻せるようにする
+const GOAL_BACKUP_PREFIX = 'popn_goal_backup_';
 
 let goalEditingId = null; // 編集中の目標ID（null = 新しく作る）
 let goalDetailId = null;  // 詳細を開いている目標ID
@@ -98,12 +100,41 @@ function formatGoalDate(ms) {
     return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
 }
 
-// 作った順（新しいものが上）
+// 並び順（↑↓で決めた順。決めていない目標は、新しいものが上）
 function getSortedGoals() {
     const records = getGoalRecords();
+    const hasO = g => typeof g.o === 'number';
     return Object.keys(records).map(id => ({ id, goal: records[id] }))
         .filter(x => x.goal && typeof x.goal === 'object')
-        .sort((a, b) => (b.goal.t || 0) - (a.goal.t || 0));
+        .sort((a, b) => {
+            if (hasO(a.goal) && hasO(b.goal) && a.goal.o !== b.goal.o) return a.goal.o - b.goal.o;
+            if (hasO(a.goal) !== hasO(b.goal)) return hasO(a.goal) ? 1 : -1; // 並べ替えたあとに作った目標は上
+            return (b.goal.t || 0) - (a.goal.t || 0);
+        });
+}
+
+// 目標を1つ上（dir = -1）か下（dir = 1）へ。達成済み・未達成それぞれのまとまりの中で動かす
+function moveGoal(id, dir) {
+    const full = getSortedGoals();
+    const doneOf = x => getGoalProgress(x.goal).complete;
+    const me = full.find(x => x.id === id);
+    if (!me) return;
+    const section = full.filter(x => doneOf(x) === doneOf(me));
+    const idx = section.indexOf(me);
+    const other = section[idx + dir];
+    if (!other) return;
+    const i = full.indexOf(me), j = full.indexOf(other);
+    full[i] = other;
+    full[j] = me;
+    full.forEach((x, k) => { x.goal.o = k; });
+    scheduleAutoSave();
+    renderTable();
+}
+
+// 今の表示レベルで見せる目標か（レベルを決めていない目標と「すべて」表示のときは、いつも見せる）
+function isGoalForCurrentLevel(goal) {
+    if (currentViewLevel === 'ALL' || !goal.lv || goal.lv.length === 0) return true;
+    return goal.lv.includes(String(currentViewLevel));
 }
 
 // ---------- 描画（renderTable の最後に呼ばれる） ----------
@@ -119,6 +150,7 @@ function updateGoalsAfterRender() {
         }
     });
 
+    saveGoalBackup();
     renderGoalStrip(list);
     renderGoalList(list);
     // 詳細を開いたままメダル・スコアを変えたら、詳細も描き直す
@@ -130,11 +162,11 @@ function goalBarHtml(p) {
     return `<div class="goal-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${p.need}" aria-valuenow="${p.value}"><span style="width: ${pct.toFixed(1)}%;"></span></div>`;
 }
 
-// 一覧の上の小さな表示（まだ達成していない目標を新しい順に最大3件）
+// 一覧の上の小さな表示（今の表示レベルの、まだ達成していない目標を並び順で。横にスライドして全部見られる）
 function renderGoalStrip(list) {
     const strip = document.getElementById('goal-strip');
     if (!strip) return;
-    const active = list.filter(x => !x.p.complete).slice(0, GOAL_STRIP_MAX);
+    const active = list.filter(x => !x.p.complete && isGoalForCurrentLevel(x.goal));
     if (active.length === 0) {
         strip.innerHTML = '';
         strip.style.display = 'none';
@@ -173,7 +205,9 @@ function renderGoalList(list) {
                 <div class="goal-meta"><span>${p.value} / ${p.need}曲（${pct}%）</span>${status}</div>
                 ${warn}
                 <div class="goal-actions">
-                    <button type="button" onclick="showGoalSongs('${safeId}')">曲を見る</button>
+                    <button type="button" class="goal-move" onclick="moveGoal('${safeId}', -1)" title="上へ" aria-label="上へ">↑</button>
+                    <button type="button" class="goal-move" onclick="moveGoal('${safeId}', 1)" title="下へ" aria-label="下へ">↓</button>
+                    <button type="button" class="goal-see" onclick="showGoalSongs('${safeId}')">曲を見る</button>
                     <button type="button" onclick="openGoalForm('${safeId}')">編集</button>
                     <button type="button" class="goal-delete" onclick="deleteGoal('${safeId}')">削除</button>
                 </div>
@@ -227,6 +261,8 @@ function deleteGoal(id) {
     if (!records[id]) return;
     if (!confirm(`目標「${goalTitle(records[id])}」を削除しますか？`)) return;
     delete records[id];
+    // 最後の1件を消したら、控えも消す（次に開いたとき「戻しますか？」と聞かないように）
+    if (Object.keys(records).length === 0) storageRemove(GOAL_BACKUP_PREFIX + currentUser);
     scheduleAutoSave();
     renderTable();
 }
@@ -323,6 +359,7 @@ function saveGoalForm() {
     const records = getGoalRecords();
     const old = goalEditingId ? records[goalEditingId] : null;
     goal.t = old ? old.t : Date.now();
+    if (old && typeof old.o === 'number') goal.o = old.o;
     // 条件を変えたら、達成日は付け直す（すでに達成していれば、描き直しのときに今日の日付が入る）
     if (old && old.done && describeGoal(old) === describeGoal(goal)) goal.done = old.done;
     const id = goalEditingId || (Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7));
@@ -417,4 +454,35 @@ function renderGoalDetail() {
     body.innerHTML = html;
     if (openDone && body.querySelector('.gd-done-group')) body.querySelector('.gd-done-group').open = true;
     body.scrollTop = scrollTop;
+}
+
+// ---------- 目標の控え（この端末） ----------
+// クラウドの読み込みが済んでから（cloudReady）、目標があるときだけ控えを書く
+function saveGoalBackup() {
+    if (typeof cloudReady === 'undefined' || !cloudReady) return;
+    const records = getGoalRecords();
+    if (Object.keys(records).length === 0) return;
+    storageSet(GOAL_BACKUP_PREFIX + currentUser, JSON.stringify(records));
+}
+
+// 起動時：クラウドに目標が1件もないのに、この端末に控えがあれば、戻すか聞く
+function checkGoalBackup() {
+    const key = GOAL_BACKUP_PREFIX + currentUser;
+    let backup = null;
+    try { backup = JSON.parse(storageGet(key) || 'null'); } catch (e) { backup = null; }
+    if (!backup || typeof backup !== 'object' || Array.isArray(backup)) return;
+    const ids = Object.keys(backup).filter(id => backup[id] && typeof backup[id] === 'object');
+    if (ids.length === 0) return;
+    const records = getGoalRecords();
+    if (Object.keys(records).length > 0) return;
+    const ok = confirm(`クラウドに目標がありませんが、この端末に目標の控えが ${ids.length}件あります。戻しますか？\n` +
+        '（何度もこの確認が出るときは、GAS（Google Apps Script）が最新になっていないため保存できていません）');
+    if (!ok) {
+        storageRemove(key);
+        return;
+    }
+    ids.forEach(id => { records[id] = backup[id]; });
+    scheduleAutoSave();
+    renderTable();
+    showToast('toast-goal', `目標を ${ids.length}件 戻しました`, '#7b1fa2', 4000);
 }
