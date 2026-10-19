@@ -22,6 +22,7 @@ const GOAL_AFFINITY_VALUES = ['得意', '苦手', '噛み合い待ち', '敵', '
 const GOAL_STRIP_MAX = 3;
 
 let goalEditingId = null; // 編集中の目標ID（null = 新しく作る）
+let goalDetailId = null;  // 詳細を開いている目標ID
 
 function getGoalRecords(user = currentUser) {
     if (!allUsersData[user]) allUsersData[user] = emptyUser();
@@ -120,6 +121,8 @@ function updateGoalsAfterRender() {
 
     renderGoalStrip(list);
     renderGoalList(list);
+    // 詳細を開いたままメダル・スコアを変えたら、詳細も描き直す
+    if (goalDetailId) renderGoalDetail();
 }
 
 function goalBarHtml(p) {
@@ -138,8 +141,8 @@ function renderGoalStrip(list) {
         return;
     }
     strip.style.display = '';
-    strip.innerHTML = active.map(({ goal, p }) => `
-        <button type="button" class="goal-chip" onclick="openGoalSheet()" title="${escapeHtml(describeGoal(goal))}">
+    strip.innerHTML = active.map(({ id, goal, p }) => `
+        <button type="button" class="goal-chip" onclick="openGoalDetail('${jsStringAttr(id)}')" title="${escapeHtml(describeGoal(goal))}（押すと詳細）">
             <span class="goal-chip-head"><span class="goal-chip-name">🎯 ${escapeHtml(goalTitle(goal))}</span><span class="goal-chip-num">${p.value}/${p.need}</span></span>
             ${goalBarHtml(p)}
         </button>`).join('');
@@ -161,9 +164,12 @@ function renderGoalList(list) {
         const warn = goal.n && p.total < goal.n ? `<div class="goal-warn">対象の曲が ${p.total}曲しかありません</div>` : '';
         return `
             <div class="goal-item${p.complete ? ' is-done' : ''}">
-                <div class="goal-name">${escapeHtml(goalTitle(goal))}</div>
-                ${goal.name ? `<div class="goal-desc">${escapeHtml(describeGoal(goal))}</div>` : ''}
-                ${goalBarHtml(p)}
+                <button type="button" class="goal-open" onclick="openGoalDetail('${safeId}')" title="押すと、対象の曲と今のメダル・スコアが見られます">
+                    <span class="goal-name">${escapeHtml(goalTitle(goal))}</span>
+                    ${goal.name ? `<span class="goal-desc">${escapeHtml(describeGoal(goal))}</span>` : ''}
+                    ${goalBarHtml(p)}
+                    <span class="goal-open-hint">詳細 ›</span>
+                </button>
                 <div class="goal-meta"><span>${p.value} / ${p.need}曲（${pct}%）</span>${status}</div>
                 ${warn}
                 <div class="goal-actions">
@@ -324,4 +330,91 @@ function saveGoalForm() {
     closeGoalForm();
     scheduleAutoSave();
     renderTable();
+}
+
+// ---------- 目標の詳細（対象の曲・今のメダル・スコア） ----------
+function openGoalDetail(id) {
+    if (!getGoalRecords()[id]) return;
+    goalDetailId = id;
+    renderGoalDetail();
+    document.getElementById('goal-detail-filter').onclick = () => { closeGoalDetail(); showGoalSongs(id); };
+    document.getElementById('goal-detail-modal').style.display = 'flex';
+    document.getElementById('goal-detail-body').scrollTop = 0;
+}
+
+function closeGoalDetail() {
+    goalDetailId = null;
+    document.getElementById('goal-detail-modal').style.display = 'none';
+}
+
+// まだの曲は「あと少し」の順（メダルなら今のメダルが良い順、スコア・ランクならスコアが高い順）
+function goalCloseness(goal, song) {
+    if (goal.kind === 'medal') return (MEDAL_TYPES[clearRecords[song.id] || ''] || { rank: -1 }).rank * 1000000 + (parseInt(scoreRecords[song.id], 10) || 0);
+    return parseInt(scoreRecords[song.id], 10) || 0;
+}
+
+function goalSongRowHtml(goal, song, done) {
+    const safeId = jsStringAttr(song.id);
+    const medalKey = clearRecords[song.id] || '';
+    const medalLabel = (MEDAL_TYPES[medalKey] || { label: medalKey }).label;
+    const score = parseInt(scoreRecords[song.id], 10) || 0;
+    const rank = getSongScoreRank(song);
+    const bannerSrc = safeUrl(song.bannerUrl, true);
+    const bannerInner = bannerSrc
+        ? `<img src="${escapeHtml(bannerSrc)}" alt="${escapeHtml(song.title)}" loading="lazy">`
+        : `<span class="gd-banner-text">${escapeHtml(song.title)}</span>`;
+    // 目標に足りない数（スコアの目標のときだけ）
+    const short = !done && goal.kind === 'score' ? `<span class="gd-short">あと ${(goal.score || 0) - score}</span>` : '';
+    return `
+        <div class="gd-row${done ? ' is-done' : ''}">
+            <button type="button" class="gd-medal${medalKey === '' ? ' is-empty' : ''}" onclick="openMedalModal('${safeId}')" title="${escapeHtml(medalLabel || '未プレイ')}（押すとメダルを変更）">${buildGridMedalInner(medalKey) || '<span class="gd-medal-none">−</span>'}</button>
+            <a class="gd-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（攻略wikiを開く）">${bannerInner}</a>
+            <div class="gd-info">
+                <div class="gd-title">${escapeHtml(song.title)}</div>
+                <div class="gd-sub"><span class="level-badge">${escapeHtml(song.level)}</span> ${escapeHtml(song.diffRaw || '未分類')} ・ ${escapeHtml(medalLabel || '未プレイ')}</div>
+            </div>
+            <button type="button" class="gd-score" onclick="openScoreModal('${safeId}')" title="押すとスコアを変更">
+                ${rank ? `<img class="gd-rank" src="${escapeHtml(RANK_IMAGES[rank])}" alt="${escapeHtml(rank)}">` : ''}
+                <span class="gd-score-num">${score ? score : '-'}</span>${short}
+            </button>
+        </div>`;
+}
+
+function renderGoalDetail() {
+    const goal = getGoalRecords()[goalDetailId];
+    if (!goal) { closeGoalDetail(); return; }
+    const p = getGoalProgress(goal);
+    const targets = getGoalTargetSongs(goal);
+    const todo = targets.filter(s => !isGoalSongDone(goal, s))
+        .sort((a, b) => (goalCloseness(goal, b) - goalCloseness(goal, a)) || (getDiffSortValue(b) - getDiffSortValue(a)) || (a.originalOrder - b.originalOrder));
+    const done = targets.filter(s => isGoalSongDone(goal, s))
+        .sort((a, b) => (getDiffSortValue(b) - getDiffSortValue(a)) || (a.originalOrder - b.originalOrder));
+    const pct = p.need > 0 ? Math.floor(p.value / p.need * 100) : 0;
+    const status = p.complete
+        ? `<span class="goal-done">✓ 達成${goal.done ? `（${formatGoalDate(goal.done)}）` : ''}</span>`
+        : `<span class="goal-rest">あと ${p.need - p.value}曲</span>`;
+
+    document.getElementById('goal-detail-head').innerHTML = `
+        <h3 class="gd-head-title">🎯 ${escapeHtml(goalTitle(goal))}</h3>
+        ${goal.name ? `<div class="goal-desc">${escapeHtml(describeGoal(goal))}</div>` : ''}
+        <div class="${p.complete ? 'goal-item is-done gd-head-bar' : 'gd-head-bar'}">${goalBarHtml(p)}</div>
+        <div class="goal-meta"><span>${p.value} / ${p.need}曲（${pct}%）・対象 ${p.total}曲</span>${status}</div>`;
+
+    let html = '';
+    if (todo.length > 0) {
+        const note = goal.n && !p.complete ? `（このうち ${p.need - p.value}曲で達成）` : '';
+        html += `<div class="gd-section">まだの曲 ${todo.length}曲 <span>${note}</span></div>`;
+        html += todo.map(s => goalSongRowHtml(goal, s, false)).join('');
+    } else {
+        html += '<div class="gd-section gd-all-done">🎉 対象の曲はすべて達成しています</div>';
+    }
+    if (done.length > 0) {
+        html += `<details class="gd-done-group"${todo.length === 0 ? ' open' : ''}><summary class="gd-section">達成した曲 ${done.length}曲</summary>${done.map(s => goalSongRowHtml(goal, s, true)).join('')}</details>`;
+    }
+    const body = document.getElementById('goal-detail-body');
+    const scrollTop = body.scrollTop;
+    const openDone = !!body.querySelector('.gd-done-group[open]');
+    body.innerHTML = html;
+    if (openDone && body.querySelector('.gd-done-group')) body.querySelector('.gd-done-group').open = true;
+    body.scrollTop = scrollTop;
 }
