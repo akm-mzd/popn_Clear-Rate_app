@@ -380,6 +380,18 @@
         <div id="diff-grid-view" style="display: none;"></div>
     </div>
 
+    <!-- 目標の詳細（メダル・スコアの変更画面がこの上に重なるよう、それらより前に置く） -->
+    <div id="goal-detail-modal" class="modal-overlay" style="display: none;" onclick="if (event.target === this) closeGoalDetail()">
+        <div class="modal-content goal-detail" style="max-width: 640px;">
+            <div id="goal-detail-head"></div>
+            <div id="goal-detail-body" class="goal-detail-body"></div>
+            <div class="modal-actions" style="justify-content: flex-end; gap: 8px;">
+                <button id="goal-detail-filter" style="border: 1px solid #ab47bc; background: #fff; color: #7b1fa2; font-weight: bold;">一覧で絞り込む</button>
+                <button onclick="closeGoalDetail()" style="border: 1px solid #ccc; background: #eee;">閉じる</button>
+            </div>
+        </div>
+    </div>
+
     <div id="random-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content" style="max-width: 500px;">
             <h3>ランダムセレクト</h3>
