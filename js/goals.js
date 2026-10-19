@@ -20,6 +20,8 @@ const GOAL_MEDAL_OPTIONS = [
 const GOAL_DIFF_VALUES = ['危険', '別格', '詐称', '強', '中(+)', '中(-)', '弱', '逆詐称', '入門', '未分類'];
 const GOAL_AFFINITY_VALUES = ['得意', '苦手', '噛み合い待ち', '敵', '💩', '未設定'];
 const GOAL_STRIP_MAX = 3;
+// 目標の控え（この端末）。GAS が古くてクラウドに保存されなかったときに戻せるようにする
+const GOAL_BACKUP_PREFIX = 'popn_goal_backup_';
 
 let goalEditingId = null; // 編集中の目標ID（null = 新しく作る）
 let goalDetailId = null;  // 詳細を開いている目標ID
@@ -119,6 +121,7 @@ function updateGoalsAfterRender() {
         }
     });
 
+    saveGoalBackup();
     renderGoalStrip(list);
     renderGoalList(list);
     // 詳細を開いたままメダル・スコアを変えたら、詳細も描き直す
@@ -227,6 +230,8 @@ function deleteGoal(id) {
     if (!records[id]) return;
     if (!confirm(`目標「${goalTitle(records[id])}」を削除しますか？`)) return;
     delete records[id];
+    // 最後の1件を消したら、控えも消す（次に開いたとき「戻しますか？」と聞かないように）
+    if (Object.keys(records).length === 0) storageRemove(GOAL_BACKUP_PREFIX + currentUser);
     scheduleAutoSave();
     renderTable();
 }
@@ -417,4 +422,35 @@ function renderGoalDetail() {
     body.innerHTML = html;
     if (openDone && body.querySelector('.gd-done-group')) body.querySelector('.gd-done-group').open = true;
     body.scrollTop = scrollTop;
+}
+
+// ---------- 目標の控え（この端末） ----------
+// クラウドの読み込みが済んでから（cloudReady）、目標があるときだけ控えを書く
+function saveGoalBackup() {
+    if (typeof cloudReady === 'undefined' || !cloudReady) return;
+    const records = getGoalRecords();
+    if (Object.keys(records).length === 0) return;
+    storageSet(GOAL_BACKUP_PREFIX + currentUser, JSON.stringify(records));
+}
+
+// 起動時：クラウドに目標が1件もないのに、この端末に控えがあれば、戻すか聞く
+function checkGoalBackup() {
+    const key = GOAL_BACKUP_PREFIX + currentUser;
+    let backup = null;
+    try { backup = JSON.parse(storageGet(key) || 'null'); } catch (e) { backup = null; }
+    if (!backup || typeof backup !== 'object' || Array.isArray(backup)) return;
+    const ids = Object.keys(backup).filter(id => backup[id] && typeof backup[id] === 'object');
+    if (ids.length === 0) return;
+    const records = getGoalRecords();
+    if (Object.keys(records).length > 0) return;
+    const ok = confirm(`クラウドに目標がありませんが、この端末に目標の控えが ${ids.length}件あります。戻しますか？\n` +
+        '（何度もこの確認が出るときは、GAS（Google Apps Script）が最新になっていないため保存できていません）');
+    if (!ok) {
+        storageRemove(key);
+        return;
+    }
+    ids.forEach(id => { records[id] = backup[id]; });
+    scheduleAutoSave();
+    renderTable();
+    showToast('toast-goal', `目標を ${ids.length}件 戻しました`, '#7b1fa2', 4000);
 }

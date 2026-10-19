@@ -41,6 +41,7 @@ window.onload = async () => {
         saveCache(fresh);
         cloudReady = true;
         migrateLocalPokkuraRecords(); // 端末にだけあるポックラ用データをクラウドへ
+        checkGoalBackup();            // クラウドに目標がなく、この端末に控えがあれば戻すか聞く
         runAutoSave();      // 待っている間の編集があれば保存
         startRemoteSync();  // 他端末の変更の確認を開始
     } catch (e) {
