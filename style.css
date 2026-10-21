@@ -1045,3 +1045,16 @@ body.ui-new #back-to-top { background-color: var(--nu-purple) !important; }
 .ura-btn.active { background: #424242; border-color: #424242; color: #fff; font-weight: bold; }
 .ura-old { font-size: 0.85em; color: #333; display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .ura-old.is-disabled { color: #aaa; cursor: default; }
+
+/* ポックラ：計算方法の比べ表 */
+.pk-compare { margin-top: 8px; text-align: left; font-size: 12px; }
+.pk-compare > summary { cursor: pointer; color: #7b1fa2; font-weight: bold; text-align: center; }
+.pkc-table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+.pk-summary .pkc-table th, .pk-summary .pkc-table td { padding: 4px 6px; border: none; border-bottom: 1px solid #eee; text-align: left; background: transparent; font-size: 12px; }
+.pkc-table th { color: #777; font-weight: normal; }
+.pkc-val, .pkc-diff { text-align: right !important; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pkc-diff.is-zero { color: #2e7d32; font-weight: bold; }
+.pk-summary .pkc-table tr.is-near td { background: #f1f8e9; }
+.pkc-mark { display: inline-block; margin-left: 4px; padding: 0 5px; border-radius: 8px; background: #eee; color: #555; font-size: 10px; }
+.pkc-mark.pkc-near { background: #43a047; color: #fff; }
+.pk-summary .pkc-copy { width: 100%; margin: 8px 0 0; padding: 7px; border: 1px solid #ab47bc; border-radius: 8px; background: #fff; color: #7b1fa2; font-size: 13px; font-weight: bold; cursor: pointer; font-family: inherit; }
