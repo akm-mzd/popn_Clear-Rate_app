@@ -286,10 +286,33 @@
     //   ページの作りが分からないので、「ポップンクラス」「ポックラ」の文字の近くにある 123.45 の形の数を探す。
     //   読めなければ null（取り込みは止めない）。読めなかったときのため、まわりの文字を pcDiag に残す
     let pcDiag = '';
+    const PC_NUM = /(\d{1,3}\.\d{1,3})/;
+
+    // プレーデータのトップの <div id="popnclass"><img ...><br>173.94</div> から読む
+    function readPopnClassElement(doc) {
+        const el = doc && doc.getElementById ? doc.getElementById('popnclass') : null;
+        if (!el) return null;
+        const m = clean(el.textContent).replace(/[,，]/g, '').match(PC_NUM);
+        const v = m ? parseFloat(m[1]) : NaN;
+        return v > 0 && v <= 1000 ? v : null;
+    }
+
     async function fetchOfficialPokkura() {
-        const doc = await fetchDoc(playdataUrl('index.html'));
+        // ① 今開いているページがトップなら、そこから直接読む
+        const here = readPopnClassElement(document);
+        if (here !== null) return here;
+        // ② トップを取得して読む
+        let doc;
+        try {
+            doc = await fetchDoc(playdataUrl('index.html'));
+        } catch (e) {
+            pcDiag = 'fetch error: ' + e.message;
+            return null;
+        }
+        const byId = readPopnClassElement(doc);
+        if (byId !== null) return byId;
         const LABEL = /ポップンクラス|ポックラ|pop'?n\s*class/i;
-        const NUM = /(\d{1,3}\.\d{1,3})/;
+        const NUM = PC_NUM;
         const candidates = [];
         const walker = doc.createTreeWalker(doc.body || doc, NodeFilter.SHOW_TEXT);
         let node;
@@ -326,7 +349,8 @@
             }
             spots.push(path.join('>') + ' = ' + t);
         });
-        pcDiag = (i >= 0 ? all.slice(Math.max(0, i - 40), i + 80) : 'no label; title=' + clean(doc.title)) + ' || ' + spots.join(' | ');
+        pcDiag = `title=${clean(doc.title)}; status_table=${!!doc.getElementById('status_table')}; popnclass=${!!doc.getElementById('popnclass')} || ` +
+            (i >= 0 ? all.slice(Math.max(0, i - 40), i + 80) : 'no label') + ' || ' + spots.join(' | ');
         return null;
     }
 
