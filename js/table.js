@@ -1392,8 +1392,8 @@ function renderPokkuraGrid() {
     // 公式サイトの値があれば、それを大きく出し、アプリの計算値は下に小さく出す
     const official = pk.version && typeof pk.version.pc === 'number' ? pk.version.pc : null;
     const oldPk = calcOldPokkura();
-    const oldPkHtml = `<div class="pk-calc">旧ポックラ <b>${oldPk.total.toFixed(2)}</b>（Lv48〜50 上位${OLD_POKKURA_COUNT}曲・歴代ベスト${oldPk.count < OLD_POKKURA_COUNT ? `、${oldPk.count}曲` : ''}）</div>`;
-    const partsText = `新曲（${escapeHtml(pk.newVersionLabel)}） ${pk.newPoint.toFixed(2)}（${pk.topNew.length}/${POKKURA_NEW_COUNT}曲） ＋ 旧曲 ${pk.oldPoint.toFixed(2)}（${pk.topOld.length}/${POKKURA_OLD_COUNT}曲）`;
+    const oldPkHtml = `<div class="pk-calc">旧ポックラ <b>${oldPk.total.toFixed(2)}</b></div>`;
+    const partsText = `新曲 ${pk.newPoint.toFixed(2)} ＋ 旧曲 ${pk.oldPoint.toFixed(2)}`;
     let html = official !== null ? `
         <div class="pk-summary">
             <div class="pk-total"><span class="pk-total-label">ポックラ</span><span class="pk-total-value">${official.toFixed(2)}</span></div>
