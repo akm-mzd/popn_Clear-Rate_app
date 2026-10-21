@@ -14,10 +14,25 @@ const EXPORT_ACCENT = '#3949ab';
 const EXPORT_MAX_PIXELS_PC = 16000000;     // iOS のキャンバス上限（約1677万px）より少し小さく
 const EXPORT_MAX_PIXELS_MOBILE = 8000000;  // スマホはメモリが少ないので、さらに小さく抑える
 
-// 画像を作るとき html2canvas が複製しなくてよい（画像に関係ない・重い）部分
-const EXPORT_IGNORE_IDS = ['capture-area', 'menu-panel', 'loading', 'admin-controls'];
-function shouldIgnoreForExport(el) {
-    return EXPORT_IGNORE_IDS.includes(el.id) || (el.classList && el.classList.contains('modal-overlay'));
+const EXPORT_IMAGE_TIMEOUT_MS = 8000;   // 画像1枚の読み込みを待つ上限
+const EXPORT_RENDER_TIMEOUT_MS = 60000; // 画像を作る処理全体の上限
+
+// html2canvas はページ全体を複製してから描くので、画像にする部分（とその親）と <head> 以外は全部外す。
+//   一覧の難易度表などにはバナー画像が何百枚もあり、スマホではそれを複製するだけで止まってしまうため
+function makeExportIgnore(root) {
+    return el => {
+        if (el === root || root.contains(el) || el.contains(root)) return false;
+        if (el.closest && el.closest('head')) return el.tagName === 'SCRIPT';
+        return true;
+    };
+}
+
+function withTimeout(promise, ms, message) {
+    let timer;
+    return Promise.race([
+        promise,
+        new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), ms); })
+    ]).finally(() => clearTimeout(timer));
 }
 
 // スマホの結果表示で使っている画像URL（閉じるときに解放する）
@@ -110,15 +125,18 @@ function buildBannerBoxHtml(song, width, height) {
     return `<div style="${style} ${EXPORT_CENTER} background: #37474f; color: #fff; padding: 2px 6px; overflow: hidden;"><span style="font-size: 11px; line-height: 1.2; font-weight: bold;">${escapeHtml(song.title)}</span></div>`;
 }
 
+// 画像の読み込みを待つ。1枚あたり EXPORT_IMAGE_TIMEOUT_MS を過ぎたら、その画像は外して先に進む
 function waitExportImages(root) {
     const images = Array.from(root.querySelectorAll('img'));
     return Promise.all(images.map(img => new Promise(res => {
-        if (img.complete) {
+        if (img.complete) { res(); return; }
+        const timer = setTimeout(() => {
+            console.warn('Image load timeout:', img.src);
+            img.removeAttribute('src'); // 読み込み途中の画像で html2canvas が待たないように
             res();
-        } else {
-            img.onload = res;
-            img.onerror = () => { console.warn("Image proxy failed:", img.src); res(); };
-        }
+        }, EXPORT_IMAGE_TIMEOUT_MS);
+        img.onload = () => { clearTimeout(timer); res(); };
+        img.onerror = () => { clearTimeout(timer); console.warn("Image proxy failed:", img.src); res(); };
     })));
 }
 
@@ -134,9 +152,11 @@ async function prepareExport(btn) {
     const originalText = getButtonLabel(btn);
     beginImageExport();
     btn.textContent = "準備中... (ライブラリ読込)";
+    showLoading(true, '画像を作成中…（準備）');
     try {
-        await ensureHtml2Canvas();
+        await withTimeout(ensureHtml2Canvas(), 20000, 'timeout');
     } catch (e) {
+        showLoading(false);
         alert("画像生成ライブラリの読み込みに失敗しました。通信環境を確認してください。");
         btn.textContent = originalText;
         endImageExport();
@@ -155,11 +175,12 @@ async function renderExportToBlobUrl(root) {
         // キャンバスの上限を超えないよう、大きい画像は倍率を下げる
         const maxPixels = isMobileDevice() ? EXPORT_MAX_PIXELS_MOBILE : EXPORT_MAX_PIXELS_PC;
         const scale = Math.max(0.5, Math.min(2, Math.sqrt(maxPixels / Math.max(1, w * h))));
-        const canvas = await html2canvas(root, {
+        const canvas = await withTimeout(html2canvas(root, {
             backgroundColor: EXPORT_BG, scale, useCORS: true, logging: false,
             width: w, height: h, windowWidth: Math.max(w + 100, 1200),
-            ignoreElements: shouldIgnoreForExport, // 曲の表やメニューまで複製すると重いので外す
-        });
+            imageTimeout: EXPORT_IMAGE_TIMEOUT_MS,
+            ignoreElements: makeExportIgnore(root),
+        }), EXPORT_RENDER_TIMEOUT_MS, 'timeout');
         const blob = await new Promise((resolve, reject) => {
             canvas.toBlob(b => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/png');
         });
@@ -184,6 +205,7 @@ function downloadBlobUrl(blobUrl, filename) {
 // 1枚の画像を出力する（スマホ：画面に表示して長押し保存 / PC：ダウンロード）
 async function outputExportImage(root, filename, btn, originalText) {
     btn.textContent = "生成中... (描画中)";
+    showLoading(true, '画像を作成中…');
     let showedModal = false;
     try {
         const blobUrl = await renderExportToBlobUrl(root);
@@ -197,9 +219,10 @@ async function outputExportImage(root, filename, btn, originalText) {
             downloadBlobUrl(blobUrl, filename);
         }
     } catch (e) {
-        alert("画像の生成に失敗しました。");
+        alert(e && e.message === 'timeout' ? '画像の作成に時間がかかりすぎたため中止しました。もう一度試してください。' : '画像の生成に失敗しました。');
         console.error(e);
     } finally {
+        showLoading(false);
         btn.textContent = originalText;
         if (!showedModal) endImageExport();
     }
@@ -382,12 +405,19 @@ function buildPokkuraRoot(pk) {
         ? `旧曲は公式データ取り込み（${formatPokkuraDate(pk.version.at)}）の今作スコアで計算`
         : '旧曲は歴代ベストスコアで計算した目安';
     const extraNote = pk.extraCount > 0 ? '・Lv45以下の新曲（バナーなし）は公式データ取り込みで読んだもの' : '';
+    // 公式サイトの値があれば大きく出し、アプリの計算値は小さく添える
+    const official = pk.version && typeof pk.version.pc === 'number' ? pk.version.pc : null;
+    const bigValue = official !== null ? official : pk.total;
+    const calcLine = official !== null
+        ? `<div style="font-size: 11px; line-height: 1; color: #888; margin-top: 5px; white-space: nowrap;">計算値 ${pk.total.toFixed(2)}</div>`
+        : '';
 
     let html = `
         <div style="display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 14px;">
             <div style="background: #fff; border: 3px solid #d82f66; border-radius: 12px; padding: 8px 16px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0;">
                 <div style="font-size: 14px; line-height: 1; font-weight: bold; color: #d82f66; letter-spacing: 1px;">ポックラ</div>
-                <div style="font-size: 38px; line-height: 1; font-weight: bold; color: #333; margin-top: 6px;">${pk.total.toFixed(2)}</div>
+                <div style="font-size: 38px; line-height: 1; font-weight: bold; color: #333; margin-top: 6px;">${bigValue.toFixed(2)}</div>
+                ${calcLine}
             </div>
             <div style="flex: 1; text-align: center;">
                 <div style="font-size: 28px; line-height: 1.2; font-weight: bold; color: #d82f66;">pop'n music ポックラ対象曲</div>

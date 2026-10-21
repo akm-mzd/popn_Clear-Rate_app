@@ -1359,12 +1359,21 @@ function renderPokkuraGrid() {
     const topCount = pk.topNew.length + pk.topOld.length;
     const restCount = pk.restNew.length + pk.restOld.length;
 
-    let html = `
+    // 公式サイトの値があれば、それを大きく出し、アプリの計算値は下に小さく出す
+    const official = pk.version && typeof pk.version.pc === 'number' ? pk.version.pc : null;
+    const partsText = `新曲（${escapeHtml(pk.newVersionLabel)}） ${pk.newPoint.toFixed(2)}（${pk.topNew.length}/${POKKURA_NEW_COUNT}曲） ＋ 旧曲 ${pk.oldPoint.toFixed(2)}（${pk.topOld.length}/${POKKURA_OLD_COUNT}曲）`;
+    let html = official !== null ? `
+        <div class="pk-summary">
+            <div class="pk-total"><span class="pk-total-label">ポックラ</span><span class="pk-total-value">${official.toFixed(2)}</span></div>
+            <div class="pk-source">公式 ${escapeHtml(formatPokkuraDate(pk.version.at))} 時点</div>
+            <div class="pk-calc">計算値 ${pk.total.toFixed(2)}（${partsText}）</div>
+        </div>` : `
         <div class="pk-summary">
             <div class="pk-total"><span class="pk-total-label">推定ポックラ</span><span class="pk-total-value">${pk.total.toFixed(2)}</span></div>
-            <div class="pk-parts">新曲（${escapeHtml(pk.newVersionLabel)}） ${pk.newPoint.toFixed(2)}（${pk.topNew.length}/${POKKURA_NEW_COUNT}曲） ＋ 旧曲 ${pk.oldPoint.toFixed(2)}（${pk.topOld.length}/${POKKURA_OLD_COUNT}曲）</div>
+            <div class="pk-parts">${partsText}</div>
             <div class="pk-source${pk.version ? '' : ' pk-source-none'}">${escapeHtml(sourceText)}</div>
-        </div>
+        </div>`;
+    html += `
         <div class="pk-tabs" role="tablist" aria-label="ポックラの曲">
             <button type="button" role="tab" id="pk-tab-top" aria-controls="pk-panel-top" onclick="setPokkuraTab('top', true)">対象曲<span class="pk-tab-count">${topCount}</span></button>
             <button type="button" role="tab" id="pk-tab-rest" aria-controls="pk-panel-rest" onclick="setPokkuraTab('rest', true)">圏外<span class="pk-tab-count">${restCount}</span></button>

@@ -108,7 +108,8 @@ function ensureHtml2Canvas() {
         const script = document.createElement('script');
         script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
         script.onload = resolve;
-        script.onerror = reject;
+        // 失敗したら、次に押したときにもう一度読み込めるようにする
+        script.onerror = (e) => { html2canvasLoadPromise = null; script.remove(); reject(e); };
         document.head.appendChild(script);
     });
     return html2canvasLoadPromise;
