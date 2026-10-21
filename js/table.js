@@ -1328,8 +1328,10 @@ function calcOldPokkura() {
     return { total: pkFloor(pkRound(sum / OLD_POKKURA_COUNT, 8), 2), count: top.length };
 }
 
-// ---------- 旧筐体でつけたイージー（新ポックラでは黒として数える曲） ----------
-//   pokkuraFlagRecords: { 曲ID: { vm: '黒星' | '黒菱' | '黒丸' } }（ユーザーごと・クラウドに保存。イージーのときは記録なし）
+// ---------- イージーの曲の裏メダルと旧筐体EC ----------
+//   pokkuraFlagRecords: { 曲ID: { vm: 裏メダル（'黒星' | '黒菱' | '黒丸'）, old: 旧筐体EC } }（ユーザーごと・クラウドに保存）
+//   どのイージーの曲にも裏メダルを付けられる。ポックラで裏メダルを使うのは、旧筐体EC（旧筐体でつけたイージー）の曲だけ。
+//   ver 3.8.0.0 の { vm } だけの記録は、旧筐体EC として読む
 const POKKURA_OLD_EASY_CHOICES = ['イージー', '黒星', '黒菱', '黒丸'];
 
 function getPokkuraFlagRecords(user = currentUser) {
@@ -1338,18 +1340,35 @@ function getPokkuraFlagRecords(user = currentUser) {
     return allUsersData[user].pokkuraFlagRecords;
 }
 
-function getPokkuraOldEasyMedal(songId) {
+const URA_MEDALS = ['黒星', '黒菱', '黒丸'];
+
+// { ura: 裏メダル（なければ ''）, old: 旧筐体EC }
+function getUraMedalInfo(songId) {
     const f = getPokkuraFlagRecords()[songId];
-    return f && POKKURA_OLD_EASY_CHOICES.includes(f.vm) ? f.vm : 'イージー';
+    const ura = f && URA_MEDALS.includes(f.vm) ? f.vm : '';
+    return { ura, old: !!ura && (f.old === undefined ? true : !!f.old) };
 }
 
-function setPokkuraOldEasyMedal(songId, medal) {
-    if (!POKKURA_OLD_EASY_CHOICES.includes(medal)) return;
+function setUraMedalInfo(songId, ura, old) {
     const flags = getPokkuraFlagRecords();
-    if (medal === 'イージー') delete flags[songId];
-    else flags[songId] = { vm: medal };
+    if (!URA_MEDALS.includes(ura)) ura = '';
+    if (!ura) delete flags[songId];
+    else flags[songId] = { vm: ura, old: !!old };
     scheduleAutoSave();
     renderTable();
+}
+
+// ポックラで使うメダル（旧筐体EC で裏メダルがあれば裏メダル、なければイージー）
+function getPokkuraOldEasyMedal(songId) {
+    const info = getUraMedalInfo(songId);
+    return info.old ? info.ura : 'イージー';
+}
+
+// ポックラ画面のプルダウン：黒を選ぶと裏メダル＋旧筐体EC、イージーを選ぶと旧筐体EC だけ外す（裏メダルは残す）
+function setPokkuraOldEasyMedal(songId, medal) {
+    if (!POKKURA_OLD_EASY_CHOICES.includes(medal)) return;
+    if (medal === 'イージー') setUraMedalInfo(songId, getUraMedalInfo(songId).ura, false);
+    else setUraMedalInfo(songId, medal, true);
 }
 
 function calcPokkura() {
@@ -1363,9 +1382,9 @@ function calcPokkura() {
         const vr = group === 'old' && version ? version.records[song.id] : null;
         const score = vr ? vr.s : scoreRecords[song.id];
         let medal = vr ? vr.m : (clearRecords[song.id] || '');
-        // 今作のメダルはプレイ回数からの推測で、イージークリアは黒星になる。
-        //   歴代がイージーの曲はイージーとして数える。ただし旧筐体でつけたイージー（自分で黒を選んだ曲）は黒
-        const easySelectable = !!vr && vr.m === '黒星' && clearRecords[song.id] === 'イージー';
+        // 歴代のイージーで計算する曲（今作スコアを読んだ旧曲で今作のメダルが黒星と推測された曲・今作スコアを読んでいない旧曲・新曲）は、
+        //   旧筐体EC なら裏メダル（黒）、そうでなければイージーで数える
+        const easySelectable = clearRecords[song.id] === 'イージー' && (!vr || vr.m === '黒星');
         if (easySelectable) medal = getPokkuraOldEasyMedal(song.id);
         const point = calcPokkuraPoint(parseInt(getPokkuraLevel(song), 10), score, medal);
         if (point > 0) entries[group].push({ song, point, score: parseInt(score, 10) || 0, isVersion: !!vr, easySelectable, calcMedal: medal });
@@ -1472,7 +1491,7 @@ function renderPokkuraGrid() {
                 : `<span class="dg-banner-text">${escapeHtml(song.title)}</span>`;
             const safeId = jsStringAttr(song.id);
             const easySelectHtml = easySelectable
-                ? `<select class="pk-oldeasy${calcMedal !== 'イージー' ? ' is-black' : ''}" onchange="setPokkuraOldEasyMedal('${safeId}', this.value)" aria-label="${escapeHtml(song.title)}のポックラでのメダル" title="歴代はイージー・今作の記録は未クリアと推測した曲です。旧筐体でつけたイージーなら、新ポックラでの黒（星・菱・丸）を選んでください">${POKKURA_OLD_EASY_CHOICES.map(m => `<option value="${m}"${m === calcMedal ? ' selected' : ''}>${m === 'イージー' ? 'イージー' : `${m}（旧筐体EC）`}</option>`).join('')}</select>`
+                ? `<select class="pk-oldeasy${calcMedal !== 'イージー' ? ' is-black' : ''}" onchange="setPokkuraOldEasyMedal('${safeId}', this.value)" aria-label="${escapeHtml(song.title)}のポックラでのメダル" title="イージーの曲です。旧筐体でつけたイージー（旧筐体EC）なら、黒（星・菱・丸）を選ぶとポックラはそのメダルで計算します">${POKKURA_OLD_EASY_CHOICES.map(m => `<option value="${m}"${m === calcMedal ? ' selected' : ''}>${m}</option>`).join('')}</select>`
                 : '';
             // ポックラ反映時のレベルが Lv と違う曲は、印を付けて両方を見せる
             const pkLevel = getPokkuraLevel(song);

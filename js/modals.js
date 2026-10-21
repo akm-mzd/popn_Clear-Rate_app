@@ -28,7 +28,40 @@ function initMedalGrid() {
 
 function openMedalModal(id) {
     currentMedalEditId = id;
+    renderUraMedalBox();
     document.getElementById('medal-modal').style.display = 'flex';
+}
+
+// イージーの曲だけ：裏メダル（黒星・黒菱・黒丸）と旧筐体EC（ポックラは裏メダルで計算）
+function renderUraMedalBox() {
+    const box = document.getElementById('ura-medal-box');
+    if (!box) return;
+    const id = currentMedalEditId;
+    if (!id || clearRecords[id] !== 'イージー') {
+        box.style.display = 'none';
+        box.innerHTML = '';
+        return;
+    }
+    const info = getUraMedalInfo(id);
+    const safeId = jsStringAttr(id);
+    const btn = (value, label) => `<button type="button" class="ura-btn${info.ura === value ? ' active' : ''}" onclick="setUraMedalFromModal('${safeId}', '${value}')">${label}</button>`;
+    box.innerHTML = `
+        <div class="ura-title">裏メダル</div>
+        <div class="ura-btns">${btn('', 'なし')}${URA_MEDALS.map(m => btn(m, m)).join('')}</div>
+        <label class="ura-old${info.ura ? '' : ' is-disabled'}"><input type="checkbox"${info.old ? ' checked' : ''}${info.ura ? '' : ' disabled'} onchange="setUraOldFromModal('${safeId}', this.checked)"> 旧筐体EC（ポックラは裏メダルで計算）</label>`;
+    box.style.display = '';
+}
+
+function setUraMedalFromModal(id, ura) {
+    const info = getUraMedalInfo(id);
+    // 裏メダルを初めて付けるときは、旧筐体EC は外したまま（付けるかは自分で決める）
+    setUraMedalInfo(id, ura, ura ? info.old : false);
+    renderUraMedalBox();
+}
+
+function setUraOldFromModal(id, old) {
+    setUraMedalInfo(id, getUraMedalInfo(id).ura, old);
+    renderUraMedalBox();
 }
 
 function closeMedalModal() {
