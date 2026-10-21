@@ -134,7 +134,9 @@ function parseEagatePayload(text) {
         if (!Number.isInteger(c.s) || c.s < 0 || c.s > 100000) return;
         extraNew.push({ t: c.t.slice(0, 300), g: typeof c.g === 'string' ? c.g.slice(0, 300) : '', l: c.l, s: c.s, m: typeof c.m === 'string' && MEDAL_TYPES[c.m] ? c.m : '' });
     });
-    return { charts, extraNew, at: typeof data.at === 'string' ? data.at : '' };
+    // 公式サイトに載っているポックラ（読めたときだけ）
+    const pc = typeof data.pc === 'number' && isFinite(data.pc) && data.pc > 0 && data.pc <= 1000 ? Math.round(data.pc * 100) / 100 : null;
+    return { charts, extraNew, pc, at: typeof data.at === 'string' ? data.at : '' };
 }
 
 // ---------- 曲の突き合わせ ----------
@@ -300,7 +302,7 @@ function openEagateImportPreview(text) {
     });
     const versionCount = Object.keys(versionRecords).length;
     const extraCount = parsed.extraNew.length;
-    pendingEagateImport = { user: currentUser, changes, versionRecords, extraNew: parsed.extraNew, at: parsed.at };
+    pendingEagateImport = { user: currentUser, changes, versionRecords, extraNew: parsed.extraNew, pc: parsed.pc, at: parsed.at };
 
     const medalCount = changes.filter(c => c.newMedal !== null).length;
     const scoreCount = changes.filter(c => c.newScore !== null).length;
@@ -312,8 +314,9 @@ function openEagateImportPreview(text) {
         <div>公式の譜面 <b>${parsed.charts.length}</b> 件のうち、アプリの曲（Lv${EAGATE_MIN_LEVEL}〜${EAGATE_MAX_LEVEL}）と合ったもの <b>${pairs.length}</b> 件</div>
         <div>メダル更新 <b>${medalCount}</b> 件 / スコア更新 <b>${scoreCount}</b> 件</div>
         <div style="font-size:0.85em;color:#666;">※ メダルは上がるときだけ、スコアは高いときだけ更新します。</div>
-        ${versionCount > 0 ? `<div style="font-size:0.85em;color:#666;">ポックラ用に、旧曲 <b>${versionCount}</b> 曲の今作スコアも保存します（この端末に保存）。</div>` : ''}
-        ${extraCount > 0 ? `<div style="font-size:0.85em;color:#666;">ポックラ用に、Lv45以下の新曲 <b>${extraCount}</b> 曲も保存します（この端末に保存）。</div>` : ''}
+        ${versionCount > 0 ? `<div style="font-size:0.85em;color:#666;">ポックラ用に、旧曲 <b>${versionCount}</b> 曲の今作スコアも保存します。</div>` : ''}
+        ${extraCount > 0 ? `<div style="font-size:0.85em;color:#666;">ポックラ用に、Lv45以下の新曲 <b>${extraCount}</b> 曲も保存します。</div>` : ''}
+        ${parsed.pc !== null ? `<div style="font-size:0.85em;color:#666;">公式のポックラ <b>${parsed.pc.toFixed(2)}</b> も保存します。</div>` : ''}
     </div>`;
 
     if (changes.length > 0) {
@@ -342,7 +345,7 @@ function openEagateImportPreview(text) {
     document.getElementById('eagate-import-body').innerHTML = html;
     const applyBtn = document.getElementById('eagate-import-apply');
     applyBtn.textContent = `${currentUser} さんに反映`;
-    applyBtn.disabled = changes.length === 0 && versionCount === 0 && extraCount === 0;
+    applyBtn.disabled = changes.length === 0 && versionCount === 0 && extraCount === 0 && parsed.pc === null;
     document.getElementById('eagate-import-modal').style.display = 'flex';
     return true;
 }
@@ -369,9 +372,9 @@ function applyEagateImport() {
     if (!allUsersData[currentUser]) allUsersData[currentUser] = emptyUser();
     allUsersData[currentUser].clearRecords = clearRecords;
     allUsersData[currentUser].scoreRecords = scoreRecords;
-    const hasPokkuraData = Object.keys(pending.versionRecords).length > 0 || pending.extraNew.length > 0;
+    const hasPokkuraData = Object.keys(pending.versionRecords).length > 0 || pending.extraNew.length > 0 || pending.pc !== null;
     if (hasPokkuraData) {
-        savePokkuraVersionRecords(currentUser, pending.versionRecords, pending.at, pending.extraNew);
+        savePokkuraVersionRecords(currentUser, pending.versionRecords, pending.at, pending.extraNew, pending.pc);
     }
     closeEagateImportModal();
     if (pending.changes.length > 0 || hasPokkuraData) scheduleAutoSave();
@@ -388,13 +391,16 @@ function applyEagateImport() {
 //   その端末のデータは、クラウドに入ったと確認できるまで残しておく（GAS が古いときの保険）
 const POKKURA_AT_KEY = '_at';
 const POKKURA_EXTRA_KEY = '_extra';
+const POKKURA_PC_KEY = '_pc'; // 公式サイトに載っているポックラ
+// 曲の記録ではないキー（_vm・_ec は ver 3.3.x で使っていたもの。読むときに無視する）
+const POKKURA_META_KEYS = [POKKURA_AT_KEY, POKKURA_EXTRA_KEY, POKKURA_PC_KEY, '_vm', '_ec'];
 
 function pokkuraVersionKey(user) {
     return 'popn_pokkura_version_' + user;
 }
 
-function savePokkuraVersionRecords(user, records, at, extraNew) {
-    const data = { at: at || new Date().toISOString(), records, extraNew: extraNew || [] };
+function savePokkuraVersionRecords(user, records, at, extraNew, pc) {
+    const data = { at: at || new Date().toISOString(), records, extraNew: extraNew || [], pc: typeof pc === 'number' ? pc : null };
     if (!allUsersData[user]) allUsersData[user] = emptyUser();
     // 前回の取り込み分は丸ごと置き換える
     allUsersData[user].pokkuraRecords = toPokkuraCloudRecords(data);
@@ -402,16 +408,23 @@ function savePokkuraVersionRecords(user, records, at, extraNew) {
 }
 
 function toPokkuraCloudRecords(data) {
-    return Object.assign({}, data.records, { [POKKURA_AT_KEY]: data.at, [POKKURA_EXTRA_KEY]: data.extraNew || [] });
+    const rec = Object.assign({}, data.records, { [POKKURA_AT_KEY]: data.at, [POKKURA_EXTRA_KEY]: data.extraNew || [] });
+    if (typeof data.pc === 'number') rec[POKKURA_PC_KEY] = data.pc;
+    return rec;
 }
 
 function fromPokkuraCloudRecords(rec) {
     if (!rec || typeof rec !== 'object' || !rec[POKKURA_AT_KEY]) return null;
     const records = {};
     for (const id in rec) {
-        if (id !== POKKURA_AT_KEY && id !== POKKURA_EXTRA_KEY) records[id] = rec[id];
+        if (!POKKURA_META_KEYS.includes(id)) records[id] = rec[id];
     }
-    return { at: rec[POKKURA_AT_KEY], records, extraNew: Array.isArray(rec[POKKURA_EXTRA_KEY]) ? rec[POKKURA_EXTRA_KEY] : [] };
+    const pc = rec[POKKURA_PC_KEY];
+    return {
+        at: rec[POKKURA_AT_KEY], records,
+        extraNew: Array.isArray(rec[POKKURA_EXTRA_KEY]) ? rec[POKKURA_EXTRA_KEY] : [],
+        pc: typeof pc === 'number' && isFinite(pc) ? pc : null
+    };
 }
 
 function loadLocalPokkuraVersionRecords(user) {
@@ -419,6 +432,7 @@ function loadLocalPokkuraVersionRecords(user) {
         const data = JSON.parse(storageGet(pokkuraVersionKey(user)) || 'null');
         if (!data || typeof data.records !== 'object' || !data.records) return null;
         if (!Array.isArray(data.extraNew)) data.extraNew = [];
+        if (typeof data.pc !== 'number') data.pc = null;
         return data;
     } catch (e) {
         return null;

@@ -635,6 +635,7 @@ body.exporting-image #back-to-top { display: none !important; }
 .pk-total-value { font-size: 28px; font-weight: bold; color: #333; font-variant-numeric: tabular-nums; }
 .pk-parts { font-size: 13px; color: #555; margin-top: 2px; }
 .pk-source { display: inline-block; font-size: 11px; color: #7b1fa2; background: #f3e5f5; border-radius: 10px; padding: 1px 10px; margin-top: 6px; }
+.pk-calc { font-size: 11px; color: #999; margin-top: 4px; line-height: 1.4; }
 .pk-source-none { color: #8d6e63; background: #efebe9; }
 /* 対象曲 / 圏外 のタブ（横スライドでも切り替わる） */
 .pk-tabs { display: flex; gap: 4px; background: rgba(0,0,0,0.06); padding: 3px; border-radius: 10px; }

@@ -282,6 +282,54 @@
     }
 
     // ---------- 診断データ（うまく読めなかったときに作者へ送ってもらう） ----------
+    // 公式のポップンクラス（ポックラ）を、プレーデータのトップから読む。
+    //   ページの作りが分からないので、「ポップンクラス」「ポックラ」の文字の近くにある 123.45 の形の数を探す。
+    //   読めなければ null（取り込みは止めない）。読めなかったときのため、まわりの文字を pcDiag に残す
+    let pcDiag = '';
+    async function fetchOfficialPokkura() {
+        const doc = await fetchDoc(playdataUrl('index.html'));
+        const LABEL = /ポップンクラス|ポックラ|pop'?n\s*class/i;
+        const NUM = /(\d{1,3}\.\d{1,3})/;
+        const candidates = [];
+        const walker = doc.createTreeWalker(doc.body || doc, NodeFilter.SHOW_TEXT);
+        let node;
+        while ((node = walker.nextNode())) {
+            // 「ポップンクラス」などのほか、見出しが「クラス」「CLASS」だけのときも候補にする
+            if (LABEL.test(node.textContent) || /^\s*(クラス|class)\s*[:：]?\s*$/i.test(node.textContent)) candidates.push(node.parentElement);
+        }
+        for (const el of candidates) {
+            // ラベルの要素 → 親 → その親 … と広げながら、最初に見つかった数を使う
+            let box = el;
+            for (let depth = 0; box && depth < 4; depth++, box = box.parentElement) {
+                const text = clean(box.textContent).replace(/[,，]/g, '');
+                const at = text.search(LABEL) >= 0 ? text.search(LABEL) : text.search(/クラス|class/i);
+                const after = text.slice(Math.max(0, at));
+                const m = after.match(NUM) || text.match(NUM);
+                if (m) {
+                    const v = parseFloat(m[1]);
+                    if (v > 0 && v <= 1000) return v;
+                }
+            }
+        }
+        // 読めなかった：診断用に「クラス」まわりの文字と、小数が書かれた要素の場所（タグ・class 名）だけを残す
+        //   （プレーヤー名などはなるべく含めない）
+        const all = clean(doc.body ? doc.body.textContent : '');
+        const i = all.search(/クラス|class/i);
+        const spots = [];
+        (doc.body ? doc.body.querySelectorAll('*') : []).forEach(el => {
+            if (spots.length >= 15 || el.children.length > 0) return;
+            const t = clean(el.textContent);
+            if (!NUM.test(t) || t.length > 20) return;
+            const path = [];
+            for (let e = el; e && e !== doc.body && path.length < 4; e = e.parentElement) {
+                path.unshift(e.tagName.toLowerCase() + (e.id ? '#' + e.id : '') + (e.className && typeof e.className === 'string' ? '.' + e.className.trim().split(/\s+/).join('.') : ''));
+            }
+            spots.push(path.join('>') + ' = ' + t);
+        });
+        pcDiag = (i >= 0 ? all.slice(Math.max(0, i - 40), i + 80) : 'no label; title=' + clean(doc.title)) + ' || ' + spots.join(' | ');
+        return null;
+    }
+
     function buildDiag(doc, url, diag, reason) {
         const imgs = [];
         doc.querySelectorAll('img').forEach(img => {
@@ -302,6 +350,7 @@
             positional: diag.positional,
             multiInLevelPage: diag.multiInLevelPage,
             badRows: diag.badRows,
+            pokkuraText: pcDiag,
             images: imgs,
             html: html.slice(0, 6000)
         });
@@ -513,6 +562,15 @@
             versionError = e.message;
         }
 
+        // 公式のポックラ（読めなくても取り込みは続ける）
+        let officialPokkura = null;
+        try {
+            setStatus('公式のポックラを確認中…');
+            officialPokkura = await fetchOfficialPokkura();
+        } catch (e) {
+            pcDiag = 'error: ' + e.message;
+        }
+
         // 結果
         const counts = {};
         charts.forEach(c => { const k = c.m || '未プレイ(スコアのみ)'; counts[k] = (counts[k] || 0) + 1; });
@@ -520,6 +578,7 @@
         const summary = Object.keys(counts).sort((a, b) => order.indexOf(a) - order.indexOf(b)).map(k => `${k} ${counts[k]}`).join(' / ');
         const payload = { type: 'popn-eagate', v: 1, at: new Date().toISOString(), pages, charts };
         if (extraNew.length > 0) payload.extraNew = extraNew;
+        if (officialPokkura !== null) payload.pc = officialPokkura;
         const json = JSON.stringify(payload);
 
         setStatus(`Lv${MIN_LEVEL}〜${MAX_LEVEL} の ${pages}ページから、${charts.length}譜面を読み取りました。`);
@@ -528,6 +587,7 @@
         addNote(versionError
             ? `旧曲の今作スコアは読めませんでした（${versionError}）。ポックラは歴代ベストで計算されます。`
             : `ポックラ用に、旧曲 ${versionChecked}曲の今作スコアを読み取りました。` + (extraNew.length ? `Lv45以下の新曲 ${extraNew.length}曲も読み取りました。` : ''));
+        addNote(officialPokkura !== null ? `公式のポックラ：${officialPokkura.toFixed(2)}` : '公式のポックラは読み取れませんでした（アプリでは計算値を出します）。');
         addButton('アプリに送る（新しいタブで開く）', '#e91e63', () => sendToApp(json));
         const box = addTextBox(json);
         addButton('コピー（アプリで「クリップボードから取り込む」）', '#2196F3', async () => {
@@ -539,6 +599,8 @@
             showDiag(buildDiag(firstDoc, firstUrl, diag, 'bad rows'), `読めなかった行が ${diag.badRows} 行ありました。その曲は取り込みません。`);
         } else if (unknown.length) {
             showDiag(buildDiag(firstDoc, firstUrl, diag, 'unknown medals'), `知らないメダル画像がありました（${unknown.join(', ')}）。その譜面は取り込みません。`);
+        } else if (officialPokkura === null) {
+            showDiag(buildDiag(firstDoc, firstUrl, diag, 'no official pokkura'), '公式のポックラを読み取れませんでした。直すために、この診断データを送ってもらえると助かります。');
         }
         addCloseButton();
         finish();
