@@ -421,7 +421,7 @@ function buildPokkuraRoot(pk) {
             </div>
             <div style="flex: 1; text-align: center;">
                 <div style="font-size: 28px; line-height: 1.2; font-weight: bold; color: #d82f66;">pop'n music ポックラ対象曲</div>
-                <div style="font-size: 15px; line-height: 1.4; color: #555; margin-top: 4px;">新曲（${escapeHtml(pk.newVersionLabel)}） ${pk.newPoint.toFixed(2)}（${pk.topNew.length}/${POKKURA_NEW_COUNT}曲） ＋ 旧曲 ${pk.oldPoint.toFixed(2)}（${pk.topOld.length}/${POKKURA_OLD_COUNT}曲）</div>
+                <div style="font-size: 15px; line-height: 1.4; color: #555; margin-top: 4px;">新曲 ${pk.newPoint.toFixed(2)} ＋ 旧曲 ${pk.oldPoint.toFixed(2)}</div>
                 <div style="font-size: 12px; line-height: 1.4; color: #888;">${escapeHtml(note + extraNote)}</div>
             </div>
             <div style="text-align: right; color: #555; font-size: 14px; line-height: 1.6; flex-shrink: 0;">
