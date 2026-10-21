@@ -347,6 +347,8 @@ async function deleteSong() {
         updateDynamicFilters();
         renderTable();
         closeEditModal();
+        // 楽曲リストもクラウドに保存する（しないと、読み込み直したときに元に戻る）
+        await saveToCloud(true);
     }
 }
 
@@ -448,6 +450,8 @@ async function saveEditModal() {
     updateDynamicFilters();
     renderTable();
     closeEditModal();
+    // 楽曲リストもクラウドに保存する（しないと、読み込み直したときに元に戻る）
+    await saveToCloud(true);
 }
 
 function handleBannerFileUpload(event) {
