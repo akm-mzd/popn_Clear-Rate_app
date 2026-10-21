@@ -1036,3 +1036,12 @@ body.ui-new #back-to-top { background-color: var(--nu-purple) !important; }
     .gd-medal img { width: 26px; height: 26px; }
     .gd-score { min-width: 54px; }
 }
+
+/* メダルを選ぶ画面：イージーの曲の裏メダル */
+.ura-medal-box { margin-top: 14px; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; background: #fafafa; display: flex; flex-direction: column; gap: 8px; }
+.ura-title { font-size: 0.85em; font-weight: bold; color: #555; }
+.ura-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.ura-btn { width: auto; margin: 0; padding: 6px 12px; border: 1px solid #bbb; border-radius: 6px; background: #fff; color: #333; font-size: 0.9em; cursor: pointer; font-family: inherit; }
+.ura-btn.active { background: #424242; border-color: #424242; color: #fff; font-weight: bold; }
+.ura-old { font-size: 0.85em; color: #333; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.ura-old.is-disabled { color: #aaa; cursor: default; }
