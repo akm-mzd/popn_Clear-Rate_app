@@ -5,7 +5,7 @@
 // ==========================================
 
 function downloadSongsAndClearsJson() {
-    const exportData = { songs: songs, clearRecords: clearRecords, scoreRecords: scoreRecords, memoRecords: memoRecords, historyRecords: getHistoryRecords(), pokkuraRecords: (allUsersData[currentUser] && allUsersData[currentUser].pokkuraRecords) || {}, goalRecords: getGoalRecords() };
+    const exportData = { songs: songs, clearRecords: clearRecords, scoreRecords: scoreRecords, memoRecords: memoRecords, historyRecords: getHistoryRecords(), pokkuraRecords: (allUsersData[currentUser] && allUsersData[currentUser].pokkuraRecords) || {}, goalRecords: getGoalRecords(), pokkuraFlagRecords: getPokkuraFlagRecords() };
     const dataStr = JSON.stringify(exportData, null, 2);
     triggerDownload(dataStr, `popn_data_${currentUser}.json`, 'クリア・スコア・メモを含めて');
 }
@@ -489,6 +489,7 @@ async function restoreFromJson(event) {
             if (isObj(data.historyRecords)) user.historyRecords = data.historyRecords;
             if (isObj(data.pokkuraRecords)) user.pokkuraRecords = data.pokkuraRecords;
             if (isObj(data.goalRecords)) user.goalRecords = data.goalRecords;
+            if (isObj(data.pokkuraFlagRecords)) user.pokkuraFlagRecords = data.pokkuraFlagRecords;
 
             clearRecords = user.clearRecords;
             scoreRecords = user.scoreRecords;
