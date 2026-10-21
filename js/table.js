@@ -1371,7 +1371,12 @@ function setPokkuraOldEasyMedal(songId, medal) {
     else setUraMedalInfo(songId, medal, true);
 }
 
-function calcPokkura() {
+// opts（ずれを探す比べ表用。ふだんは指定しない）
+//   score：旧曲のスコア 'version'（今作。読めていなければ歴代）/ 'best'（歴代ベスト）
+//   medal：旧曲のメダル 'easy'（推測＋イージー補正・旧筐体EC は裏メダル）/ 'raw'（推測そのまま）/ 'best'（歴代のメダル）
+function calcPokkura(opts) {
+    const scoreMode = opts && opts.score === 'best' ? 'best' : 'version';
+    const medalMode = opts && (opts.medal === 'raw' || opts.medal === 'best') ? opts.medal : 'easy';
     const entries = { new: [], old: [] };
     const newVersion = getPokkuraNewVersion();
     // 旧曲は、公式データ取り込みで保存した「今作のスコア」があればそれで数える（なければ歴代ベスト）
@@ -1380,14 +1385,16 @@ function calcPokkura() {
         const group = getPokkuraGroup(song, newVersion.value);
         if (!group) return;
         const vr = group === 'old' && version ? version.records[song.id] : null;
-        const score = vr ? vr.s : scoreRecords[song.id];
-        let medal = vr ? vr.m : (clearRecords[song.id] || '');
+        const bestMedal = clearRecords[song.id] || '';
+        const useVersionScore = !!vr && scoreMode === 'version';
+        const score = useVersionScore ? vr.s : scoreRecords[song.id];
+        let medal = vr && medalMode !== 'best' ? vr.m : bestMedal;
         // 歴代のイージーで計算する曲（今作スコアを読んだ旧曲で今作のメダルが黒星と推測された曲・今作スコアを読んでいない旧曲・新曲）は、
         //   旧筐体EC なら裏メダル（黒）、そうでなければイージーで数える
-        const easySelectable = clearRecords[song.id] === 'イージー' && (!vr || vr.m === '黒星');
+        const easySelectable = medalMode === 'easy' && bestMedal === 'イージー' && (!vr || vr.m === '黒星');
         if (easySelectable) medal = getPokkuraOldEasyMedal(song.id);
         const point = calcPokkuraPoint(parseInt(getPokkuraLevel(song), 10), score, medal);
-        if (point > 0) entries[group].push({ song, point, score: parseInt(score, 10) || 0, isVersion: !!vr, easySelectable, calcMedal: medal });
+        if (point > 0) entries[group].push({ song, point, score: parseInt(score, 10) || 0, isVersion: useVersionScore, easySelectable, calcMedal: medal, bestScore: scoreRecords[song.id], bestMedal });
     });
     // Lv45 以下の今作の新曲（公式データ取り込みで保存したもの。アプリには曲として入っていない）
     const extraNew = version ? version.extraNew : [];
@@ -1413,6 +1420,65 @@ function calcPokkura() {
         oldPoint: pkFloor(pkRound(sum(topOld), 8) / 60, 2),
         total: pkFloor(pkRound(sum(topNew) + sum(topOld), 8) / 60, 2)
     };
+}
+
+// ---------- ずれを探す道具：計算方法の比べ表・内訳のコピー ----------
+const POKKURA_COMPARE_MODES = [
+    { score: 'version', medal: 'easy', label: '今作スコア・イージー補正（今の方法）' },
+    { score: 'version', medal: 'raw', label: '今作スコア・推測メダルそのまま' },
+    { score: 'version', medal: 'best', label: '今作スコア・歴代メダル' },
+    { score: 'best', medal: 'easy', label: '歴代スコア・イージー補正' },
+    { score: 'best', medal: 'raw', label: '歴代スコア・推測メダルそのまま' },
+    { score: 'best', medal: 'best', label: '歴代スコア・歴代メダル' }
+];
+
+function buildPokkuraCompareHtml(official) {
+    const rows = POKKURA_COMPARE_MODES.map(m => ({ m, total: calcPokkura(m).total }));
+    const diffOf = r => official !== null ? Math.round((r.total - official) * 100) / 100 : null;
+    let nearest = -1;
+    if (official !== null) {
+        rows.forEach((r, i) => { if (nearest < 0 || Math.abs(diffOf(r)) < Math.abs(diffOf(rows[nearest]))) nearest = i; });
+    }
+    const body = rows.map((r, i) => {
+        const d = diffOf(r);
+        const diffText = d === null ? '' : `<td class="pkc-diff${d === 0 ? ' is-zero' : ''}">${d > 0 ? '+' : ''}${d.toFixed(2)}</td>`;
+        const marks = (i === 0 ? '<span class="pkc-mark">今</span>' : '') + (i === nearest ? '<span class="pkc-mark pkc-near">近</span>' : '');
+        return `<tr${i === nearest ? ' class="is-near"' : ''}><td>${escapeHtml(r.m.label)}${marks}</td><td class="pkc-val">${r.total.toFixed(2)}</td>${diffText}</tr>`;
+    }).join('');
+    return `
+        <details class="pk-compare">
+            <summary>計算方法を比べる（ずれの原因さがし）</summary>
+            <table class="pkc-table"><thead><tr><th>旧曲の扱い</th><th>値</th>${official !== null ? '<th>公式との差</th>' : ''}</tr></thead><tbody>${body}</tbody></table>
+            <button type="button" class="pkc-copy" onclick="copyPokkuraBreakdown()">内訳をコピー（送る用）</button>
+        </details>`;
+}
+
+// 今の計算の内訳（新曲20・旧曲40と、すぐ下の圏外）を文字にしてコピーする
+async function copyPokkuraBreakdown() {
+    const pk = calcPokkura();
+    const official = pk.version && typeof pk.version.pc === 'number' ? pk.version.pc : null;
+    const line = (kind, e) => {
+        if (e.extra) return [kind, e.extra.title, e.extra.level, e.score, e.extra.medal || '-', e.point.toFixed(2), '今作(Lv45以下)', '', ''].join('\t');
+        return [kind, e.song.title, getPokkuraLevel(e.song), e.score, e.calcMedal || '-', e.point.toFixed(2),
+            e.isVersion ? '今作' : '歴代', e.bestScore || '-', e.bestMedal || '-'].join('\t');
+    };
+    const lines = [
+        `ポックラ内訳 ${new Date().toLocaleString()}`,
+        `公式 ${official !== null ? official.toFixed(2) : '-'} / 計算 ${pk.total.toFixed(2)}（新曲 ${pk.newPoint.toFixed(2)} ＋ 旧曲 ${pk.oldPoint.toFixed(2)}）/ 取り込み ${pk.version ? pk.version.at : '-'}`,
+        ['区分', '曲名', 'Lv', 'スコア', 'メダル', 'ポイント', 'スコアの出どころ', '歴代スコア', '歴代メダル'].join('\t'),
+        ...pk.topNew.map(e => line('新曲', e)),
+        ...pk.restNew.slice(0, 5).map(e => line('新曲圏外', e)),
+        ...pk.topOld.map(e => line('旧曲', e)),
+        ...pk.restOld.slice(0, 10).map(e => line('旧曲圏外', e))
+    ];
+    const text = lines.join('\n');
+    try {
+        await navigator.clipboard.writeText(text);
+        showToast('toast-pkcopy', '内訳をコピーしました', '#4caf50', 2500);
+    } catch (e) {
+        // コピーできない環境では、選んでコピーできるように出す
+        prompt('この文字を全部コピーしてください', text);
+    }
 }
 
 function formatPokkuraDate(iso) {
@@ -1447,12 +1513,14 @@ function renderPokkuraGrid() {
             <div class="pk-source">公式 ${escapeHtml(formatPokkuraDate(pk.version.at))} 時点</div>
             <div class="pk-calc">計算値 ${pk.total.toFixed(2)}（${partsText}）</div>
             ${oldPkHtml}
+            ${buildPokkuraCompareHtml(official)}
         </div>` : `
         <div class="pk-summary">
             <div class="pk-total"><span class="pk-total-label">推定ポックラ</span><span class="pk-total-value">${pk.total.toFixed(2)}</span></div>
             <div class="pk-parts">${partsText}</div>
             <div class="pk-source${pk.version ? '' : ' pk-source-none'}">${escapeHtml(sourceText)}</div>
             ${oldPkHtml}
+            ${buildPokkuraCompareHtml(official)}
         </div>`;
     html += `
         <div class="pk-tabs" role="tablist" aria-label="ポックラの曲">
