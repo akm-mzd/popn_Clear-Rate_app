@@ -1298,6 +1298,36 @@ function getPokkuraGroup(song, newVersionValue) {
     return (lv >= 48 && lv <= 50) ? 'old' : null;
 }
 
+// ---------- 旧ポックラ（Jam&Fizz までの計算。ssdh233/popn-class の index.js と同じ式） ----------
+//   1曲 = (10000×Lv + スコア − 50000 + メダルボーナス) ÷ 5440（スコア 50000 未満は 0）
+//   旧ポックラ = Lv48〜50 の全曲（歴代ベスト）の上位50曲の平均
+const OLD_POKKURA_MEDAL_BONUS = {
+    '金星': 5000, '銀星': 5000, '銀菱': 5000, '銀丸': 5000,
+    '銅星': 3000, '銅菱': 3000, '銅丸': 3000,
+    'イージー': 3000, 'ロングオフ': 3000
+};
+const OLD_POKKURA_COUNT = 50;
+
+function calcOldPokkuraPoint(level, score, medalKey) {
+    const s = parseInt(score, 10);
+    if (isNaN(s) || s < 50000) return 0;
+    return pkFloor(pkRound((10000 * level + s - 50000 + (OLD_POKKURA_MEDAL_BONUS[medalKey] || 0)) / 5440, 8), 2);
+}
+
+function calcOldPokkura() {
+    const points = [];
+    songs.forEach(song => {
+        const lv = parseInt(song.level, 10);
+        if (!(lv >= 48 && lv <= 50)) return;
+        const point = calcOldPokkuraPoint(lv, scoreRecords[song.id], clearRecords[song.id] || '');
+        if (point > 0) points.push(point);
+    });
+    points.sort((a, b) => b - a);
+    const top = points.slice(0, OLD_POKKURA_COUNT);
+    const sum = top.reduce((acc, p) => acc + p, 0);
+    return { total: pkFloor(pkRound(sum / OLD_POKKURA_COUNT, 8), 2), count: top.length };
+}
+
 function calcPokkura() {
     const entries = { new: [], old: [] };
     const newVersion = getPokkuraNewVersion();
@@ -1361,17 +1391,21 @@ function renderPokkuraGrid() {
 
     // 公式サイトの値があれば、それを大きく出し、アプリの計算値は下に小さく出す
     const official = pk.version && typeof pk.version.pc === 'number' ? pk.version.pc : null;
+    const oldPk = calcOldPokkura();
+    const oldPkHtml = `<div class="pk-calc">旧ポックラ <b>${oldPk.total.toFixed(2)}</b>（Lv48〜50 上位${OLD_POKKURA_COUNT}曲・歴代ベスト${oldPk.count < OLD_POKKURA_COUNT ? `、${oldPk.count}曲` : ''}）</div>`;
     const partsText = `新曲（${escapeHtml(pk.newVersionLabel)}） ${pk.newPoint.toFixed(2)}（${pk.topNew.length}/${POKKURA_NEW_COUNT}曲） ＋ 旧曲 ${pk.oldPoint.toFixed(2)}（${pk.topOld.length}/${POKKURA_OLD_COUNT}曲）`;
     let html = official !== null ? `
         <div class="pk-summary">
             <div class="pk-total"><span class="pk-total-label">ポックラ</span><span class="pk-total-value">${official.toFixed(2)}</span></div>
             <div class="pk-source">公式 ${escapeHtml(formatPokkuraDate(pk.version.at))} 時点</div>
             <div class="pk-calc">計算値 ${pk.total.toFixed(2)}（${partsText}）</div>
+            ${oldPkHtml}
         </div>` : `
         <div class="pk-summary">
             <div class="pk-total"><span class="pk-total-label">推定ポックラ</span><span class="pk-total-value">${pk.total.toFixed(2)}</span></div>
             <div class="pk-parts">${partsText}</div>
             <div class="pk-source${pk.version ? '' : ' pk-source-none'}">${escapeHtml(sourceText)}</div>
+            ${oldPkHtml}
         </div>`;
     html += `
         <div class="pk-tabs" role="tablist" aria-label="ポックラの曲">

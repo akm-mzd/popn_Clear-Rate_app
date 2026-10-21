@@ -408,9 +408,9 @@ function buildPokkuraRoot(pk) {
     // 公式サイトの値があれば大きく出し、アプリの計算値は小さく添える
     const official = pk.version && typeof pk.version.pc === 'number' ? pk.version.pc : null;
     const bigValue = official !== null ? official : pk.total;
-    const calcLine = official !== null
+    const calcLine = (official !== null
         ? `<div style="font-size: 11px; line-height: 1; color: #888; margin-top: 5px; white-space: nowrap;">計算値 ${pk.total.toFixed(2)}</div>`
-        : '';
+        : '') + `<div style="font-size: 11px; line-height: 1; color: #888; margin-top: 4px; white-space: nowrap;">旧ポックラ ${calcOldPokkura().total.toFixed(2)}</div>`;
 
     let html = `
         <div style="display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 14px;">
