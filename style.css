@@ -898,6 +898,7 @@ body.ui-new #nu-stat-card {
     color: var(--nu-ink); cursor: pointer; font-family: inherit; box-sizing: border-box;
 }
 body.ui-new #nu-stat-card:hover { border-color: var(--nu-accent); }
+body.ui-new #nu-stat-card:focus-visible { outline: 2px solid var(--nu-purple); outline-offset: 2px; }
 .nu-stat-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .nu-stat-label { font-size: 11px; color: var(--nu-muted); }
 .nu-stat-main { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
@@ -905,16 +906,24 @@ body.ui-new #nu-stat-card:hover { border-color: var(--nu-accent); }
 .nu-stat-main span { font-size: 12px; color: var(--nu-muted); }
 .nu-stat-more { font-size: 12px; font-weight: 700; color: var(--nu-purple); white-space: nowrap; }
 .nu-stat-text { flex: 0 1 auto; }
-.nu-stat-breakdown { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; justify-content: flex-start; padding-left: 12px; border-left: 1px solid var(--nu-line); }
-.nu-stat-chip { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 700; color: var(--nu-ink); white-space: nowrap; }
-.nu-stat-chip img { width: 20px; height: 20px; object-fit: contain; }
-.nu-stat-chip img.nu-stat-chip-rank { width: auto; max-width: 34px; height: 16px; }
-.nu-stat-chip-text { font-size: 10px; color: var(--nu-muted); }
+.nu-stat-breakdown { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: flex-start; padding-left: 12px; border-left: 1px solid var(--nu-line); }
+.nu-stat-chip {
+    display: inline-flex; align-items: center; gap: 4px; width: auto; flex: 0 0 auto; height: 38px; margin: 0; padding: 0 10px 0 6px;
+    border: 1px solid var(--nu-line); border-radius: 19px; background: var(--nu-surface);
+    font-size: 15px; font-weight: 700; font-family: inherit; color: var(--nu-ink); white-space: nowrap; cursor: pointer;
+}
+.nu-stat-chip:hover { border-color: var(--nu-accent); background: var(--nu-accent-soft); }
+.nu-stat-chip.is-active { border-color: var(--nu-accent); background: var(--nu-accent); color: #fff; }
+.nu-stat-chip.is-active .nu-stat-chip-text { color: #fff; }
+.nu-stat-chip img { width: 28px; height: 28px; object-fit: contain; }
+.nu-stat-chip img.nu-stat-chip-rank { width: auto; max-width: 52px; height: 22px; }
+.nu-stat-chip-text { font-size: 12px; color: var(--nu-muted); padding-left: 4px; }
 @media screen and (max-width: 768px) {
     body.ui-new #nu-stat-card { flex-wrap: wrap; row-gap: 6px; }
     .nu-stat-text { flex: 1; }
-    .nu-stat-breakdown { order: 3; flex: 0 0 100%; gap: 3px 8px; padding: 6px 0 0; border-left: none; border-top: 1px solid var(--nu-line); }
-    .nu-stat-chip img { width: 18px; height: 18px; }
+    .nu-stat-breakdown { order: 3; flex: 0 0 100%; gap: 6px; padding: 8px 0 0; border-left: none; border-top: 1px solid var(--nu-line); }
+    body.ui-new .nu-stat-chip { width: auto; height: 36px; font-size: 14px; padding: 0 9px 0 5px; }
+    .nu-stat-chip img { width: 26px; height: 26px; }
 }
 
 /* 一覧 */

@@ -167,9 +167,13 @@ function updateNewUiChrome(summary) {
 }
 
 // 統計のミニカードの内訳（難易度表・メダル表はメダル、スコア表はスコアランク。0曲のものは出さない）
+//   押すとそのメダル・ランクだけで絞り込む（もう一度押すと外す）
 function buildStatCardBreakdownHtml(summary) {
-    const chip = (iconHtml, count, title) =>
-        `<span class="nu-stat-chip" title="${escapeHtml(title)}：${count}曲">${iconHtml}<span>${count}</span></span>`;
+    const chipOf = kind => (iconHtml, count, title, value) => {
+        const current = getFilterValues(kind === 'medal' ? 'filter-medal' : 'filter-rank');
+        const active = current.length === 1 && current[0] === value;
+        return `<button type="button" class="nu-stat-chip${active ? ' is-active' : ''}" aria-pressed="${active}" title="${escapeHtml(title)}：${count}曲（押すと${active ? '絞り込みを外す' : 'これで絞り込む'}）" onclick="event.stopPropagation(); toggleStatCardFilter('${kind}', '${jsStringAttr(value)}')">${iconHtml}<span>${count}</span></button>`;
+    };
     const chips = [];
     if ((viewMode === 'grid' || viewMode === 'medal') && summary.medalCounts) {
         Object.keys(MEDAL_TYPES)
@@ -181,7 +185,7 @@ function buildStatCardBreakdownHtml(summary) {
                 const icon = k === '' ? '<span class="nu-stat-chip-text">未</span>'
                     : k === '未解禁' ? '<span class="nu-stat-chip-text">🔒</span>'
                     : src ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(m.label)}">` : `<span class="nu-stat-chip-text">${escapeHtml(m.label)}</span>`;
-                chips.push(chip(icon, summary.medalCounts[k], m.label));
+                chips.push(chipOf('medal')(icon, summary.medalCounts[k], m.label, k === '' ? 'unplayed' : k));
             });
     } else if (viewMode === 'score' && summary.rankCounts) {
         SCORE_RANK_KEYS.concat(SCORE_RANK_NONE).forEach(k => {
@@ -189,10 +193,17 @@ function buildStatCardBreakdownHtml(summary) {
             if (!(count > 0)) return;
             const icon = k === SCORE_RANK_NONE ? '<span class="nu-stat-chip-text">なし</span>'
                 : `<img class="nu-stat-chip-rank" src="${escapeHtml(safeUrl(RANK_IMAGES[k], true) || '')}" alt="${escapeHtml(k)}">`;
-            chips.push(chip(icon, count, k === SCORE_RANK_NONE ? 'スコアなし' : k));
+            chips.push(chipOf('rank')(icon, count, k === SCORE_RANK_NONE ? 'スコアなし' : k, k));
         });
     }
     return chips.length ? `<span class="nu-stat-breakdown">${chips.join('')}</span>` : '';
+}
+
+function toggleStatCardFilter(kind, value) {
+    const id = kind === 'medal' ? 'filter-medal' : 'filter-rank';
+    const current = getFilterValues(id);
+    setFilterValues(id, current.length === 1 && current[0] === value ? [] : [value]);
+    renderTable();
 }
 
 // 保存の状態（cloud.js の setSaveStatus から呼ばれる）
