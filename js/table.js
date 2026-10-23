@@ -1427,12 +1427,134 @@ function calcPokkura() {
     };
 }
 
+// ---------- ポックラを上げるおすすめ ----------
+//   曲ごとに「メダルを1段上げる」「スコアを +1000 点ずつ上げる」「未プレイの曲をクリア」の案を作り、
+//   やりやすさ（上がり幅 ÷ 大変さ）の一番よい案を1つ残す。大変さ = 種類の重み × 難しさ（Lv・難易度） × 相性
+const POKKURA_REC_COUNT = 20;
+const POKKURA_REC_AFFINITY = { '得意': 0.7, '噛み合い待ち': 1.3, '苦手': 1.5, '敵': 2, '💩': 2 };
+
+// スコアを from から to に上げる大変さ（1000点ごとに 1、98000点より上は 2 倍）
+function pokkuraScoreEffort(from, to) {
+    const low = Math.max(0, Math.min(to, 98000) - from);
+    const high = Math.max(0, to - Math.max(from, 98000));
+    return (low + high * 2) / 1000;
+}
+
+function calcPokkuraRecommendations(pk) {
+    const groups = {
+        new: { top: pk.topNew, count: POKKURA_NEW_COUNT },
+        old: { top: pk.topOld, count: POKKURA_OLD_COUNT }
+    };
+    Object.values(groups).forEach(g => {
+        g.sum = g.top.reduce((acc, e) => acc + e.point, 0);
+        g.cutoff = g.top.length >= g.count ? g.top[g.top.length - 1].point : 0;
+    });
+    const totalOf = (newSum, oldSum) => pkFloor(pkRound(newSum + oldSum, 8) / 60, 2);
+    // その曲のポイントが newPoint になったときの上がり幅
+    const gainOf = (groupKey, entry, newPoint) => {
+        const g = groups[groupKey];
+        let sum = g.sum;
+        if (entry && g.top.includes(entry)) sum += Math.max(newPoint, entry.point) - entry.point;
+        else if (g.top.length < g.count) sum += newPoint;
+        else if (newPoint > g.cutoff) sum += newPoint - g.cutoff;
+        const total = groupKey === 'new' ? totalOf(sum, groups.old.sum) : totalOf(groups.new.sum, sum);
+        return pkRound(total - pk.total, 2);
+    };
+
+    const entryOf = {};
+    [...pk.topNew, ...pk.restNew, ...pk.topOld, ...pk.restOld].forEach(e => { if (e.song) entryOf[e.song.id] = e; });
+    const newVersion = getPokkuraNewVersion();
+    const recs = [];
+    songs.forEach(song => {
+        if (clearRecords[song.id] === '未解禁') return;
+        const groupKey = getPokkuraGroup(song, newVersion.value);
+        if (!groupKey) return;
+        const lv = parseInt(getPokkuraLevel(song), 10);
+        const diff = getDiffSortValue(song);
+        const memo = memoRecords[song.id] || {};
+        const hardness = Math.pow(2, (lv - 48) + (diff === -999 ? 0 : diff) * 0.5) * (POKKURA_REC_AFFINITY[memo.affinity] || 1);
+        const entry = entryOf[song.id] || null;
+        const options = [];
+        const add = (kind, gain, effort, extra) => {
+            if (gain >= 0.01) options.push({ kind, gain, ease: gain / (effort * hardness), ...extra });
+        };
+        if (entry) {
+            const score = entry.score;
+            const medal = entry.calcMedal || '';
+            const bonus = POKKURA_MEDAL_BONUS[medal] || 0;
+            // メダルを1段上げる（スコアはそのまま。パーフェクトは 100000 点）
+            let target = null;
+            if (bonus < POKKURA_MEDAL_BONUS['銅星']) target = { medal: '銅星', label: 'クリア', effort: 5, score };
+            else if (bonus < POKKURA_MEDAL_BONUS['銀星']) target = { medal: '銀星', label: 'フルコンボ', effort: 5 + Math.max(0, 95000 - score) / 2000, score };
+            else if (bonus < POKKURA_MEDAL_BONUS['金星']) target = { medal: '金星', label: 'パーフェクト', effort: 15, score: 100000 };
+            if (target) add('medal', gainOf(groupKey, entry, calcPokkuraPoint(lv, target.score, target.medal)), target.effort, { target, from: medal });
+            // スコアを +1000 点ずつ、0.01 以上上がるところまで
+            for (let to = score + 1000; score < 100000; to += 1000) {
+                const s = Math.min(to, 100000);
+                const gain = gainOf(groupKey, entry, calcPokkuraPoint(lv, s, medal));
+                if (gain >= 0.01) { add('score', gain, pokkuraScoreEffort(score, s), { from: score, to: s }); break; }
+                if (s >= 100000) break;
+            }
+        } else {
+            // 未プレイ（ポイントなし）：クリアで 0.01 以上上がる一番低い点数（1000点刻み）
+            for (let s = 50000; s <= 100000; s += 1000) {
+                const gain = gainOf(groupKey, null, calcPokkuraPoint(lv, s, '銅星'));
+                if (gain >= 0.01) { add('new', gain, 3 + pokkuraScoreEffort(80000, Math.max(s, 80000)), { to: s }); break; }
+            }
+        }
+        if (options.length === 0) return;
+        options.sort((a, b) => b.ease - a.ease);
+        recs.push({ song, group: groupKey, entry, ...options[0] });
+    });
+    recs.sort((a, b) => (b.ease - a.ease) || (b.gain - a.gain) || (a.song.originalOrder - b.song.originalOrder));
+    return recs.slice(0, POKKURA_REC_COUNT);
+}
+
+function buildPokkuraRecHtml(pk) {
+    const recs = calcPokkuraRecommendations(pk);
+    if (recs.length === 0) return '<div class="dg-empty">おすすめの曲はありません</div>';
+    const fmt = n => Number(n).toLocaleString('ja-JP');
+    const rows = recs.map((r, i) => {
+        const song = r.song;
+        const safeId = jsStringAttr(song.id);
+        const bannerSrc = safeUrl(song.bannerUrl, true);
+        const bannerInner = bannerSrc
+            ? `<img src="${escapeHtml(bannerSrc)}" alt="${escapeHtml(song.title)}" loading="lazy">`
+            : `<span class="pk-rec-title">${escapeHtml(song.title)}</span>`;
+        let action;
+        if (r.kind === 'medal') {
+            action = `<button type="button" class="pk-rec-action" onclick="openMedalModal('${safeId}')" title="メダルを変更">
+                ${r.from ? `<span class="pk-rec-medal">${buildGridMedalInner(r.from)}</span>→` : ''}<span class="pk-rec-medal">${buildGridMedalInner(r.target.medal)}</span>
+                <b>${r.target.label}</b>${r.target.score !== r.entry.score ? `<span class="pk-rec-sub">（${fmt(r.target.score)}点）</span>` : ''}</button>`;
+        } else if (r.kind === 'score') {
+            action = `<button type="button" class="pk-rec-action" onclick="openScoreModal('${safeId}')" title="スコアを変更">
+                スコア ${fmt(r.from)} → <b>${fmt(r.to)}</b><span class="pk-rec-sub">（+${fmt(r.to - r.from)}）</span></button>`;
+        } else {
+            action = `<button type="button" class="pk-rec-action" onclick="openMedalModal('${safeId}')" title="メダルを変更">
+                <span class="pk-rec-medal">${buildGridMedalInner('銅星')}</span><b>クリア</b>＋<b>${fmt(r.to)}</b>点</button>`;
+        }
+        const pkLevel = getPokkuraLevel(song);
+        return `
+            <div class="pk-rec-row">
+                <span class="pk-rec-rank">${i + 1}</span>
+                <a class="pk-rec-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（攻略wikiを開く）">${bannerInner}</a>
+                <div class="pk-rec-body">
+                    <div class="pk-rec-meta"><span class="pk-rec-group pk-rec-group-${r.group}">${r.group === 'new' ? '新曲' : '旧曲'}</span>Lv${escapeHtml(pkLevel)}${song.diffClass ? ` ${escapeHtml(song.diffClass)}` : ''}</div>
+                    ${action}
+                </div>
+                <span class="pk-rec-gain">+${r.gain.toFixed(2)}</span>
+            </div>`;
+    }).join('');
+    return `<div class="pk-rec-list">${rows}</div>`;
+}
+
 function formatPokkuraDate(iso) {
     const d = new Date(iso);
     return isNaN(d) ? '' : `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-// ポックラ画面のタブ（'top' = 対象曲 / 'rest' = 圏外）。描き直しても選んだタブのまま
+// ポックラ画面のタブ（'top' = 対象曲 / 'rest' = 圏外 / 'up' = おすすめ）。描き直しても選んだタブのまま
+const POKKURA_TABS = ['top', 'rest', 'up'];
 let pokkuraTab = 'top';
 
 function renderPokkuraGrid() {
@@ -1470,6 +1592,7 @@ function renderPokkuraGrid() {
         <div class="pk-tabs" role="tablist" aria-label="ポックラの曲">
             <button type="button" role="tab" id="pk-tab-top" aria-controls="pk-panel-top" onclick="setPokkuraTab('top', true)">対象曲<span class="pk-tab-count">${topCount}</span></button>
             <button type="button" role="tab" id="pk-tab-rest" aria-controls="pk-panel-rest" onclick="setPokkuraTab('rest', true)">圏外<span class="pk-tab-count">${restCount}</span></button>
+            <button type="button" role="tab" id="pk-tab-up" aria-controls="pk-panel-up" onclick="setPokkuraTab('up', true)">おすすめ</button>
         </div>`;
 
     const section = (label, sub, color, list) => {
@@ -1541,6 +1664,7 @@ function renderPokkuraGrid() {
         <div class="pk-slider" id="pk-slider">
             <div class="pk-panel" id="pk-panel-top" role="tabpanel" aria-labelledby="pk-tab-top">${topHtml}</div>
             <div class="pk-panel pk-panel-rest" id="pk-panel-rest" role="tabpanel" aria-labelledby="pk-tab-rest">${restHtml}</div>
+            <div class="pk-panel pk-panel-up" id="pk-panel-up" role="tabpanel" aria-labelledby="pk-tab-up">${buildPokkuraRecHtml(pk)}</div>
         </div>`;
     grid.innerHTML = html;
 
@@ -1550,7 +1674,10 @@ function renderPokkuraGrid() {
         // スライドが止まったら、見えているほうのタブにする
         clearTimeout(scrollTimer);
         scrollTimer = setTimeout(() => {
-            const tab = slider.scrollLeft > slider.clientWidth / 2 ? 'rest' : 'top';
+            // 描き直したあとの古いスライダーは無視する
+            if (!slider.isConnected) return;
+            const index = Math.round(slider.scrollLeft / Math.max(1, slider.clientWidth));
+            const tab = POKKURA_TABS[Math.min(POKKURA_TABS.length - 1, Math.max(0, index))];
             if (tab !== pokkuraTab) setPokkuraTab(tab, false);
         }, 80);
     }, { passive: true });
@@ -1573,10 +1700,11 @@ function fitPokkuraSliderHeight() {
 
 // タブを切り替える（scroll = true ならそのパネルまでスライドする）
 function setPokkuraTab(tab, scroll, instant) {
+    if (!POKKURA_TABS.includes(tab)) tab = 'top';
     pokkuraTab = tab;
     const slider = document.getElementById('pk-slider');
     if (!slider) return;
-    ['top', 'rest'].forEach(key => {
+    POKKURA_TABS.forEach(key => {
         const active = key === tab;
         const btn = document.getElementById(`pk-tab-${key}`);
         btn.classList.toggle('active', active);
@@ -1586,7 +1714,10 @@ function setPokkuraTab(tab, scroll, instant) {
     });
     // 高さは見えているパネルに合わせる（もう片方の長さで下に空白ができないように）
     fitPokkuraSliderHeight();
-    const left = tab === 'rest' ? slider.clientWidth : 0;
+    // おすすめはリストなので、向きの矢印は出さない
+    const dirBar = document.querySelector('#diff-grid-view .dg-dir');
+    if (dirBar) dirBar.style.display = tab === 'up' ? 'none' : '';
+    const left = POKKURA_TABS.indexOf(tab) * slider.clientWidth;
     if (instant) slider.scrollLeft = left;
     else if (scroll) slider.scrollTo({ left, behavior: 'smooth' });
 }
