@@ -688,7 +688,7 @@ function renderTable() {
         levelLabel += ' (絞り込み中)';
     }
     if (typeof updateNewUiChrome === 'function') {
-        updateNewUiChrome({ levelLabel, cleared: normalClearCount, total: rateTotal, shown: displaySongs.length });
+        updateNewUiChrome({ levelLabel, cleared: normalClearCount, total: rateTotal, shown: displaySongs.length, medalCounts, rankCounts, showUnreleased });
     }
     if (typeof updateGoalsAfterRender === 'function') updateGoalsAfterRender();
     
