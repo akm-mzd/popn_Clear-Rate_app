@@ -904,6 +904,18 @@ body.ui-new #nu-stat-card:hover { border-color: var(--nu-accent); }
 .nu-stat-main b { font-size: 22px; color: var(--nu-accent); }
 .nu-stat-main span { font-size: 12px; color: var(--nu-muted); }
 .nu-stat-more { font-size: 12px; font-weight: 700; color: var(--nu-purple); white-space: nowrap; }
+.nu-stat-text { flex: 0 1 auto; }
+.nu-stat-breakdown { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; justify-content: flex-start; padding-left: 12px; border-left: 1px solid var(--nu-line); }
+.nu-stat-chip { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 700; color: var(--nu-ink); white-space: nowrap; }
+.nu-stat-chip img { width: 20px; height: 20px; object-fit: contain; }
+.nu-stat-chip img.nu-stat-chip-rank { width: auto; max-width: 34px; height: 16px; }
+.nu-stat-chip-text { font-size: 10px; color: var(--nu-muted); }
+@media screen and (max-width: 768px) {
+    body.ui-new #nu-stat-card { flex-wrap: wrap; row-gap: 6px; }
+    .nu-stat-text { flex: 1; }
+    .nu-stat-breakdown { order: 3; flex: 0 0 100%; gap: 3px 8px; padding: 6px 0 0; border-left: none; border-top: 1px solid var(--nu-line); }
+    .nu-stat-chip img { width: 18px; height: 18px; }
+}
 
 /* 一覧 */
 body.ui-new #diff-grid-view { background: var(--nu-surface); border: 1px solid var(--nu-line); border-radius: 16px; }

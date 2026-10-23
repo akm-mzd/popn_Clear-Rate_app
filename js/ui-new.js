@@ -159,10 +159,40 @@ function updateNewUiChrome(summary) {
             <span class="nu-stat-label">${escapeHtml(summary.levelLabel)}・ノーマルクリア以上</span>
             <span class="nu-stat-main"><b>${formatRate(summary.cleared, summary.total)}%</b><span>${summary.cleared} / ${summary.total}曲（残り ${summary.total - summary.cleared}）</span></span>
         </span>
+        ${buildStatCardBreakdownHtml(summary)}
         <span class="nu-stat-more">内訳 ›</span>`;
 
     // 絞り込みシートの「N曲を表示」
     document.getElementById('nu-show-count').textContent = `${summary.shown}曲を表示`;
+}
+
+// 統計のミニカードの内訳（難易度表・メダル表はメダル、スコア表はスコアランク。0曲のものは出さない）
+function buildStatCardBreakdownHtml(summary) {
+    const chip = (iconHtml, count, title) =>
+        `<span class="nu-stat-chip" title="${escapeHtml(title)}：${count}曲">${iconHtml}<span>${count}</span></span>`;
+    const chips = [];
+    if ((viewMode === 'grid' || viewMode === 'medal') && summary.medalCounts) {
+        Object.keys(MEDAL_TYPES)
+            .filter(k => summary.medalCounts[k] > 0 && (k !== '未解禁' || summary.showUnreleased))
+            .sort((a, b) => MEDAL_TYPES[b].rank - MEDAL_TYPES[a].rank)
+            .forEach(k => {
+                const m = MEDAL_TYPES[k];
+                const src = safeUrl(m.imgUrl, true);
+                const icon = k === '' ? '<span class="nu-stat-chip-text">未</span>'
+                    : k === '未解禁' ? '<span class="nu-stat-chip-text">🔒</span>'
+                    : src ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(m.label)}">` : `<span class="nu-stat-chip-text">${escapeHtml(m.label)}</span>`;
+                chips.push(chip(icon, summary.medalCounts[k], m.label));
+            });
+    } else if (viewMode === 'score' && summary.rankCounts) {
+        SCORE_RANK_KEYS.concat(SCORE_RANK_NONE).forEach(k => {
+            const count = summary.rankCounts[k];
+            if (!(count > 0)) return;
+            const icon = k === SCORE_RANK_NONE ? '<span class="nu-stat-chip-text">なし</span>'
+                : `<img class="nu-stat-chip-rank" src="${escapeHtml(safeUrl(RANK_IMAGES[k], true) || '')}" alt="${escapeHtml(k)}">`;
+            chips.push(chip(icon, count, k === SCORE_RANK_NONE ? 'スコアなし' : k));
+        });
+    }
+    return chips.length ? `<span class="nu-stat-breakdown">${chips.join('')}</span>` : '';
 }
 
 // 保存の状態（cloud.js の setSaveStatus から呼ばれる）
