@@ -1481,13 +1481,18 @@ function calcPokkuraRecommendations(pk) {
         if (entry) {
             const score = entry.score;
             const medal = entry.calcMedal || '';
-            const bonus = POKKURA_MEDAL_BONUS[medal] || 0;
-            // メダルを1段上げる（スコアはそのまま。パーフェクトは 100000 点）
+            // メダルを1段上げる（スコアはそのまま）。あと少しで届く曲だけ：
+            //   黒星・裏メダルが黒星のイージー → クリア、銅星 → フルコンボ
             let target = null;
-            if (bonus < POKKURA_MEDAL_BONUS['銅星']) target = { medal: '銅星', label: 'クリア', effort: 5, score };
-            else if (bonus < POKKURA_MEDAL_BONUS['銀星']) target = { medal: '銀星', label: 'フルコンボ', effort: 5 + Math.max(0, 95000 - score) / 2000, score };
-            else if (bonus < POKKURA_MEDAL_BONUS['金星']) target = { medal: '金星', label: 'パーフェクト', effort: 15, score: 100000 };
-            if (target) add('medal', gainOf(groupKey, entry, calcPokkuraPoint(lv, target.score, target.medal)), target.effort, { target, from: medal });
+            let from = medal;
+            const uraKuroboshi = medal === 'イージー' && getUraMedalInfo(song.id).ura === '黒星';
+            if (medal === '黒星' || uraKuroboshi) {
+                target = { medal: '銅星', label: 'クリア', effort: 5, score };
+                if (uraKuroboshi) from = '黒星';
+            } else if (medal === '銅星') {
+                target = { medal: '銀星', label: 'フルコンボ', effort: 5 + Math.max(0, 95000 - score) / 2000, score };
+            }
+            if (target) add('medal', gainOf(groupKey, entry, calcPokkuraPoint(lv, target.score, target.medal)), target.effort, { target, from, ura: uraKuroboshi });
             // スコアを +1000 点ずつ、0.01 以上上がるところまで
             for (let to = score + 1000; score < 100000; to += 1000) {
                 const s = Math.min(to, 100000);
@@ -1524,8 +1529,8 @@ function buildPokkuraRecHtml(pk) {
         let action;
         if (r.kind === 'medal') {
             action = `<button type="button" class="pk-rec-action" onclick="openMedalModal('${safeId}')" title="メダルを変更">
-                ${r.from ? `<span class="pk-rec-medal">${buildGridMedalInner(r.from)}</span>→` : ''}<span class="pk-rec-medal">${buildGridMedalInner(r.target.medal)}</span>
-                <b>${r.target.label}</b>${r.target.score !== r.entry.score ? `<span class="pk-rec-sub">（${fmt(r.target.score)}点）</span>` : ''}</button>`;
+                ${r.ura ? '<span class="pk-rec-sub">裏</span>' : ''}<span class="pk-rec-medal">${buildGridMedalInner(r.from)}</span>→<span class="pk-rec-medal">${buildGridMedalInner(r.target.medal)}</span>
+                <b>${r.target.label}</b></button>`;
         } else if (r.kind === 'score') {
             action = `<button type="button" class="pk-rec-action" onclick="openScoreModal('${safeId}')" title="スコアを変更">
                 スコア ${fmt(r.from)} → <b>${fmt(r.to)}</b><span class="pk-rec-sub">（+${fmt(r.to - r.from)}）</span></button>`;
