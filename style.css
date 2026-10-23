@@ -600,6 +600,11 @@ body.exporting-image #back-to-top { display: none !important; }
     position: absolute; right: -8px; bottom: -6px; width: auto; height: 18px; max-width: 34px;
     filter: drop-shadow(0 0 1px #fff) drop-shadow(0 1px 1px rgba(0,0,0,0.5)); pointer-events: none;
 }
+/* 裏メダル：メダルの左上に小さく重ねる */
+#diff-grid-view .dg-medal img.dg-ura {
+    position: absolute; left: -7px; top: -7px; width: 15px; height: 15px; padding: 1px;
+    background: #fff; border-radius: 50%; box-shadow: 0 0 0 1px #9e9e9e; pointer-events: auto;
+}
 #diff-grid-view .dg-medal:hover { border-color: #2196F3; box-shadow: 0 0 0 2px rgba(33,150,243,0.25); }
 .dg-medal img { width: 30px; height: 30px; object-fit: contain; display: block; }
 .dg-lock { font-size: 14px; line-height: 1; }
@@ -685,6 +690,7 @@ body.exporting-image #back-to-top { display: none !important; }
     #diff-grid-view .dg-medal { width: 30px; height: 30px; }
     .dg-medal img { width: 24px; height: 24px; }
     #diff-grid-view .dg-medal img.dg-rank { height: 15px; max-width: 28px; right: -7px; bottom: -5px; }
+    #diff-grid-view .dg-medal img.dg-ura { width: 12px; height: 12px; left: -6px; top: -6px; }
     .dg-banner-text { font-size: 10px; }
     #diff-grid-view .dg-score { font-size: 10px; padding: 0 4px; }
     .sg-rank-img { max-width: 40px; max-height: 20px; }

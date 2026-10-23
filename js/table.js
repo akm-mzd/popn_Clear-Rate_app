@@ -184,6 +184,8 @@ function clearSearch() { document.getElementById('search-input').value = ''; ren
 
 function changeViewLevel(level) {
     toggleMenu(false); // レベルを選んだらメニューを閉じる
+    // ポックラはレベルに関係なく全体を出すので、レベルを選んだら難易度表に切り替える
+    if (viewMode === 'pokkura') viewMode = 'grid';
     document.getElementById('search-input').value = '';
     currentViewLevel = level;
     updateDynamicFilters();
@@ -1072,6 +1074,16 @@ function buildGridMedalInner(medalKey) {
     return '';
 }
 
+// 裏メダルの小さな表示（表示しているメダルがイージーで、裏メダルがある曲だけ。メダル枠の左上に重ねる）
+function buildUraBadgeHtml(songId, shownMedal) {
+    if (shownMedal !== 'イージー' || typeof getUraMedalInfo !== 'function') return '';
+    const info = getUraMedalInfo(songId);
+    const m = info.ura ? MEDAL_TYPES[info.ura] : null;
+    if (!m || !m.imgUrl) return '';
+    const title = `裏メダル：${info.ura}${info.old ? '（旧筐体EC）' : ''}`;
+    return `<img class="dg-ura" src="${escapeHtml(m.imgUrl)}" alt="${escapeHtml(title)}" title="${escapeHtml(title)}" loading="lazy">`;
+}
+
 function renderDiffGrid(targetSongs) {
     const grid = document.getElementById('diff-grid-view');
     const showScore = document.getElementById('show-score-col').checked; // スコア表示中は、メダルの上にスコアランクを重ねる
@@ -1106,7 +1118,7 @@ function renderDiffGrid(targetSongs) {
                 : `<span class="dg-banner-text">${escapeHtml(song.title)}</span>`;
             cells += `
                 <div class="dg-cell">
-                    <button type="button" class="dg-medal${medalClass}" onclick="openMedalModal('${jsStringAttr(song.id)}')" title="メダルを変更">${buildGridMedalInner(medalKey)}${rankHtml}</button>
+                    <button type="button" class="dg-medal${medalClass}" onclick="openMedalModal('${jsStringAttr(song.id)}')" title="メダルを変更">${buildGridMedalInner(medalKey)}${rankHtml}${buildUraBadgeHtml(song.id, medalKey)}</button>
                     <a class="dg-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（攻略wikiを開く）">${bannerInner}</a>
                 </div>`;
         });
@@ -1164,7 +1176,7 @@ function renderMedalGrid(targetSongs) {
             const diffText = song.diffRaw ? `・${song.diffRaw}` : '';
             cells += `
                 <div class="dg-cell">
-                    <button type="button" class="dg-medal${k === '' ? ' dg-medal-empty' : ''}" onclick="openMedalModal('${jsStringAttr(song.id)}')" title="メダルを変更">${buildGridMedalInner(k)}${rankHtml}</button>
+                    <button type="button" class="dg-medal${k === '' ? ' dg-medal-empty' : ''}" onclick="openMedalModal('${jsStringAttr(song.id)}')" title="メダルを変更">${buildGridMedalInner(k)}${rankHtml}${buildUraBadgeHtml(song.id, k)}</button>
                     <a class="dg-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（Lv${escapeHtml(song.level)}${escapeHtml(diffText)}・攻略wikiを開く）">${bannerInner}</a>
                 </div>`;
         });
@@ -1228,7 +1240,7 @@ function renderScoreGrid(targetSongs) {
             const safeId = jsStringAttr(song.id);
             cells += `
                 <div class="dg-cell">
-                    <button type="button" class="dg-medal${medalClass}" onclick="openMedalModal('${safeId}')" title="メダルを変更">${buildGridMedalInner(medalKey)}</button>
+                    <button type="button" class="dg-medal${medalClass}" onclick="openMedalModal('${safeId}')" title="メダルを変更">${buildGridMedalInner(medalKey)}${buildUraBadgeHtml(song.id, medalKey)}</button>
                     <div class="dg-banner-wrap">
                         <a class="dg-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（攻略wikiを開く）">${bannerInner}</a>
                         <button type="button" class="dg-score${score ? '' : ' dg-score-none'}" onclick="openScoreModal('${safeId}')" title="スコアを変更">${score ? score : '-'}</button>
@@ -1500,7 +1512,7 @@ function renderPokkuraGrid() {
                 : `<span class="pk-lv">${escapeHtml(song.level)}</span>`;
             cells += `
                 <div class="dg-cell">
-                    <button type="button" class="dg-medal${medalClass}" onclick="openMedalModal('${safeId}')" title="${escapeHtml(medalTitle)}">${buildGridMedalInner(medalKey)}</button>
+                    <button type="button" class="dg-medal${medalClass}" onclick="openMedalModal('${safeId}')" title="${escapeHtml(medalTitle)}">${buildGridMedalInner(medalKey)}${buildUraBadgeHtml(song.id, medalKey)}</button>
                     <div class="dg-banner-wrap">
                         <a class="dg-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（Lv${escapeHtml(song.level)}・攻略wikiを開く）">${bannerInner}</a>
                         ${lvHtml}
