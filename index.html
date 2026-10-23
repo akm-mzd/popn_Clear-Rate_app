@@ -143,7 +143,7 @@
             </div>
             <!-- 見た目の切り替え（この端末に保存） -->
             <section class="menu-card ui-switch-card" data-sheet="more">
-                <div class="menu-card-title">🎨 見た目</div>
+                <div class="menu-card-title"><span><span class="menu-emoji">🎨</span> 見た目</span></div>
                 <div class="ui-switch-row">
                     <span id="ui-switch-text" class="ui-switch-text"></span>
                     <button type="button" id="ui-switch-btn" class="ui-switch-btn" onclick="toggleUiMode()"></button>
@@ -151,7 +151,7 @@
             </section>
             <!-- ① ユーザー -->
             <section class="menu-card menu-user-section" data-sheet="more">
-                <div class="menu-card-title">👤 ユーザー</div>
+                <div class="menu-card-title"><span><span class="menu-emoji">👤</span> ユーザー</span></div>
                 <div class="menu-user-controls">
                     <select id="current-user-select" onchange="switchUser()"></select>
                     <button onclick="addNewUser()" class="menu-add-user-btn">+ 新規追加</button>
@@ -162,7 +162,7 @@
             <!-- ② 表示レベル -->
             <section class="menu-card menu-level-row" data-sheet="more">
                 <div class="menu-card-title">
-                    <span>表示レベル・方法</span>
+                    <span class="menu-level-title-classic">表示レベル・方法</span><span class="menu-level-title-new">表示の設定</span>
                     <label class="check-label" style="font-size: 0.85em; font-weight: normal; cursor: pointer;"><input type="checkbox" id="level-btn-on-main" onchange="setLevelButtonPlacement(this.checked)" checked> メイン画面に表示</label>
                 </div>
                 <div id="menu-level-slot">
@@ -181,7 +181,7 @@
                         </div>
                     </div>
                 </div>
-                <button type="button" class="btn-history" onclick="openHistoryModal()">📜 更新履歴を見る</button>
+                <button type="button" class="btn-history" onclick="openHistoryModal()"><span class="menu-emoji">📜</span> 更新履歴を見る</button>
                 <!-- 起動時の表示（メニューの中だけ。この端末に保存） -->
                 <div class="startup-view-settings">
                     <div class="startup-view-title">起動時の表示 <span>（この端末に保存）</span></div>
@@ -203,19 +203,19 @@
             </section>
 
             <!-- ③ 検索（検索・ランダムセレクト・絞り込み） -->
-            <section class="menu-card" data-sheet="filter">
-                <div class="menu-card-title">🔍 検索</div>
+            <section class="menu-card menu-filter-section" data-sheet="filter">
+                <div class="menu-card-title"><span><span class="menu-emoji">🔍</span> 検索</span></div>
                 <div class="menu-search-row">
                     <span class="menu-row-label">検索</span>
                     <input type="text" id="search-input" class="search-box" placeholder="ジャンル・曲名で全レベル検索..." oninput="handleSearch()">
-                    <button onclick="clearSearch()" style="padding: 6px 12px; border: 1px solid #ccc; background: #eee; cursor: pointer;">クリア</button>
+                    <button onclick="clearSearch()" class="menu-search-clear" style="padding: 6px 12px; border: 1px solid #ccc; background: #eee; cursor: pointer;">クリア</button>
                 </div>
                 <div class="menu-random-row">
                     <span class="menu-row-label">ランダムセレクト</span>
                     <button onclick="openRandomModal()" class="random-ready-btn">Are You Ready?</button>
                 </div>
                 <details class="menu-filter-details">
-                    <summary style="cursor: pointer; font-weight: bold; color: #555; user-select: none;">🔍 さらに条件で絞り込む<span id="filter-summary-count"></span></summary>
+                    <summary style="cursor: pointer; font-weight: bold; color: #555; user-select: none;"><span class="menu-emoji">🔍</span> さらに条件で絞り込む<span id="filter-summary-count"></span></summary>
                     <div class="filter-groups">
                         <div class="filter-group">
                             <div class="filter-group-title">メダル</div>
@@ -257,7 +257,7 @@
                         </details>
                         <div class="filter-group-footer">
                             <span class="filter-hint">何も選ばない項目は「すべて」になります</span>
-                            <button onclick="resetFilters()" style="padding: 4px 12px; background: #eee; border: 1px solid #ccc;">リセット</button>
+                            <button onclick="resetFilters()" class="filter-footer-reset" style="padding: 4px 12px; background: #eee; border: 1px solid #ccc;">リセット</button>
                         </div>
                     </div>
                 </details>
@@ -265,14 +265,14 @@
 
             <!-- ④ 統計表示 -->
             <section class="menu-card goal-card" id="goal-card" data-sheet="goal">
-                <div class="menu-card-title">🎯 目標</div>
+                <div class="menu-card-title"><span><span class="menu-emoji">🎯</span> 目標</span></div>
                 <div id="goal-list"></div>
                 <button type="button" id="goal-add-btn" class="goal-add-btn" onclick="openGoalForm()">＋ 目標を追加</button>
                 <div id="goal-form" class="goal-form" style="display: none;"></div>
             </section>
 
-            <section class="menu-card" data-sheet="stats">
-                <div class="menu-card-title">📊 統計表示</div>
+            <section class="menu-card menu-stats-section" data-sheet="stats">
+                <div class="menu-card-title"><span><span class="menu-emoji">📊</span> 統計表示</span></div>
                 <div class="stats-toggles">
                     <label><input type="checkbox" id="show-kurohishi-rate" onchange="renderTable()" style="margin:0;"> 黒菱</label>
                     <label><input type="checkbox" id="show-kuroboshi-rate" onchange="renderTable()" style="margin:0;"> 黒星</label>
@@ -286,8 +286,8 @@
             </section>
 
             <!-- ⑤ スコア -->
-            <section class="menu-card" data-sheet="more">
-                <div class="menu-card-title">🔢 スコア</div>
+            <section class="menu-card menu-score-section" data-sheet="more">
+                <div class="menu-card-title"><span><span class="menu-emoji">🔢</span> スコア</span></div>
                 <div class="stats-toggles">
                     <label><input type="checkbox" id="show-score-col" onchange="handleScoreToggle()" style="margin:0;"> スコア表示</label>
                     <label><input type="checkbox" id="enable-compare" onchange="renderTable()" style="margin:0;"> スコア比較</label>
@@ -297,8 +297,8 @@
             </section>
 
             <!-- ⑥ 公式データ取り込み -->
-            <section class="menu-card" data-sheet="more">
-                <div class="menu-card-title">📥 公式データ取り込み</div>
+            <section class="menu-card menu-eagate-section" data-sheet="more">
+                <div class="menu-card-title"><span><span class="menu-emoji">📥</span> 公式データ取り込み</span></div>
                 <div class="eagate-import-actions">
                     <button onclick="importEagateFromClipboard()" class="btn-eagate">クリップボードから取り込む</button>
                     <button onclick="openEagateHelpModal()" class="btn-eagate-sub">ブックマークレットと使い方</button>
@@ -312,17 +312,17 @@
 
             <!-- ⑦ 画像 -->
             <section class="menu-card menu-image-section" data-sheet="image">
-                <div class="menu-card-title">🖼️ 画像</div>
+                <div class="menu-card-title"><span><span class="menu-emoji">🖼️</span> 画像</span></div>
                 <div id="image-export-area" class="controls" style="margin: 0; padding: 0; box-shadow: none; background: transparent; display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 8px;">
                     <button id="btn-overview-image" onclick="generateOverviewImage()" class="btn-image">全体統計画像</button>
                     <button id="btn-diff-image" onclick="generateDiffTableImage()" class="btn-image">難易度順画像</button>
                     <button onclick="exportAsImage(event)" class="btn-image">表示曲画像</button>
                     <button id="btn-pokkura-image" onclick="generatePokkuraImage()" class="btn-image" style="display: none;">ポックラ画像</button>
 
-                    <details style="position: relative;">
-                        <summary style="padding: 6px 12px; border: 1px solid #ccc; background-color: #fff; border-radius: 4px; cursor: pointer; font-size: 0.9em; font-weight: bold; color: #555;">⚙️ 画像の列設定</summary>
-                        <div style="position: absolute; top: 100%; right: 0; background: #fff; border: 1px solid #ccc; border-radius: 6px; padding: 12px; z-index: 2000; box-shadow: 0 4px 10px rgba(0,0,0,0.2); width: max-content; display: grid; gap: 8px; margin-top: 5px; text-align: left;">
-                            <div style="font-size: 0.85em; color: #666; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 4px; margin-bottom: 4px;">📷 画像に出力する列</div>
+                    <details class="export-col-details" style="position: relative;">
+                        <summary style="padding: 6px 12px; border: 1px solid #ccc; background-color: #fff; border-radius: 4px; cursor: pointer; font-size: 0.9em; font-weight: bold; color: #555;"><span class="menu-emoji">⚙️</span> 画像の列設定</summary>
+                        <div class="export-col-menu" style="position: absolute; top: 100%; right: 0; background: #fff; border: 1px solid #ccc; border-radius: 6px; padding: 12px; z-index: 2000; box-shadow: 0 4px 10px rgba(0,0,0,0.2); width: max-content; display: grid; gap: 8px; margin-top: 5px; text-align: left;">
+                            <div class="export-col-head" style="font-size: 0.85em; color: #666; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 4px; margin-bottom: 4px;">📷 画像に出力する列</div>
                             <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="0" checked> メダル</label>
                             <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="1"> スコア</label>
                             <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="2"> 比較</label>
