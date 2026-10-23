@@ -348,7 +348,7 @@
 
         <div id="main-level-slot"></div>
         <div id="nu-filterbar" class="nu-only" aria-label="絞り込みの条件"></div>
-        <button type="button" id="nu-stat-card" class="nu-only" onclick="openNewUiSheet('stats')"></button>
+        <div id="nu-stat-card" class="nu-only" role="button" tabindex="0" aria-label="統計を開く" onclick="openNewUiSheet('stats')" onkeydown="if (event.target === this &amp;&amp; (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); openNewUiSheet('stats'); }"></div>
         <div id="main-stats-anchor"></div>
         <div id="goal-strip" class="goal-strip" style="display: none;"></div>
         <div class="stats-container" id="stats-display"></div>
