@@ -87,14 +87,67 @@ function historyScoreHtml(os, ns) {
     return `<span class="hist-score">${os} → <span class="hist-diff ${diff >= 0 ? 'up' : 'down'}">(${diffText})</span> <b>${ns}</b></span>`;
 }
 
-// 履歴を1件消す（管理者だけ。曲のメダル・スコアはそのまま）。消したことは自動保存でクラウドにも反映される
+// 履歴を1件消す（管理者だけ）。消した変更は、なかったことにする：
+//   その曲のそれより後の変更がなければ、メダル・スコアを変更前に戻す（例：銅丸 → 銅菱 を消すと銅丸に戻る）
+//   後の変更があれば、今のメダル・スコアはそのままにして、次の履歴の「変更前」をこの履歴の変更前につなぎ直す
+//   消したことは自動保存でクラウドにも反映される
+function planHistoryUndo(records, key) {
+    const e = records[key];
+    const plan = { revert: {}, relink: [] };
+    [['nm', 'om', 'medal'], ['ns', 'os', 'score']].forEach(([newKey, oldKey, field]) => {
+        if (!(newKey in e)) return;
+        // 同じ曲・同じ項目の、この履歴より後の変更で一番早いもの
+        let next = null;
+        Object.keys(records).forEach(k => {
+            const x = records[k];
+            if (k === key || !x || x.id !== e.id || !(newKey in x) || !(x.t > e.t)) return;
+            if (!next || x.t < records[next].t) next = k;
+        });
+        if (next) plan.relink.push({ key: next, oldKey, newKey, value: e[oldKey] });
+        else plan.revert[field] = { from: e[newKey], to: e[oldKey] };
+    });
+    return plan;
+}
+
 function deleteHistoryEntry(key) {
     const records = getHistoryRecords();
-    if (!records[key]) return;
+    const e = records[key];
+    if (!e) return;
     if (!checkAdminAuth()) return;
-    if (!confirm('この履歴を削除しますか？\n（曲のメダル・スコアは変わりません）')) return;
+    const song = songs.find(s => s.id === e.id);
+    const plan = planHistoryUndo(records, key);
+    const lines = [];
+    const medalName = k => k === '' ? '未プレイ' : k;
+    const scoreName = v => v === null || v === undefined ? 'なし' : String(v);
+    if (song && plan.revert.medal) lines.push(`メダル：${medalName(plan.revert.medal.from)} → ${medalName(plan.revert.medal.to)} に戻します`);
+    if (song && plan.revert.score) lines.push(`スコア：${scoreName(plan.revert.score.from)} → ${scoreName(plan.revert.score.to)} に戻します`);
+    if (plan.relink.length > 0) lines.push('（この曲はあとでも更新しているので、その分は今のままです）');
+    if (lines.length === 0) lines.push('（曲のメダル・スコアは変わりません）');
+    if (!confirm(`この履歴を削除しますか？\n${e.ti}\n${lines.join('\n')}`)) return;
+
+    // 変更前に戻す（今の値が履歴の「変更後」と違うときは、別の方法で変わっているので触らない）
+    if (song && plan.revert.medal && (clearRecords[e.id] || '') === plan.revert.medal.from) {
+        if (plan.revert.medal.to === '') delete clearRecords[e.id];
+        else clearRecords[e.id] = plan.revert.medal.to;
+    }
+    if (song && plan.revert.score) {
+        const cur = scoreRecords[e.id];
+        const curNum = cur === undefined || cur === null || cur === '' ? null : parseInt(cur, 10);
+        if (curNum === plan.revert.score.from) {
+            if (plan.revert.score.to === null) delete scoreRecords[e.id];
+            else scoreRecords[e.id] = plan.revert.score.to;
+        }
+    }
+    // 後の履歴の「変更前」をつなぎ直す。変更前と変更後が同じになったら、その項目（全部なら履歴ごと）を消す
+    plan.relink.forEach(({ key: k, oldKey, newKey, value }) => {
+        const x = records[k];
+        x[oldKey] = value;
+        if (x[oldKey] === x[newKey]) { delete x[oldKey]; delete x[newKey]; }
+        if (!('nm' in x) && !('ns' in x)) delete records[k];
+    });
     delete records[key];
     scheduleAutoSave();
+    renderTable();
     const body = document.getElementById('history-modal-body');
     const scrollTop = body.scrollTop;
     renderHistoryModal();
