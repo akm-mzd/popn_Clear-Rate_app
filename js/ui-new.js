@@ -181,7 +181,7 @@ function buildStatCardBreakdownHtml(summary) {
             .sort((a, b) => MEDAL_TYPES[b].rank - MEDAL_TYPES[a].rank)
             .forEach(k => {
                 const m = MEDAL_TYPES[k];
-                const src = safeUrl(m.imgUrl, true);
+                const src = isImageSrc(m.imgUrl) ? m.imgUrl : '';
                 const icon = k === '' ? '<span class="nu-stat-chip-text">未</span>'
                     : k === '未解禁' ? '<span class="nu-stat-chip-text">🔒</span>'
                     : src ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(m.label)}">` : `<span class="nu-stat-chip-text">${escapeHtml(m.label)}</span>`;
@@ -192,7 +192,7 @@ function buildStatCardBreakdownHtml(summary) {
             const count = summary.rankCounts[k];
             if (!(count > 0)) return;
             const icon = k === SCORE_RANK_NONE ? '<span class="nu-stat-chip-text">なし</span>'
-                : `<img class="nu-stat-chip-rank" src="${escapeHtml(safeUrl(RANK_IMAGES[k], true) || '')}" alt="${escapeHtml(k)}">`;
+                : `<img class="nu-stat-chip-rank" src="${escapeHtml(RANK_IMAGES[k])}" alt="${escapeHtml(k)}">`;
             chips.push(chipOf('rank')(icon, count, k === SCORE_RANK_NONE ? 'スコアなし' : k, k));
         });
     }

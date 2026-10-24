@@ -596,7 +596,7 @@ function renderTable() {
         
         const safeId = jsStringAttr(song.id); // onclick の引数に埋め込む用
 
-        const isValidMedalUrl = medalInfo.imgUrl.startsWith('http') || medalInfo.imgUrl.startsWith('data:');
+        const isValidMedalUrl = isImageSrc(medalInfo.imgUrl);
         const medalDisplayHtml = isValidMedalUrl
             ? `<img src="${medalInfo.imgUrl}" loading="lazy" style="width: 32px; height: 32px; object-fit: contain; cursor: pointer; display: block; margin: 0 auto;" onclick="openMedalModal('${safeId}')" title="${medalInfo.label}">`
             : `<div onclick="openMedalModal('${safeId}')" style="cursor: pointer; font-weight: bold; padding: 4px; border: 1px solid #ccc; border-radius: 4px; background: #fff; font-size: 0.8em; color: #555; white-space: nowrap;" title="クリックして変更">${medalInfo.label}</div>`;
@@ -841,7 +841,7 @@ function renderTable() {
             sortedMedalKeys.forEach(k => {
                 const m = MEDAL_TYPES[k];
                 const count = medalCounts[k];
-                const isValidMedalUrl = m.imgUrl.startsWith('http') || m.imgUrl.startsWith('data:');
+                const isValidMedalUrl = isImageSrc(m.imgUrl);
                 const iconHtml = isValidMedalUrl 
                     ? `<img src="${m.imgUrl}" style="width: 26px; height: 26px; object-fit: contain; margin-bottom: 2px;">` 
                     : `<div style="font-weight: bold; color: #555; font-size: 0.7em;">${m.label}</div>`;
@@ -1120,7 +1120,7 @@ function applyViewMode(displaySongs) {
 function buildGridMedalInner(medalKey) {
     const m = MEDAL_TYPES[medalKey];
     if (medalKey === '未解禁') return '<span class="dg-lock">🔒</span>';
-    if (m && m.imgUrl && (m.imgUrl.startsWith('http') || m.imgUrl.startsWith('data:'))) {
+    if (m && m.imgUrl && isImageSrc(m.imgUrl)) {
         return `<img src="${escapeHtml(m.imgUrl)}" alt="${escapeHtml(m.label)}" loading="lazy">`;
     }
     return '';
@@ -1194,7 +1194,7 @@ const SPECIAL_WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 function buildSvMedalIcon(key) {
     const m = MEDAL_TYPES[key];
     if (key === '') return '<span class="sv-medal-text">未</span>';
-    if (m && m.imgUrl && /^(https?:|data:)/.test(m.imgUrl)) return `<img class="sv-medal" src="${escapeHtml(m.imgUrl)}" alt="${escapeHtml(m.label)}" loading="lazy">`;
+    if (m && m.imgUrl && isImageSrc(m.imgUrl)) return `<img class="sv-medal" src="${escapeHtml(m.imgUrl)}" alt="${escapeHtml(m.label)}" loading="lazy">`;
     return `<span class="sv-medal-text">${escapeHtml(m ? m.label : key)}</span>`;
 }
 

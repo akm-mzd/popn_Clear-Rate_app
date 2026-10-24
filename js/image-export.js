@@ -99,7 +99,7 @@ function getExportLevelText() {
 
 function buildMedalIconHtml(medalKey, size) {
     const m = MEDAL_TYPES[medalKey];
-    if (m && m.imgUrl && (m.imgUrl.startsWith('http') || m.imgUrl.startsWith('data:'))) {
+    if (m && m.imgUrl && isImageSrc(m.imgUrl)) {
         return `<img src="${toImageProxyUrl(m.imgUrl)}" crossorigin="anonymous" style="width: ${size}px; height: ${size}px; object-fit: contain; display: block;">`;
     }
     const label = m ? m.label : '';
@@ -110,7 +110,7 @@ function buildMedalIconHtml(medalKey, size) {
 function buildMedalBoxHtml(medalKey) {
     const m = MEDAL_TYPES[medalKey];
     const boxStyle = `width: 34px; height: 34px; flex-shrink: 0; border-radius: 6px; ${EXPORT_CENTER} box-sizing: border-box;`;
-    if (m && m.imgUrl && (m.imgUrl.startsWith('http') || m.imgUrl.startsWith('data:'))) {
+    if (m && m.imgUrl && isImageSrc(m.imgUrl)) {
         return `<div style="${boxStyle} background: #fff; border: 2px solid #90a4ae;"><img src="${toImageProxyUrl(m.imgUrl)}" crossorigin="anonymous" style="width: 28px; height: 28px; object-fit: contain; display: block;"></div>`;
     }
     if (medalKey === '未解禁') {

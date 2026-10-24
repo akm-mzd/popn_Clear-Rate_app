@@ -10,7 +10,7 @@
 //   小数第2位: UI・操作感の変更 / 小数第3位: バグ修正
 //   ※ 変更を加えるたびに必ず更新する（CLAUDE.md 参照）
 // ==========================================
-const APP_VERSION = '3.13.0.0';
+const APP_VERSION = '3.13.0.1';
 
 // ==========================================
 // ★ 端末の判定（スマホ表示に切り替える画面幅）
@@ -60,18 +60,18 @@ let memoRecords = {};
 const MEDAL_TYPES = {
     '':         { imgUrl: 'URLをペースト', label: '未プレイ', rank: 0, isKuroHishiClear: false, isKuroBoshiClear: false, isEasyClear: false, isNormalClear: false },
     '未解禁':   { imgUrl: '', label: '未解禁', rank: -1, isKuroHishiClear: false, isKuroBoshiClear: false, isEasyClear: false, isNormalClear: false, excludeFromRate: true },
-    '黒丸':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/groove_02.png', label: '黒丸', rank: 1, isKuroHishiClear: false, isKuroBoshiClear: false, isEasyClear: false, isNormalClear: false },
-    '黒菱':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/groove_01.png', label: '黒菱', rank: 2, isKuroHishiClear: true, isKuroBoshiClear: false, isEasyClear: false, isNormalClear: false },
-    '黒星':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/groove_00.png', label: '黒星', rank: 3, isKuroHishiClear: true, isKuroBoshiClear: true, isEasyClear: false, isNormalClear: false },
-    'イージー': { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/easy.png', label: 'イージー', rank: 4, isKuroHishiClear: false, isKuroBoshiClear: false, isEasyClear: true, isNormalClear: false },
-    'ロングオフ': { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/long_off.png', label: 'ロングオフ', rank: 5, isKuroHishiClear: false, isKuroBoshiClear: false, isEasyClear: true, isNormalClear: true },
-    '銅丸':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/bad_02.png', label: '銅丸', rank: 6, isKuroHishiClear: true, isKuroBoshiClear: true, isEasyClear: true, isNormalClear: true },
-    '銅菱':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/bad_01.png', label: '銅菱', rank: 7, isKuroHishiClear: true, isKuroBoshiClear: true, isEasyClear: true, isNormalClear: true },
-    '銅星':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/bad_00.png', label: '銅星', rank: 8, isKuroHishiClear: true, isKuroBoshiClear: true, isEasyClear: true, isNormalClear: true },
-    '銀丸':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/full_combo_02.png', label: '銀丸', rank: 9, isKuroHishiClear: true, isKuroBoshiClear: true, isEasyClear: true, isNormalClear: true },
-    '銀菱':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/full_combo_01.png', label: '銀菱', rank: 10, isKuroHishiClear: true, isKuroBoshiClear: true, isEasyClear: true, isNormalClear: true },
-    '銀星':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/full_combo_00.png', label: '銀星', rank: 11, isKuroHishiClear: true, isKuroBoshiClear: true, isEasyClear: true, isNormalClear: true },
-    '金星':     { imgUrl: 'https://eacache.s.konaminet.jp/game/popn/popn29/images/p/howto/more/perfect_00.png', label: '金星', rank: 12, isKuroHishiClear: true, isKuroBoshiClear: true, isEasyClear: true, isNormalClear: true }
+    '黒丸':     { imgUrl: 'images/medal/groove_02.png', label: '黒丸', rank: 1, isKuroHishiClear: false, isKuroBoshiClear: false, isEasyClear: false, isNormalClear: false },
+    '黒菱':     { imgUrl: 'images/medal/groove_01.png', label: '黒菱', rank: 2, isKuroHishiClear: true, isKuroBoshiClear: false, isEasyClear: false, isNormalClear: false },
+    '黒星':     { imgUrl: 'images/medal/groove_00.png', label: '黒星', rank: 3, isKuroHishiClear: true, isKuroBoshiClear: true, isEasyClear: false, isNormalClear: false },
+    'イージー': { imgUrl: 'images/medal/easy.png', label: 'イージー', rank: 4, isKuroHishiClear: false, isKuroBoshiClear: false, isEasyClear: true, isNormalClear: false },
+    'ロングオフ': { imgUrl: 'images/medal/long_off.png', label: 'ロングオフ', rank: 5, isKuroHishiClear: false, isKuroBoshiClear: false, isEasyClear: true, isNormalClear: true },
+    '銅丸':     { imgUrl: 'images/medal/bad_02.png', label: '銅丸', rank: 6, isKuroHishiClear: true, isKuroBoshiClear: true, isEasyClear: true, isNormalClear: true },
+    '銅菱':     { imgUrl: 'images/medal/bad_01.png', label: '銅菱', rank: 7, isKuroHishiClear: true, isKuroBoshiClear: true, isEasyClear: true, isNormalClear: true },
+    '銅星':     { imgUrl: 'images/medal/bad_00.png', label: '銅星', rank: 8, isKuroHishiClear: true, isKuroBoshiClear: true, isEasyClear: true, isNormalClear: true },
+    '銀丸':     { imgUrl: 'images/medal/full_combo_02.png', label: '銀丸', rank: 9, isKuroHishiClear: true, isKuroBoshiClear: true, isEasyClear: true, isNormalClear: true },
+    '銀菱':     { imgUrl: 'images/medal/full_combo_01.png', label: '銀菱', rank: 10, isKuroHishiClear: true, isKuroBoshiClear: true, isEasyClear: true, isNormalClear: true },
+    '銀星':     { imgUrl: 'images/medal/full_combo_00.png', label: '銀星', rank: 11, isKuroHishiClear: true, isKuroBoshiClear: true, isEasyClear: true, isNormalClear: true },
+    '金星':     { imgUrl: 'images/medal/perfect_00.png', label: '金星', rank: 12, isKuroHishiClear: true, isKuroBoshiClear: true, isEasyClear: true, isNormalClear: true }
 };
 
 const MEDAL_COLORS = {
@@ -103,17 +103,23 @@ let dataLoaded = false; // キャッシュかクラウドのどちらかを読�
 
 const emptyUser = () => ({ clearRecords: {}, scoreRecords: {}, memoRecords: {}, historyRecords: {}, pokkuraRecords: {}, goalRecords: {}, pokkuraFlagRecords: {}, recentRecords: {} });
 
+// メダル・ランクの画像はリポジトリの images/ に置いている（公式サイトの画像を使うと、公式が止まったときに出なくなるため）
+// 画像として使える場所か（リポジトリの images/・http(s)・data:）。'URLをペースト' などの仮の値は使わない
+function isImageSrc(url) {
+    return typeof url === 'string' && /^(images\/|https?:\/\/|data:image\/)/.test(url);
+}
+
 const RANK_IMAGES = {
-    'S+':  'https://p.eagate.573.jp/game/popn/popn29/images/p/common/medal/rank_big_s_plus.png',
-    'S':   'https://p.eagate.573.jp/game/popn/popn29/images/p/common/medal/rank_big_s.png',
-    'AAA': 'https://p.eagate.573.jp/game/popn/popn29/images/p/common/medal/rank_big_a3.png',
-    'AA+': 'https://p.eagate.573.jp/game/popn/popn29/images/p/common/medal/rank_big_a2_plus.png',
-    'AA':  'https://p.eagate.573.jp/game/popn/popn29/images/p/common/medal/rank_big_a2.png',
-    'A+':  'https://p.eagate.573.jp/game/popn/popn29/images/p/common/medal/rank_big_a1_plus.png',
-    'A':   'https://p.eagate.573.jp/game/popn/popn29/images/p/common/medal/rank_big_a1.png',
-    'B+':  'https://p.eagate.573.jp/game/popn/popn29/images/p/common/medal/rank_big_b_plus.png',
-    'B':   'https://p.eagate.573.jp/game/popn/popn29/images/p/common/medal/rank_big_b.png',
-    'C':   'https://p.eagate.573.jp/game/popn/popn29/images/p/common/medal/rank_big_c.png',
-    'D':   'https://p.eagate.573.jp/game/popn/popn29/images/p/common/medal/rank_big_d.png',
-    'E':   'https://p.eagate.573.jp/game/popn/popn29/images/p/common/medal/rank_big_e.png'
+    'S+':  'images/rank/rank_big_s_plus.png',
+    'S':   'images/rank/rank_big_s.png',
+    'AAA': 'images/rank/rank_big_a3.png',
+    'AA+': 'images/rank/rank_big_a2_plus.png',
+    'AA':  'images/rank/rank_big_a2.png',
+    'A+':  'images/rank/rank_big_a1_plus.png',
+    'A':   'images/rank/rank_big_a1.png',
+    'B+':  'images/rank/rank_big_b_plus.png',
+    'B':   'images/rank/rank_big_b.png',
+    'C':   'images/rank/rank_big_c.png',
+    'D':   'images/rank/rank_big_d.png',
+    'E':   'images/rank/rank_big_e.png'
 };

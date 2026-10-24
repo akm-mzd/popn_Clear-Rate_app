@@ -24,7 +24,7 @@ pop'n music のクリア状況を管理する静的サイトです（GitHub Page
 
 | ファイル | 役割 |
 |---|---|
-| `js/config.js` | バージョン・クラウドURL・メダル定義などの設定と、共有する状態。端末判定と localStorage の安全な読み書き |
+| `js/config.js` | バージョン・クラウドURL・メダル定義などの設定と、共有する状態。端末判定と localStorage の安全な読み書き。メダル・スコアランクの画像はリポジトリの `images/medal/`・`images/rank/`（公式と同じファイル名）を使う。画像として使える値かは `isImageSrc()` で確かめる |
 | `js/utils.js` | 共通の道具：HTMLエスケープ、URLの安全確認、クリア率の表示形式、難易度の解釈、レベル一覧、難易度表の行分け（`buildDiffTableGroups`）、攻略wikiのURL |
 | `js/cloud.js` | クラウドとのやり取り：読み込み、自動保存、他端末の変更の反映、手動保存 |
 | `js/users.js` | ユーザーの切替・追加 |

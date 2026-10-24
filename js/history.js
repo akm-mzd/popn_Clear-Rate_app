@@ -73,7 +73,7 @@ function historyMedalHtml(key) {
     if (key === '') return '<span class="hist-medal-text">未プレイ</span>';
     if (key === '未解禁') return '<span class="hist-medal-text">🔒未解禁</span>';
     const m = MEDAL_TYPES[key];
-    if (m && (m.imgUrl.startsWith('http') || m.imgUrl.startsWith('data:'))) {
+    if (m && isImageSrc(m.imgUrl)) {
         return `<img class="hist-medal" src="${escapeHtml(m.imgUrl)}" alt="${escapeHtml(m.label)}" title="${escapeHtml(m.label)}">`;
     }
     return `<span class="hist-medal-text">${escapeHtml(m ? m.label : key)}</span>`;
