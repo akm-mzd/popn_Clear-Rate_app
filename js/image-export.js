@@ -91,6 +91,7 @@ function buildExportHeader(levelText, titleText) {
 function getExportLevelText() {
     const searchInput = document.getElementById('search-input');
     if (searchInput && searchInput.value.trim() !== '') return '検索';
+    if (isSpecialViewLevel(currentViewLevel)) return SPECIAL_VIEW_LEVELS[currentViewLevel];
     return currentViewLevel === 'ALL' ? 'ALL' : currentViewLevel;
 }
 

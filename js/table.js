@@ -116,7 +116,7 @@ function updateDynamicFilters() {
         const levels = getSortedLevels();
         
         // データにないレベルなら「すべて」にする（曲データが届く前の空の状態では戻さない）
-        if (levels.length > 0 && currentViewLevel !== 'ALL' && !levels.includes(currentViewLevel)) {
+        if (levels.length > 0 && currentViewLevel !== 'ALL' && !isSpecialViewLevel(currentViewLevel) && !levels.includes(currentViewLevel)) {
             currentViewLevel = 'ALL';
             allBtn.classList.add('active');
         }
@@ -129,8 +129,54 @@ function updateDynamicFilters() {
             btn.onclick = () => changeViewLevel(l);
             viewLevelContainer.appendChild(btn);
         });
+        // 「更新」「最近」は「すべて」の左
+        Object.keys(SPECIAL_VIEW_LEVELS).forEach(key => {
+            const btn = document.createElement('button');
+            btn.className = `level-btn level-btn-text level-btn-special${key === 'UPDATED' ? ' level-btn-special-first' : ''} ${currentViewLevel === key ? 'active' : ''}`;
+            btn.innerText = SPECIAL_VIEW_LEVELS[key];
+            btn.title = key === 'UPDATED' ? 'メダル・スコアを更新した曲（日付ごと）' : '最近プレーした曲（公式データ取り込みで読んだ20曲）';
+            btn.onclick = () => changeViewLevel(key);
+            viewLevelContainer.appendChild(btn);
+        });
         viewLevelContainer.appendChild(allBtn);
     }
+}
+
+// ---------- 「更新」「最近」（レベルの代わりに選ぶ） ----------
+//   更新：更新履歴のある曲を日付ごとに。期間は 1か月 / 全部（この端末に popn_updated_range で保存）
+//   最近：公式データ取り込みで読んだ「最近プレーした曲」（recentRecords）
+const SPECIAL_VIEW_LEVELS = { UPDATED: '更新', RECENT: '最近' };
+const UPDATED_RANGE_DAYS = 31;
+
+function isSpecialViewLevel(level) {
+    return Object.prototype.hasOwnProperty.call(SPECIAL_VIEW_LEVELS, level);
+}
+
+function getUpdatedRange() {
+    return storageGet('popn_updated_range') === 'all' ? 'all' : 'month';
+}
+
+function setUpdatedRange(range) {
+    storageSet('popn_updated_range', range === 'all' ? 'all' : 'month');
+    renderTable();
+}
+
+// 期間内の更新履歴（新しい順）
+function getUpdatedHistoryList() {
+    const records = getHistoryRecords();
+    const since = getUpdatedRange() === 'all' ? 0 : Date.now() - UPDATED_RANGE_DAYS * 24 * 60 * 60 * 1000;
+    return Object.values(records).filter(e => e && typeof e.t === 'number' && e.t >= since).sort((a, b) => b.t - a.t);
+}
+
+// レベルの代わりに「更新」「最近」を選んだときの曲
+function getSpecialViewSongIds(level) {
+    const ids = new Set();
+    if (level === 'UPDATED') getUpdatedHistoryList().forEach(e => ids.add(e.id));
+    if (level === 'RECENT') {
+        const recent = typeof loadRecentRecords === 'function' ? loadRecentRecords() : null;
+        if (recent) matchRecentSongs(recent.list).forEach(r => r.songs.forEach(s => ids.add(s.id)));
+    }
+    return ids;
 }
 
 function resetFilters() {
@@ -185,7 +231,8 @@ function clearSearch() { document.getElementById('search-input').value = ''; ren
 function changeViewLevel(level) {
     toggleMenu(false); // レベルを選んだらメニューを閉じる
     // ポックラはレベルに関係なく全体を出すので、レベルを選んだら難易度表に切り替える
-    if (viewMode === 'pokkura') viewMode = 'grid';
+    //   「更新」「最近」は難易度表の形で見るものなので、いつも難易度表にする
+    if (viewMode === 'pokkura' || isSpecialViewLevel(level)) viewMode = 'grid';
     document.getElementById('search-input').value = '';
     currentViewLevel = level;
     updateDynamicFilters();
@@ -347,7 +394,9 @@ function renderTable() {
 
     // 1. 表示レベル・検索キーワードだけを当てた楽曲（絞り込みがないときの統計にも使う）
     //    検索中は、表示レベルに関係なく全曲から探す
+    const specialIds = !searchQuery && isSpecialViewLevel(currentViewLevel) ? getSpecialViewSongIds(currentViewLevel) : null;
     let baseSongs = songs.filter(s => {
+        if (specialIds) return specialIds.has(s.id);
         if (!searchQuery && currentViewLevel !== 'ALL' && s.level !== currentViewLevel) return false;
         if (searchQuery && !(s.genre.toLowerCase().includes(searchQuery) || s.title.toLowerCase().includes(searchQuery))) return false;
         return true;
@@ -682,7 +731,7 @@ function renderTable() {
     const easyRemain = rateTotal - easyClearCount;
     const normalRemain = rateTotal - normalClearCount;
 
-    let levelLabel = currentViewLevel === 'ALL' ? '全体' : `Lv${currentViewLevel}`;
+    let levelLabel = currentViewLevel === 'ALL' ? '全体' : isSpecialViewLevel(currentViewLevel) ? SPECIAL_VIEW_LEVELS[currentViewLevel] : `Lv${currentViewLevel}`;
     if (searchQuery) levelLabel = `検索結果 ("${searchQuery}")`;
     if (isFiltered) {
         levelLabel += ' (絞り込み中)';
@@ -1057,7 +1106,10 @@ function applyViewMode(displaySongs) {
     const isGrid = viewMode !== 'list';
     capture.style.display = isGrid ? 'none' : '';
     grid.style.display = isGrid ? '' : 'none';
-    if (viewMode === 'grid') renderDiffGrid(displaySongs);
+    const specialGrid = viewMode === 'grid' && !(document.getElementById('search-input').value.trim()) && isSpecialViewLevel(currentViewLevel);
+    if (specialGrid && currentViewLevel === 'UPDATED') renderUpdatedGrid(displaySongs);
+    else if (specialGrid && currentViewLevel === 'RECENT') renderRecentGrid(displaySongs);
+    else if (viewMode === 'grid') renderDiffGrid(displaySongs);
     else if (viewMode === 'medal') renderMedalGrid(displaySongs);
     else if (viewMode === 'score') renderScoreGrid(displaySongs);
     else if (viewMode === 'pokkura') renderPokkuraGrid();
@@ -1107,21 +1159,7 @@ function renderDiffGrid(targetSongs) {
         const ordered = orderForDirection(g.songs, COLS, getGridDirection('grid'));
 
         let cells = '';
-        ordered.forEach(song => {
-            const medalKey = clearRecords[song.id] || '';
-            const medalClass = medalKey === '' ? ' dg-medal-empty' : '';
-            const rank = showScore ? getSongScoreRank(song) : '';
-            const rankHtml = rank ? `<img class="dg-rank" src="${escapeHtml(RANK_IMAGES[rank])}" alt="${escapeHtml(rank)}" loading="lazy">` : '';
-            const bannerSrc = safeUrl(song.bannerUrl, true);
-            const bannerInner = bannerSrc
-                ? `<img src="${escapeHtml(bannerSrc)}" alt="${escapeHtml(song.title)}" loading="lazy">`
-                : `<span class="dg-banner-text">${escapeHtml(song.title)}</span>`;
-            cells += `
-                <div class="dg-cell">
-                    <button type="button" class="dg-medal${medalClass}" onclick="openMedalModal('${jsStringAttr(song.id)}')" title="メダルを変更">${buildGridMedalInner(medalKey)}${rankHtml}${buildUraBadgeHtml(song.id, medalKey)}</button>
-                    <a class="dg-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（攻略wikiを開く）">${bannerInner}</a>
-                </div>`;
-        });
+        ordered.forEach(song => { cells += buildDiffGridCellHtml(song, showScore); });
 
         html += `
             <div class="dg-row">
@@ -1129,6 +1167,150 @@ function renderDiffGrid(targetSongs) {
                 <div class="dg-cells" style="grid-template-columns: repeat(${COLS}, minmax(0, 1fr));">${cells}</div>
             </div>`;
     });
+    grid.innerHTML = html;
+}
+
+// 難易度表の1曲分（メダル：押すと変更 / バナー：押すと攻略wiki）。extraHtml はバナーの下に小さく出すもの
+function buildDiffGridCellHtml(song, showScore, extraHtml = '') {
+    const medalKey = clearRecords[song.id] || '';
+    const medalClass = medalKey === '' ? ' dg-medal-empty' : '';
+    const rank = showScore ? getSongScoreRank(song) : '';
+    const rankHtml = rank ? `<img class="dg-rank" src="${escapeHtml(RANK_IMAGES[rank])}" alt="${escapeHtml(rank)}" loading="lazy">` : '';
+    const bannerSrc = safeUrl(song.bannerUrl, true);
+    const bannerInner = bannerSrc
+        ? `<img src="${escapeHtml(bannerSrc)}" alt="${escapeHtml(song.title)}" loading="lazy">`
+        : `<span class="dg-banner-text">${escapeHtml(song.title)}</span>`;
+    const banner = `<a class="dg-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（攻略wikiを開く）">${bannerInner}</a>`;
+    return `
+                <div class="dg-cell">
+                    <button type="button" class="dg-medal${medalClass}" onclick="openMedalModal('${jsStringAttr(song.id)}')" title="メダルを変更">${buildGridMedalInner(medalKey)}${rankHtml}${buildUraBadgeHtml(song.id, medalKey)}</button>
+                    ${extraHtml ? `<div class="dg-banner-wrap sv-wrap">${banner}${extraHtml}</div>` : banner}
+                </div>`;
+}
+
+// ---------- 「更新」：日付ごとの行。セルにその日の変更（メダル・スコア）を小さく出す ----------
+const SPECIAL_WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
+
+function buildSvMedalIcon(key) {
+    const m = MEDAL_TYPES[key];
+    if (key === '') return '<span class="sv-medal-text">未</span>';
+    if (m && m.imgUrl && /^(https?:|data:)/.test(m.imgUrl)) return `<img class="sv-medal" src="${escapeHtml(m.imgUrl)}" alt="${escapeHtml(m.label)}" loading="lazy">`;
+    return `<span class="sv-medal-text">${escapeHtml(m ? m.label : key)}</span>`;
+}
+
+function renderUpdatedGrid(targetSongs) {
+    const grid = document.getElementById('diff-grid-view');
+    const showScore = document.getElementById('show-score-col').checked;
+    const narrow = isNarrowScreen();
+    const COLS = narrow ? 2 : 5;
+    lastGridNarrow = narrow;
+    const range = getUpdatedRange();
+    const rangeBar = `
+        <div class="sv-bar">
+            <span class="sv-bar-text">${range === 'all' ? 'すべての更新' : `直近${UPDATED_RANGE_DAYS}日の更新`}</span>
+            <div class="sv-range" role="group" aria-label="期間">
+                <button type="button" class="${range === 'month' ? 'active' : ''}" onclick="setUpdatedRange('month')">1か月</button>
+                <button type="button" class="${range === 'all' ? 'active' : ''}" onclick="setUpdatedRange('all')">全部</button>
+            </div>
+        </div>`;
+
+    // 日付ごと・曲ごとにまとめる（その日の最初の変更前 → 最後の変更後）
+    const shown = new Map(targetSongs.map(s => [s.id, s]));
+    const days = [];
+    const dayIndex = new Map();
+    getUpdatedHistoryList().forEach(e => {
+        const song = shown.get(e.id);
+        if (!song) return;
+        const d = new Date(e.t);
+        const dayKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+        if (!dayIndex.has(dayKey)) {
+            dayIndex.set(dayKey, days.length);
+            days.push({ label: `${d.getMonth() + 1}/${d.getDate()}`, wd: SPECIAL_WEEKDAYS[d.getDay()], items: new Map() });
+        }
+        const items = days[dayIndex.get(dayKey)].items;
+        // 新しい順に見ていくので、最初に見た記録が「最後の変更後」、あとで見た記録が「最初の変更前」
+        if (!items.has(e.id)) items.set(e.id, { song });
+        const it = items.get(e.id);
+        if ('nm' in e) { if (!('nm' in it)) it.nm = e.nm; it.om = e.om; }
+        if ('ns' in e) { if (!('ns' in it)) it.ns = e.ns; it.os = e.os; }
+    });
+
+    if (days.length === 0) {
+        grid.innerHTML = rangeBar + `<div class="dg-empty">${range === 'all' ? '更新履歴がありません' : `直近${UPDATED_RANGE_DAYS}日の更新はありません（「全部」で前の更新も見られます）`}</div>`;
+        return;
+    }
+    let html = rangeBar;
+    days.forEach(day => {
+        let cells = '';
+        day.items.forEach(it => {
+            const parts = [];
+            if ('nm' in it && it.om !== it.nm) parts.push(`<span class="sv-change">${buildSvMedalIcon(it.om || '')}<span class="sv-arrow">→</span>${buildSvMedalIcon(it.nm || '')}</span>`);
+            if ('ns' in it && it.os !== it.ns) {
+                if (it.ns === null) parts.push('<span class="sv-score">スコア削除</span>');
+                else if (it.os === null || it.os === undefined) parts.push(`<span class="sv-score">→${it.ns.toLocaleString('ja-JP')}</span>`);
+                else {
+                    const diff = it.ns - it.os;
+                    parts.push(`<span class="sv-score ${diff >= 0 ? 'up' : 'down'}">${diff >= 0 ? '+' : '−'}${Math.abs(diff).toLocaleString('ja-JP')}</span>`);
+                }
+            }
+            if (parts.length === 0) parts.push('<span class="sv-score">もとに戻した</span>');
+            cells += buildDiffGridCellHtml(it.song, showScore, `<div class="sv-info">${parts.join('')}</div>`);
+        });
+        html += `
+            <div class="dg-row">
+                <div class="dg-label sv-label"><span class="dg-label-cls">${day.label}</span><span class="dg-label-idx">（${day.wd}）</span></div>
+                <div class="dg-cells" style="grid-template-columns: repeat(${COLS}, minmax(0, 1fr));">${cells}</div>
+            </div>`;
+    });
+    grid.innerHTML = html;
+}
+
+// ---------- 「最近」：公式の「最近プレーした曲」を、公式の順番（左が一番最近）で ----------
+function renderRecentGrid(targetSongs) {
+    const grid = document.getElementById('diff-grid-view');
+    const showScore = document.getElementById('show-score-col').checked;
+    const narrow = isNarrowScreen();
+    const COLS = narrow ? 2 : 5;
+    lastGridNarrow = narrow;
+    const recent = typeof loadRecentRecords === 'function' ? loadRecentRecords() : null;
+    if (!recent || recent.list.length === 0) {
+        grid.innerHTML = '<div class="dg-empty">公式データ取り込みをすると、最近プレーした曲が出ます</div>';
+        return;
+    }
+    const at = recent.at ? new Date(recent.at) : null;
+    const when = recent.rt ? `最終プレー ${recent.rt}` : (at && !isNaN(at) ? `${at.getMonth() + 1}/${at.getDate()} ${at.getHours()}:${String(at.getMinutes()).padStart(2, '0')} 取り込み` : '');
+    const shown = new Set(targetSongs.map(s => s.id));
+    const isFiltered = targetSongs.length < getSpecialViewSongIds('RECENT').size;
+    let cells = '';
+    let count = 0;
+    matchRecentSongs(recent.list).forEach((r, i) => {
+        const order = `<span class="sv-order">${i + 1}</span>`;
+        if (r.songs.length === 0) {
+            // アプリにない曲（Lv45以下など）：曲名だけ。絞り込み中は出さない
+            if (isFiltered) return;
+            count++;
+            cells += `
+                <div class="dg-cell sv-cell-none">
+                    <span class="dg-medal dg-medal-empty pk-medal-static"></span>
+                    <div class="dg-banner-wrap sv-wrap">
+                        <div class="dg-banner sv-none-banner" title="アプリにない曲です"><span class="dg-banner-text">${escapeHtml(r.t)}</span></div>
+                        <div class="sv-info">${order}<span class="sv-score">アプリにない曲</span></div>
+                    </div>
+                </div>`;
+            return;
+        }
+        r.songs.forEach(song => {
+            if (!shown.has(song.id)) return;
+            count++;
+            cells += buildDiffGridCellHtml(song, showScore, `<div class="sv-info">${order}<span class="sv-lv">Lv${escapeHtml(song.level)}</span></div>`);
+        });
+    });
+    let html = `<div class="sv-bar"><span class="sv-bar-text">公式の「最近プレーした曲」${when ? `（${escapeHtml(when)}）` : ''}</span></div>`;
+    html += count === 0 ? '<div class="dg-empty">表示する曲がありません</div>' : `
+        <div class="dg-row">
+            <div class="dg-label sv-label"><span class="dg-label-cls">最近</span></div>
+            <div class="dg-cells" style="grid-template-columns: repeat(${COLS}, minmax(0, 1fr));">${cells}</div>
+        </div>`;
     grid.innerHTML = html;
 }
 

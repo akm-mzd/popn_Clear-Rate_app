@@ -5,7 +5,7 @@
 // ==========================================
 
 function downloadSongsAndClearsJson() {
-    const exportData = { songs: songs, clearRecords: clearRecords, scoreRecords: scoreRecords, memoRecords: memoRecords, historyRecords: getHistoryRecords(), pokkuraRecords: (allUsersData[currentUser] && allUsersData[currentUser].pokkuraRecords) || {}, goalRecords: getGoalRecords(), pokkuraFlagRecords: getPokkuraFlagRecords() };
+    const exportData = { songs: songs, clearRecords: clearRecords, scoreRecords: scoreRecords, memoRecords: memoRecords, historyRecords: getHistoryRecords(), pokkuraRecords: (allUsersData[currentUser] && allUsersData[currentUser].pokkuraRecords) || {}, goalRecords: getGoalRecords(), pokkuraFlagRecords: getPokkuraFlagRecords(), recentRecords: (allUsersData[currentUser] && allUsersData[currentUser].recentRecords) || {} };
     const dataStr = JSON.stringify(exportData, null, 2);
     triggerDownload(dataStr, `popn_data_${currentUser}.json`, 'クリア・スコア・メモを含めて');
 }
@@ -490,6 +490,7 @@ async function restoreFromJson(event) {
             if (isObj(data.pokkuraRecords)) user.pokkuraRecords = data.pokkuraRecords;
             if (isObj(data.goalRecords)) user.goalRecords = data.goalRecords;
             if (isObj(data.pokkuraFlagRecords)) user.pokkuraFlagRecords = data.pokkuraFlagRecords;
+            if (isObj(data.recentRecords)) user.recentRecords = data.recentRecords;
 
             clearRecords = user.clearRecords;
             scoreRecords = user.scoreRecords;
