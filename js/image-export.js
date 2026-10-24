@@ -11,6 +11,8 @@
 // ==========================================
 const EXPORT_BG = '#f5f1e6';
 const EXPORT_ACCENT = '#3949ab';
+// 難易度順画像のレベルとタイトルの色（46 水色・47 オレンジ・48 緑・49 いつもの色・50 赤）
+const EXPORT_LEVEL_COLORS = { '46': '#039be5', '47': '#ef6c00', '48': '#2e7d32', '49': EXPORT_ACCENT, '50': '#d32f2f' };
 const EXPORT_MAX_PIXELS_PC = 16000000;     // iOS のキャンバス上限（約1677万px）より少し小さく
 const EXPORT_MAX_PIXELS_MOBILE = 8000000;  // スマホはメモリが少ないので、さらに小さく抑える
 
@@ -70,17 +72,17 @@ function createExportRoot(width) {
 // 文字を枠の中央に置くための共通スタイル
 const EXPORT_CENTER = 'display: flex; align-items: center; justify-content: center; text-align: center;';
 
-function buildExportHeader(levelText, titleText) {
+function buildExportHeader(levelText, titleText, accent = EXPORT_ACCENT) {
     const now = new Date();
     const dateText = `${now.getFullYear()}.${now.getMonth() + 1}.${now.getDate()}`;
     const lvSize = String(levelText).length > 3 ? 22 : (String(levelText).length > 2 ? 30 : 44);
     return `
         <div style="display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 14px;">
-            <div style="background: #fff; border: 3px solid ${EXPORT_ACCENT}; border-radius: 12px; width: 104px; height: 84px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0;">
-                <div style="font-size: 15px; line-height: 1; font-weight: bold; color: ${EXPORT_ACCENT}; letter-spacing: 1px;">LEVEL</div>
-                <div style="font-size: ${lvSize}px; line-height: 1; font-weight: bold; color: ${EXPORT_ACCENT}; margin-top: 6px;">${escapeHtml(levelText)}</div>
+            <div style="background: #fff; border: 3px solid ${accent}; border-radius: 12px; width: 104px; height: 84px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0;">
+                <div style="font-size: 15px; line-height: 1; font-weight: bold; color: ${accent}; letter-spacing: 1px;">LEVEL</div>
+                <div style="font-size: ${lvSize}px; line-height: 1; font-weight: bold; color: ${accent}; margin-top: 6px;">${escapeHtml(levelText)}</div>
             </div>
-            <div style="flex: 1; ${EXPORT_CENTER} font-size: 28px; line-height: 1.2; font-weight: bold; color: ${EXPORT_ACCENT};">${escapeHtml(titleText)}</div>
+            <div style="flex: 1; ${EXPORT_CENTER} font-size: 28px; line-height: 1.2; font-weight: bold; color: ${accent};">${escapeHtml(titleText)}</div>
             <div style="text-align: right; color: #555; font-size: 14px; line-height: 1.6; flex-shrink: 0;">
                 <div>作成日 ${dateText}</div>
                 <div style="font-weight: bold;">User: ${escapeHtml(currentUser)}</div>
@@ -240,7 +242,10 @@ async function generateOverviewImage() {
     const btn = document.getElementById('btn-overview-image');
     const originalText = await prepareExport(btn);
     if (originalText === null) return;
+    await outputExportImage(buildOverviewRoot(), `popn_overview_${currentUser}_${exportDateStr()}.png`, btn, originalText);
+}
 
+function buildOverviewRoot() {
     const sortedMedalKeys = Object.keys(MEDAL_TYPES)
         .sort((a, b) => MEDAL_TYPES[b].rank - MEDAL_TYPES[a].rank);
     const targetLevels = ['50', '49', '48', '47', '46'];
@@ -310,7 +315,7 @@ async function generateOverviewImage() {
     }
 
     root.innerHTML = html;
-    await outputExportImage(root, `popn_overview_${currentUser}_${exportDateStr()}.png`, btn, originalText);
+    return root;
 }
 
 // ==========================================
@@ -342,7 +347,7 @@ function buildMedalSummaryHtml(targetSongs) {
 function buildDiffTableRoot(targetSongs, levelText) {
     const COLS = 5;
     const root = createExportRoot();
-    let html = buildExportHeader(levelText, "pop'n music 難易度表");
+    let html = buildExportHeader(levelText, "pop'n music 難易度表", EXPORT_LEVEL_COLORS[String(levelText)] || EXPORT_ACCENT);
     html += buildMedalSummaryHtml(targetSongs);
 
     const groups = buildDiffTableGroups(targetSongs);
@@ -482,6 +487,168 @@ async function generatePokkuraImage() {
     const originalText = await prepareExport(btn);
     if (originalText === null) return;
     await outputExportImage(buildPokkuraRoot(pk), `popn_pokkura_${currentUser}_${exportDateStr()}.png`, btn, originalText);
+}
+
+// ==========================================
+// ★ まとめて生成：前回まとめて作ったときから更新があったものだけを作る
+//   ・難易度順画像：更新履歴のあった曲のレベル
+//   ・ポックラ画像：ポックラ（公式の値・計算値）が変わったとき
+//   ・全体統計画像：メダルが変わったとき
+//   前回の日時とポックラの値は、この端末にユーザーごとに保存（popn_batch_image_ユーザー名）。初めてのときは今日の0時から
+// ==========================================
+function batchImageKey(user = currentUser) {
+    return 'popn_batch_image_' + user;
+}
+
+function loadBatchImageState() {
+    try {
+        const s = JSON.parse(storageGet(batchImageKey()) || 'null');
+        if (s && typeof s.at === 'number') return s;
+    } catch (e) { /* 壊れていたら初めてと同じ */ }
+    return null;
+}
+
+function saveBatchImageState(snap) {
+    storageSet(batchImageKey(), JSON.stringify({ at: Date.now(), pc: snap.pc, total: snap.total }));
+}
+
+function currentPokkuraSnapshot() {
+    const pk = calcPokkura();
+    const pc = pk.version && typeof pk.version.pc === 'number' ? pk.version.pc : null;
+    return { pk, pc, total: pk.total };
+}
+
+// 何を作るか（作るものがなければ items は空）
+function planBatchImages() {
+    const state = loadBatchImageState();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const since = state ? state.at : today.getTime();
+    const entries = Object.values(getHistoryRecords()).filter(e => e && typeof e.t === 'number' && e.t > since);
+    const levelSet = new Set();
+    let medalChanged = false;
+    let pokkuraSongUpdated = false; // ポックラの対象になりうる曲を更新したか（初めてのときの判断に使う）
+    const newVersionValue = getPokkuraNewVersion().value;
+    entries.forEach(e => {
+        const song = songs.find(s => s.id === e.id);
+        const lv = song ? song.level : e.lv;
+        if (lv) levelSet.add(String(lv));
+        if ('nm' in e && e.om !== e.nm) medalChanged = true;
+        if (song && getPokkuraGroup(song, newVersionValue)) pokkuraSongUpdated = true;
+    });
+    const levels = getSortedLevels().filter(lv => levelSet.has(lv) && songs.some(s => s.level === lv));
+    const snap = currentPokkuraSnapshot();
+    const hasPokkuraSongs = snap.pk.topNew.length + snap.pk.topOld.length > 0;
+    // 前回の値があれば値で比べる。初めてのときは、今日ポックラの対象になりうる曲を更新したかで決める
+    const pokkuraChanged = hasPokkuraSongs && (state ? (state.pc !== snap.pc || state.total !== snap.total) : pokkuraSongUpdated);
+
+    const items = levels.map(lv => ({ kind: 'diff', level: lv, label: `Lv${lv} 難易度順画像` }));
+    if (pokkuraChanged) items.push({ kind: 'pokkura', label: 'ポックラ画像' });
+    if (medalChanged) items.push({ kind: 'overview', label: '全体統計画像' });
+    return { since, isFirst: !state, items, snap };
+}
+
+function formatBatchSince(ms) {
+    const d = new Date(ms);
+    return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+let batchImageResults = []; // スマホで一覧に出している画像 [{ url, filename, label }]
+
+async function generateBatchImages() {
+    const plan = planBatchImages();
+    const sinceText = plan.isFirst ? '今日' : `前回（${formatBatchSince(plan.since)}）`;
+    if (plan.items.length === 0) {
+        // 初めてのときは、今を「前回」として覚えておく（次からはここからの更新で決める）
+        if (plan.isFirst) saveBatchImageState(plan.snap);
+        alert(`${sinceText}から、画像にする更新はありません。`);
+        return;
+    }
+    if (!confirm(`${sinceText}からの更新で、次の画像を作ります。\n\n${plan.items.map(it => '・' + it.label).join('\n')}`)) return;
+
+    const btn = document.getElementById('btn-batch-image');
+    const originalText = await prepareExport(btn);
+    if (originalText === null) return;
+    const mobile = isMobileDevice();
+    const results = [];
+    let failed = false;
+    try {
+        for (let i = 0; i < plan.items.length; i++) {
+            const it = plan.items[i];
+            showLoading(true, `画像を作成中… (${i + 1}/${plan.items.length}) ${it.label}`);
+            btn.textContent = `生成中... (${i + 1}/${plan.items.length})`;
+            let root, filename;
+            if (it.kind === 'diff') {
+                root = buildDiffTableRoot(songs.filter(s => s.level === it.level), it.level);
+                filename = `popn_difftable_${currentUser}_Lv${it.level}_${exportDateStr()}.png`;
+            } else if (it.kind === 'pokkura') {
+                root = buildPokkuraRoot(plan.snap.pk);
+                filename = `popn_pokkura_${currentUser}_${exportDateStr()}.png`;
+            } else {
+                root = buildOverviewRoot();
+                filename = `popn_overview_${currentUser}_${exportDateStr()}.png`;
+            }
+            const url = await renderExportToBlobUrl(root);
+            if (mobile) {
+                results.push({ url, filename, label: it.label });
+            } else {
+                downloadBlobUrl(url, filename);
+                // 連続ダウンロードがブラウザに止められにくいよう、少し間を空ける
+                if (i < plan.items.length - 1) await new Promise(res => setTimeout(res, 400));
+            }
+        }
+    } catch (e) {
+        failed = true;
+        alert(e && e.message === 'timeout' ? '画像の作成に時間がかかりすぎたため中止しました。もう一度試してください。' : '画像の生成に失敗しました。');
+        console.error(e);
+    } finally {
+        showLoading(false);
+        btn.textContent = originalText;
+    }
+    // 全部できたときだけ「前回」を今にする（失敗したら次も同じものを作れるように）
+    if (!failed) saveBatchImageState(plan.snap);
+    if (mobile && results.length > 0) openBatchImageModal(results);
+    else endImageExport();
+}
+
+// スマホ：できた画像を縦に並べて出す（長押しで保存。共有できる端末では「まとめて共有」）
+function openBatchImageModal(results) {
+    closeBatchImageModal(true);
+    batchImageResults = results;
+    const list = document.getElementById('batch-image-list');
+    list.innerHTML = results.map(r => `
+        <figure class="batch-image-item">
+            <figcaption>${escapeHtml(r.label)}</figcaption>
+            <img src="${escapeHtml(r.url)}" alt="${escapeHtml(r.label)}">
+        </figure>`).join('');
+    const shareBtn = document.getElementById('batch-image-share');
+    shareBtn.style.display = navigator.canShare && navigator.share ? '' : 'none';
+    document.getElementById('batch-image-modal').style.display = 'flex';
+}
+
+async function shareBatchImages() {
+    try {
+        const files = await Promise.all(batchImageResults.map(async r => new File([await (await fetch(r.url)).blob()], r.filename, { type: 'image/png' })));
+        if (!navigator.canShare({ files })) {
+            alert('この端末では、まとめて共有できません。画像を1枚ずつ長押しして保存してください。');
+            return;
+        }
+        await navigator.share({ files });
+    } catch (e) {
+        if (e && e.name === 'AbortError') return;
+        alert('共有できませんでした。画像を1枚ずつ長押しして保存してください。');
+        console.error(e);
+    }
+}
+
+function closeBatchImageModal(keepExporting) {
+    const modal = document.getElementById('batch-image-modal');
+    if (modal) modal.style.display = 'none';
+    const list = document.getElementById('batch-image-list');
+    if (list) list.innerHTML = '';
+    batchImageResults.forEach(r => URL.revokeObjectURL(r.url));
+    batchImageResults = [];
+    if (!keepExporting) endImageExport();
 }
 
 // ---------- PC版：複数レベルをまとめて作成 ----------
