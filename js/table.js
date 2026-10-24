@@ -1198,6 +1198,20 @@ function buildSvMedalIcon(key) {
     return `<span class="sv-medal-text">${escapeHtml(m ? m.label : key)}</span>`;
 }
 
+// 縦並びのときの曲の情報（PC だけ。レベル・ジャンル名・曲名・難易度）
+function buildSvSongInfoHtml(song, fallback) {
+    if (!song) {
+        return `<div class="sv-song"><span class="sv-song-lv">-</span><span class="sv-song-text"><span class="sv-song-genre">${escapeHtml(fallback.g || '')}</span><span class="sv-song-title">${escapeHtml(fallback.t || '')}</span></span></div>`;
+    }
+    const diff = song.diffRaw || song.diffClass || '';
+    const style = getDifficultyColor(song.diffClass, song.diffIndex);
+    return `<div class="sv-song">
+        <span class="sv-song-lv">${escapeHtml(song.level)}</span>
+        <span class="sv-song-text"><span class="sv-song-genre">${escapeHtml(song.genre || '')}</span><span class="sv-song-title">${escapeHtml(song.title)}</span></span>
+        ${diff ? `<span class="sv-song-diff" style="color: ${style.color}; text-shadow: ${style.shadow};">${escapeHtml(diff)}</span>` : ''}
+    </div>`;
+}
+
 function renderUpdatedGrid(targetSongs) {
     const grid = document.getElementById('diff-grid-view');
     const showScore = document.getElementById('show-score-col').checked;
@@ -1263,7 +1277,7 @@ function renderUpdatedGrid(targetSongs) {
                 }
             }
             if (parts.length === 0) parts.push('<span class="sv-score">もとに戻した</span>');
-            cells += buildDiffGridCellHtml(it.song, showScore, `<div class="sv-info">${parts.join('')}</div>`);
+            cells += buildDiffGridCellHtml(it.song, showScore, `<div class="sv-info">${parts.join('')}</div>${buildSvSongInfoHtml(it.song)}`);
         });
         html += `
             <div class="dg-row">
@@ -1302,6 +1316,7 @@ function renderRecentGrid(targetSongs) {
                     <div class="dg-banner-wrap sv-wrap">
                         <div class="dg-banner sv-none-banner" title="アプリにない曲です"><span class="dg-banner-text">${escapeHtml(r.t)}</span></div>
                         <div class="sv-info">${order}<span class="sv-score">アプリにない曲</span></div>
+                        ${buildSvSongInfoHtml(null, r)}
                     </div>
                 </div>`;
             return;
@@ -1309,7 +1324,7 @@ function renderRecentGrid(targetSongs) {
         r.songs.forEach(song => {
             if (!shown.has(song.id)) return;
             count++;
-            cells += buildDiffGridCellHtml(song, showScore, `<div class="sv-info">${order}<span class="sv-lv">Lv${escapeHtml(song.level)}</span></div>`);
+            cells += buildDiffGridCellHtml(song, showScore, `<div class="sv-info">${order}<span class="sv-lv">Lv${escapeHtml(song.level)}</span></div>${buildSvSongInfoHtml(song)}`);
         });
     });
     let html = `<div class="sv-bar"><span class="sv-bar-text">公式の「最近プレーした曲」${when ? `（${escapeHtml(when)}）` : ''}</span></div>`;
