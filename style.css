@@ -647,6 +647,20 @@ body.exporting-image #back-to-top { display: none !important; }
 #diff-grid-view .sv-range button { width: auto; margin: 0; padding: 4px 12px; border: none; border-radius: 6px; background: transparent; color: #666; font-size: 12px; font-weight: bold; cursor: pointer; font-family: inherit; }
 #diff-grid-view .sv-range button.active { background: #fff; color: #6a3fb0; box-shadow: 0 1px 2px rgba(0,0,0,0.15); }
 .sv-cell-none { opacity: 0.6; }
+/* 縦に1曲ずつ：バナーの右に変更の内容・順番を出す */
+.dg-cells.sv-list { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.sv-list .dg-banner-wrap.sv-wrap { flex-direction: row; align-items: center; gap: 10px; }
+.sv-list .dg-banner-wrap.sv-wrap .dg-banner { flex: 0 0 240px; max-width: 55%; }
+.sv-list .sv-info { flex: 1; min-width: 0; font-size: 13px; gap: 4px 10px; }
+.sv-list .sv-medal { width: 22px; height: 22px; }
+.sv-list .sv-medal-text { font-size: 12px; }
+.sv-list .sv-arrow { font-size: 12px; }
+.sv-list .sv-order { font-size: 12px; min-width: 20px; padding: 1px 4px; }
+@media screen and (max-width: 768px) {
+    .sv-list .dg-banner-wrap.sv-wrap .dg-banner { flex-basis: 150px; }
+    .sv-list .sv-info { font-size: 12px; gap: 2px 8px; }
+    .sv-list .sv-medal { width: 20px; height: 20px; }
+}
 .sv-none-banner { background: #9e9e9e; cursor: default; }
 .sv-none-banner:hover { outline: none; }
 #diff-grid-view .dg-score {

@@ -1188,7 +1188,7 @@ function buildDiffGridCellHtml(song, showScore, extraHtml = '') {
                 </div>`;
 }
 
-// ---------- 「更新」：日付ごとの行。セルにその日の変更（メダル・スコア）を小さく出す ----------
+// ---------- 「更新」：日付ごとの行に、曲を縦に並べる。バナーの右にその日の変更（メダル・スコア）を出す ----------
 const SPECIAL_WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
 function buildSvMedalIcon(key) {
@@ -1201,9 +1201,7 @@ function buildSvMedalIcon(key) {
 function renderUpdatedGrid(targetSongs) {
     const grid = document.getElementById('diff-grid-view');
     const showScore = document.getElementById('show-score-col').checked;
-    const narrow = isNarrowScreen();
-    const COLS = narrow ? 2 : 5;
-    lastGridNarrow = narrow;
+    lastGridNarrow = isNarrowScreen();
     const range = getUpdatedRange();
     const rangeBar = `
         <div class="sv-bar">
@@ -1239,10 +1237,21 @@ function renderUpdatedGrid(targetSongs) {
         grid.innerHTML = rangeBar + `<div class="dg-empty">${range === 'all' ? '更新履歴がありません' : `直近${UPDATED_RANGE_DAYS}日の更新はありません（「全部」で前の更新も見られます）`}</div>`;
         return;
     }
+    // 日の中の並び：メダルが変わった曲（変わったあとのメダルが良い順）→ スコアだけ変わった曲（変わったあとのスコアが高い順）→ その他。
+    //   同じ組の中は、メダルが良い順 → スコアが高い順
+    const medalRank = k => (MEDAL_TYPES[k || ''] || MEDAL_TYPES['']).rank;
+    const scoreOf = it => ('ns' in it && it.ns !== null ? it.ns : parseInt(scoreRecords[it.song.id], 10) || 0);
+    const groupOf = it => ('nm' in it && it.om !== it.nm) ? 0 : ('ns' in it && it.os !== it.ns) ? 1 : 2;
+    const medalOf = it => ('nm' in it ? it.nm : clearRecords[it.song.id]) || '';
+    const byUpdate = (a, b) => (groupOf(a) - groupOf(b))
+        || (groupOf(a) === 1 ? 0 : medalRank(medalOf(b)) - medalRank(medalOf(a)))
+        || (scoreOf(b) - scoreOf(a))
+        || (a.song.originalOrder - b.song.originalOrder);
+
     let html = rangeBar;
     days.forEach(day => {
         let cells = '';
-        day.items.forEach(it => {
+        [...day.items.values()].sort(byUpdate).forEach(it => {
             const parts = [];
             if ('nm' in it && it.om !== it.nm) parts.push(`<span class="sv-change">${buildSvMedalIcon(it.om || '')}<span class="sv-arrow">→</span>${buildSvMedalIcon(it.nm || '')}</span>`);
             if ('ns' in it && it.os !== it.ns) {
@@ -1259,19 +1268,17 @@ function renderUpdatedGrid(targetSongs) {
         html += `
             <div class="dg-row">
                 <div class="dg-label sv-label"><span class="dg-label-cls">${day.label}</span><span class="dg-label-idx">（${day.wd}）</span></div>
-                <div class="dg-cells" style="grid-template-columns: repeat(${COLS}, minmax(0, 1fr));">${cells}</div>
+                <div class="dg-cells sv-list">${cells}</div>
             </div>`;
     });
     grid.innerHTML = html;
 }
 
-// ---------- 「最近」：公式の「最近プレーした曲」を、公式の順番（左が一番最近）で ----------
+// ---------- 「最近」：公式の「最近プレーした曲」を、公式の順番（上が一番最近）で縦に ----------
 function renderRecentGrid(targetSongs) {
     const grid = document.getElementById('diff-grid-view');
     const showScore = document.getElementById('show-score-col').checked;
-    const narrow = isNarrowScreen();
-    const COLS = narrow ? 2 : 5;
-    lastGridNarrow = narrow;
+    lastGridNarrow = isNarrowScreen();
     const recent = typeof loadRecentRecords === 'function' ? loadRecentRecords() : null;
     if (!recent || recent.list.length === 0) {
         grid.innerHTML = '<div class="dg-empty">公式データ取り込みをすると、最近プレーした曲が出ます</div>';
@@ -1309,7 +1316,7 @@ function renderRecentGrid(targetSongs) {
     html += count === 0 ? '<div class="dg-empty">表示する曲がありません</div>' : `
         <div class="dg-row">
             <div class="dg-label sv-label"><span class="dg-label-cls">最近</span></div>
-            <div class="dg-cells" style="grid-template-columns: repeat(${COLS}, minmax(0, 1fr));">${cells}</div>
+            <div class="dg-cells sv-list">${cells}</div>
         </div>`;
     grid.innerHTML = html;
 }
