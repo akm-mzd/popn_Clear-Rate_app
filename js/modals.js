@@ -11,7 +11,7 @@ function initMedalGrid() {
     
     sortedMedalKeys.forEach(k => {
         const m = MEDAL_TYPES[k];
-        const isValidUrl = m.imgUrl.startsWith('http') || m.imgUrl.startsWith('data:');
+        const isValidUrl = isImageSrc(m.imgUrl);
         const display = isValidUrl 
             ? `<img src="${m.imgUrl}" alt="${m.label}">` 
             : `<div class="fallback-text">${m.label}</div>`;
@@ -258,7 +258,7 @@ function executeRandomSelect() {
     if (!song.diffRaw.includes(dClassStr)) { dClassStr = song.diffRaw; dIndexStr = ''; }
     const styleObj = getDifficultyColor(song.diffClass, song.diffIndex);
 
-    const medalDisplay = (medalInfo.imgUrl && (medalInfo.imgUrl.startsWith('http') || medalInfo.imgUrl.startsWith('data:')))
+    const medalDisplay = (medalInfo.imgUrl && isImageSrc(medalInfo.imgUrl))
         ? `<img src="${medalInfo.imgUrl}" style="width:24px; height:24px; object-fit:contain; vertical-align:middle;">`
         : `<span style="font-size:0.9em; color:#555;">[${medalInfo.label}]</span>`;
 
