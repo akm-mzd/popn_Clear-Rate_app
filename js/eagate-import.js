@@ -136,7 +136,14 @@ function parseEagatePayload(text) {
     });
     // 公式サイトに載っているポックラ（読めたときだけ）
     const pc = typeof data.pc === 'number' && isFinite(data.pc) && data.pc > 0 && data.pc <= 1000 ? Math.round(data.pc * 100) / 100 : null;
-    return { charts, extraNew, pc, at: typeof data.at === 'string' ? data.at : '' };
+    // 最近プレーした曲（公式の順番、20曲まで）と最終プレー日時
+    const recent = [];
+    (Array.isArray(data.recent) ? data.recent : []).slice(0, RECENT_MAX).forEach(c => {
+        if (!c || typeof c.t !== 'string' || !c.t.trim()) return;
+        recent.push({ t: c.t.slice(0, 300), g: typeof c.g === 'string' ? c.g.slice(0, 300) : '' });
+    });
+    const rt = typeof data.rt === 'string' ? data.rt.slice(0, 40) : '';
+    return { charts, extraNew, pc, recent, rt, at: typeof data.at === 'string' ? data.at : '' };
 }
 
 // ---------- 曲の突き合わせ ----------
@@ -302,7 +309,7 @@ function openEagateImportPreview(text) {
     });
     const versionCount = Object.keys(versionRecords).length;
     const extraCount = parsed.extraNew.length;
-    pendingEagateImport = { user: currentUser, changes, versionRecords, extraNew: parsed.extraNew, pc: parsed.pc, at: parsed.at };
+    pendingEagateImport = { user: currentUser, changes, versionRecords, extraNew: parsed.extraNew, pc: parsed.pc, recent: parsed.recent, rt: parsed.rt, at: parsed.at };
 
     const medalCount = changes.filter(c => c.newMedal !== null).length;
     const scoreCount = changes.filter(c => c.newScore !== null).length;
@@ -317,6 +324,7 @@ function openEagateImportPreview(text) {
         ${versionCount > 0 ? `<div style="font-size:0.85em;color:#666;">ポックラ用に、旧曲 <b>${versionCount}</b> 曲の今作スコアも保存します。</div>` : ''}
         ${extraCount > 0 ? `<div style="font-size:0.85em;color:#666;">ポックラ用に、Lv45以下の新曲 <b>${extraCount}</b> 曲も保存します。</div>` : ''}
         ${parsed.pc !== null ? `<div style="font-size:0.85em;color:#666;">公式のポックラ <b>${parsed.pc.toFixed(2)}</b> も保存します。</div>` : ''}
+        ${parsed.recent.length > 0 ? `<div style="font-size:0.85em;color:#666;">最近プレーした曲（<b>${parsed.recent.length}</b> 曲）も保存します。</div>` : ''}
     </div>`;
 
     if (changes.length > 0) {
@@ -345,7 +353,7 @@ function openEagateImportPreview(text) {
     document.getElementById('eagate-import-body').innerHTML = html;
     const applyBtn = document.getElementById('eagate-import-apply');
     applyBtn.textContent = `${currentUser} さんに反映`;
-    applyBtn.disabled = changes.length === 0 && versionCount === 0 && extraCount === 0 && parsed.pc === null;
+    applyBtn.disabled = changes.length === 0 && versionCount === 0 && extraCount === 0 && parsed.pc === null && parsed.recent.length === 0;
     document.getElementById('eagate-import-modal').style.display = 'flex';
     return true;
 }
@@ -376,10 +384,46 @@ function applyEagateImport() {
     if (hasPokkuraData) {
         savePokkuraVersionRecords(currentUser, pending.versionRecords, pending.at, pending.extraNew, pending.pc);
     }
+    const hasRecent = pending.recent.length > 0;
+    if (hasRecent) saveRecentRecords(currentUser, pending.recent, pending.rt, pending.at);
     closeEagateImportModal();
-    if (pending.changes.length > 0 || hasPokkuraData) scheduleAutoSave();
+    if (pending.changes.length > 0 || hasPokkuraData || hasRecent) scheduleAutoSave();
     renderTable();
     showToast('toast-eagate', `公式データを反映しました（${pending.changes.length}曲）`, '#4caf50', 3000);
+}
+
+// ---------- 最近プレーした曲：ユーザーごとにクラウドに保存（recentRecords） ----------
+//   クラウドの形：{ _at: 取り込んだ日時, _list: [{ t: 曲名, g: ジャンル }]（公式の順番。1つ目が一番最近）, _rt: 最終プレー日時（公式の文字のまま） }
+//   取り込むたびに丸ごと置き換える
+const RECENT_MAX = 20;
+
+function saveRecentRecords(user, list, rt, at) {
+    if (!allUsersData[user]) allUsersData[user] = emptyUser();
+    allUsersData[user].recentRecords = { _at: at || new Date().toISOString(), _list: list.slice(0, RECENT_MAX), _rt: rt || '' };
+}
+
+function loadRecentRecords(user = currentUser) {
+    const r = allUsersData[user] && allUsersData[user].recentRecords;
+    if (!r || !Array.isArray(r._list)) return null;
+    return { at: typeof r._at === 'string' ? r._at : '', rt: typeof r._rt === 'string' ? r._rt : '', list: r._list.filter(c => c && typeof c.t === 'string') };
+}
+
+// 最近プレーした曲を、アプリの曲に合わせる（曲名で。「(UPPER)」付きは、アプリで UPPER と書いてある曲を優先）
+//   同じ曲名の曲が複数ある（EX と HYPER など）ときは全部。返り値 [{ t, g, songs: [曲] }]（合わなければ songs は空）
+function matchRecentSongs(list) {
+    const appSaysUpper = s => /upper/i.test(`${s.genre || ''} ${s.version || ''} ${s.diffRaw || ''}`);
+    return list.map(c => {
+        const title = normalizeSongText(c.t);
+        let hit = title ? songs.filter(s => normalizeSongText(s.title) === title) : [];
+        if (hit.length > 1) {
+            const upper = isUpperText(c.t) || isUpperText(c.g);
+            const sameKind = hit.filter(s => appSaysUpper(s) === upper);
+            if (sameKind.length > 0) hit = sameKind;
+            const sameGenre = hit.filter(s => normalizeSongText(s.genre) === normalizeSongText(c.g));
+            if (sameGenre.length > 0) hit = sameGenre;
+        }
+        return { t: c.t, g: c.g, songs: hit };
+    });
 }
 
 // ---------- ポックラ用のデータ：ユーザーごとにクラウドに保存（pokkuraRecords） ----------

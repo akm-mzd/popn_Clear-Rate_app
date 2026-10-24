@@ -297,6 +297,41 @@
         return v > 0 && v <= 1000 ? v : null;
     }
 
+    // プレーデータのトップ（index.html）。ポックラと最近プレーした曲で使うので、取りに行くのは1回だけ
+    //   今開いているページがトップなら、そのページを使う
+    let topDocPromise = null;
+    function getTopDoc() {
+        if (document.getElementById('popnclass') || document.querySelector('ul.st_tbl_r')) return Promise.resolve(document);
+        if (!topDocPromise) topDocPromise = fetchDoc(playdataUrl('index.html'));
+        return topDocPromise;
+    }
+
+    // トップの下にある「最近プレーした曲」（20曲）と「◆最終プレー日時」を読む
+    //   <ul class="st_tbl_r"> の <li>（見出しは li.st_th）の中に <a>曲名</a><p>ジャンル</p>。
+    //   同じ形の表がほかにもある（プレー回数の表）ので、メダル画像のある最初の表を使う
+    function readRecentPlays(doc) {
+        const list = [];
+        for (const ul of doc.querySelectorAll('ul.st_tbl_r')) {
+            if (!ul.querySelector('img[src*="medal/meda_"]')) continue;
+            Array.from(ul.children).forEach(li => {
+                if (li.tagName !== 'LI' || li.classList.contains('st_th') || list.length >= 20) return;
+                const a = li.querySelector('a');
+                const t = a ? clean(a.textContent) : '';
+                if (!t) return;
+                const p = a.parentElement ? a.parentElement.querySelector('p') : null;
+                list.push({ t, g: p ? clean(p.textContent) : '' });
+            });
+            break;
+        }
+        let rt = '';
+        doc.querySelectorAll('li').forEach(li => {
+            const label = li.querySelector('p');
+            const value = li.querySelector('div');
+            if (!rt && label && value && /最終プレー日時/.test(label.textContent)) rt = clean(value.textContent).slice(0, 40);
+        });
+        return { list, rt };
+    }
+
     async function fetchOfficialPokkura() {
         // ① 今開いているページがトップなら、そこから直接読む
         const here = readPopnClassElement(document);
@@ -304,7 +339,7 @@
         // ② トップを取得して読む
         let doc;
         try {
-            doc = await fetchDoc(playdataUrl('index.html'));
+            doc = await getTopDoc();
         } catch (e) {
             pcDiag = 'fetch error: ' + e.message;
             return null;
@@ -595,6 +630,13 @@
             pcDiag = 'error: ' + e.message;
         }
 
+        // 最近プレーした曲（読めなくても取り込みは続ける）
+        let recent = { list: [], rt: '' };
+        try {
+            setStatus('最近プレーした曲を確認中…');
+            recent = readRecentPlays(await getTopDoc());
+        } catch (e) { /* 読めなければ送らない */ }
+
         // 結果
         const counts = {};
         charts.forEach(c => { const k = c.m || '未プレイ(スコアのみ)'; counts[k] = (counts[k] || 0) + 1; });
@@ -603,6 +645,8 @@
         const payload = { type: 'popn-eagate', v: 1, at: new Date().toISOString(), pages, charts };
         if (extraNew.length > 0) payload.extraNew = extraNew;
         if (officialPokkura !== null) payload.pc = officialPokkura;
+        if (recent.list.length > 0) payload.recent = recent.list;
+        if (recent.rt) payload.rt = recent.rt;
         const json = JSON.stringify(payload);
 
         setStatus(`Lv${MIN_LEVEL}〜${MAX_LEVEL} の ${pages}ページから、${charts.length}譜面を読み取りました。`);
@@ -612,6 +656,7 @@
             ? `旧曲の今作スコアは読めませんでした（${versionError}）。ポックラは歴代ベストで計算されます。`
             : `ポックラ用に、旧曲 ${versionChecked}曲の今作スコアを読み取りました。` + (extraNew.length ? `Lv45以下の新曲 ${extraNew.length}曲も読み取りました。` : ''));
         addNote(officialPokkura !== null ? `公式のポックラ：${officialPokkura.toFixed(2)}` : '公式のポックラは読み取れませんでした（アプリでは計算値を出します）。');
+        addNote(recent.list.length > 0 ? `最近プレーした曲：${recent.list.length}曲` + (recent.rt ? `（最終プレー ${recent.rt}）` : '') : '最近プレーした曲は読み取れませんでした。');
         addButton('アプリに送る（新しいタブで開く）', '#e91e63', () => sendToApp(json));
         const box = addTextBox(json);
         addButton('コピー（アプリで「クリップボードから取り込む」）', '#2196F3', async () => {

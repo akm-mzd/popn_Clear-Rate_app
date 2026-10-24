@@ -133,7 +133,7 @@ function moveGoal(id, dir) {
 
 // 今の表示レベルで見せる目標か（レベルを決めていない目標と「すべて」表示のときは、いつも見せる）
 function isGoalForCurrentLevel(goal) {
-    if (currentViewLevel === 'ALL' || !goal.lv || goal.lv.length === 0) return true;
+    if (currentViewLevel === 'ALL' || isSpecialViewLevel(currentViewLevel) || !goal.lv || goal.lv.length === 0) return true;
     return goal.lv.includes(String(currentViewLevel));
 }
 
