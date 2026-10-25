@@ -578,7 +578,10 @@ body.exporting-image #back-to-top { display: none !important; }
     display: inline-flex; align-items: center; justify-content: center;
 }
 #diff-grid-view .dg-dir-btn:hover { background: #e7dcf3; }
-.dg-dir-v { font-size: 11px; color: #888; white-space: nowrap; margin-left: 4px; }
+.dg-dir-v { font-size: 11px; color: #888; white-space: nowrap; }
+/* 上下の入れ替えは左端（行の見出しの上の空き） */
+.dg-dir.has-v { padding-left: 0; }
+.dg-dir-vbox { width: 60px; flex-shrink: 0; display: inline-flex; align-items: center; gap: 3px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 /* メダル表の行ラベル（メダル画像＋曲数） */
 .mg-label { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.55); }
@@ -1036,6 +1039,8 @@ body.ui-new #back-to-top { background-color: var(--nu-purple) !important; }
     body.ui-new #view-mode-switch { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
     body.ui-new .grid-dir-btn { flex-direction: column; justify-content: center; }
     .dg-dir { padding-left: 50px; }
+    .dg-dir-vbox { width: 42px; flex-direction: column; gap: 0; }
+    .dg-dir-vbox .dg-dir-v { font-size: 9px; line-height: 1; }
     body.ui-new #view-mode-switch button { flex-direction: column; gap: 1px; font-size: 10px; padding: 5px 2px; }
     body.ui-new #save-btn { bottom: 150px !important; }
     body.ui-new .nu-save-label { display: none; }

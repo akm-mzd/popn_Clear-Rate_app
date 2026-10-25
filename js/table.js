@@ -1047,12 +1047,13 @@ function buildDirectionBar(mode) {
     const hasVertical = GRID_VDIR_MODES.includes(mode);
     const bottom = getGridVertical(mode) === 'bottom';
     const hBtn = `<button type="button" class="dg-dir-btn" onclick="toggleGridDirection('${mode}')" title="今は${right ? '右' : '左'}ほど${strong}い。押すと${right ? '左' : '右'}ほど${strong}くします" aria-label="左右を入れ替える">⇄</button>`;
-    const vBtn = hasVertical
-        ? `<span class="dg-dir-v" aria-hidden="true">${bottom ? '↓' : '↑'}${strong}</span><button type="button" class="dg-dir-btn" onclick="toggleGridVertical('${mode}')" title="今は${bottom ? '下' : '上'}ほど${strong}い。押すと${bottom ? '上' : '下'}ほど${strong}くします" aria-label="上下を入れ替える">⇅</button>`
+    // 上下は左端（行の見出しの上）、左右は右端
+    const vBox = hasVertical
+        ? `<span class="dg-dir-vbox"><button type="button" class="dg-dir-btn" onclick="toggleGridVertical('${mode}')" title="今は${bottom ? '下' : '上'}ほど${strong}い。押すと${bottom ? '上' : '下'}ほど${strong}くします" aria-label="上下を入れ替える">⇅</button><span class="dg-dir-v" aria-hidden="true">${bottom ? '↓' : '↑'}${strong}</span></span>`
         : '';
-    return `<div class="dg-dir">
-        ${right ? weakHtml : strongHtml}<span class="dg-dir-arrow ${right ? 'dg-dir-to-right' : 'dg-dir-to-left'}" aria-hidden="true"></span>${right ? strongHtml : weakHtml}
-        <span class="dg-dir-btns">${hBtn}${vBtn}</span>
+    return `<div class="dg-dir${hasVertical ? ' has-v' : ''}">
+        ${vBox}${right ? weakHtml : strongHtml}<span class="dg-dir-arrow ${right ? 'dg-dir-to-right' : 'dg-dir-to-left'}" aria-hidden="true"></span>${right ? strongHtml : weakHtml}
+        <span class="dg-dir-btns">${hBtn}</span>
         <span class="sr-only">${right ? `右ほど${strong}い` : `左ほど${strong}い`}${hasVertical ? (bottom ? `・下ほど${strong}い` : `・上ほど${strong}い`) : ''}</span>
     </div>`;
 }
