@@ -352,7 +352,8 @@ function buildDiffTableRoot(targetSongs, levelText) {
 
     const groups = buildDiffTableGroups(targetSongs);
     html += `<div style="display: flex; flex-direction: column; gap: 8px;">`;
-    groups.forEach(g => {
+    const vertical = getGridVertical('grid');
+    orderRowsForVertical(groups, vertical).forEach(g => {
         const color = getDiffTableLabelColor(g);
         const textShadow = (g.cls === '弱' || (g.cls === '中' && g.label.startsWith('-'))) ? 'text-shadow: 0 1px 2px rgba(0,0,0,0.45);' : '';
         const labelHtml = g.cls === '未定'
@@ -362,7 +363,7 @@ function buildDiffTableRoot(targetSongs, levelText) {
             <div style="width: 58px; min-height: 42px; flex-shrink: 0; background: ${color}; color: #fff; font-weight: bold; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 4px 0; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.25); ${textShadow}">${labelHtml}</div>
             <div style="display: grid; grid-template-columns: repeat(${COLS}, 216px); gap: 8px 12px; align-content: center;">`;
         // 画面の難易度表と同じ向き（最初は右上が最強）で並べる
-        const orderedSongs = orderForDirection(g.songs, COLS, getGridDirection('grid'));
+        const orderedSongs = orderForDirection(g.songs, COLS, getGridDirection('grid'), vertical);
         orderedSongs.forEach(song => {
             html += `<div style="display: flex; align-items: center; gap: 6px;">
                 ${buildMedalBoxHtml(clearRecords[song.id] || '')}${buildBannerBoxHtml(song, 168, 42)}

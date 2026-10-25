@@ -1001,30 +1001,59 @@ function getGridDirection(mode) {
     return (saved === 'left' || saved === 'right') ? saved : (GRID_DIR_DEFAULTS[mode] || 'right');
 }
 
-// 今見ている表の向きだけを入れ替える（表示レベル・方法の枠のボタン）
-function toggleGridDirection() {
-    if (!GRID_DIR_DEFAULTS[viewMode]) return;
-    storageSet('popn_dir_' + viewMode, getGridDirection(viewMode) === 'right' ? 'left' : 'right');
+// 上下の向き（'top' = 上が強い / 'bottom' = 下が強い。最初はどれも上が強い）。ポックラは上下を変えない
+const GRID_VDIR_MODES = ['grid', 'medal', 'score'];
+
+function getGridVertical(mode) {
+    if (!GRID_VDIR_MODES.includes(mode)) return 'top';
+    return storageGet('popn_vdir_' + mode) === 'bottom' ? 'bottom' : 'top';
+}
+
+// 表の上の矢印の列のボタン：その表の向きだけを入れ替える
+function toggleGridDirection(mode = viewMode) {
+    if (!GRID_DIR_DEFAULTS[mode]) return;
+    storageSet('popn_dir_' + mode, getGridDirection(mode) === 'right' ? 'left' : 'right');
     renderTable();
 }
 
-// 強い順の配列を、向きに合わせて並べ替える
-function orderForDirection(list, cols, dir) {
-    if (dir !== 'right') return list.slice();
-    const ordered = [];
-    for (let i = 0; i < list.length; i += cols) ordered.push(...list.slice(i, i + cols).reverse());
-    return ordered;
+function toggleGridVertical(mode = viewMode) {
+    if (!GRID_VDIR_MODES.includes(mode)) return;
+    storageSet('popn_vdir_' + mode, getGridVertical(mode) === 'bottom' ? 'top' : 'bottom');
+    renderTable();
 }
 
-// 表の上に出す向きの矢印（矢印の先が強い・高いほう）
+// 行（難易度・メダル・ランクのまとまり）を、上下の向きに合わせて並べる（強い順の配列を受け取る）
+function orderRowsForVertical(rows, vertical) {
+    return vertical === 'bottom' ? rows.slice().reverse() : rows.slice();
+}
+
+// 強い順の配列を、向きに合わせて並べ替える（cols ごとの列に区切り、右が強いなら各列を左右反転、下が強いなら列の順番を逆に）
+function orderForDirection(list, cols, dir, vertical = 'top') {
+    const lines = [];
+    for (let i = 0; i < list.length; i += cols) {
+        const line = list.slice(i, i + cols);
+        lines.push(dir === 'right' ? line.reverse() : line);
+    }
+    if (vertical === 'bottom') lines.reverse();
+    return [].concat(...lines);
+}
+
+// 表の上に出す向きの矢印（矢印の先が強い・高いほう）と、入れ替えボタン（⇄ 左右 / ⇅ 上下）
 function buildDirectionBar(mode) {
     const [weak, strong] = GRID_DIR_WORDS[mode] || ['弱', '強'];
     const right = getGridDirection(mode) === 'right';
     const weakHtml = `<span class="dg-dir-word">${weak}</span>`;
     const strongHtml = `<span class="dg-dir-word dg-dir-strong">${strong}</span>`;
-    return `<div class="dg-dir" title="「表示レベル・方法」の「左右入れ替え」で向きを変えられます">
+    const hasVertical = GRID_VDIR_MODES.includes(mode);
+    const bottom = getGridVertical(mode) === 'bottom';
+    const hBtn = `<button type="button" class="dg-dir-btn" onclick="toggleGridDirection('${mode}')" title="今は${right ? '右' : '左'}ほど${strong}い。押すと${right ? '左' : '右'}ほど${strong}くします" aria-label="左右を入れ替える">⇄</button>`;
+    const vBtn = hasVertical
+        ? `<span class="dg-dir-v" aria-hidden="true">${bottom ? '↓' : '↑'}${strong}</span><button type="button" class="dg-dir-btn" onclick="toggleGridVertical('${mode}')" title="今は${bottom ? '下' : '上'}ほど${strong}い。押すと${bottom ? '上' : '下'}ほど${strong}くします" aria-label="上下を入れ替える">⇅</button>`
+        : '';
+    return `<div class="dg-dir">
         ${right ? weakHtml : strongHtml}<span class="dg-dir-arrow ${right ? 'dg-dir-to-right' : 'dg-dir-to-left'}" aria-hidden="true"></span>${right ? strongHtml : weakHtml}
-        <span class="sr-only">${right ? `右ほど${strong}い` : `左ほど${strong}い`}</span>
+        <span class="dg-dir-btns">${hBtn}${vBtn}</span>
+        <span class="sr-only">${right ? `右ほど${strong}い` : `左ほど${strong}い`}${hasVertical ? (bottom ? `・下ほど${strong}い` : `・上ほど${strong}い`) : ''}</span>
     </div>`;
 }
 
@@ -1090,8 +1119,6 @@ function updateViewModeButtons() {
     });
     const pkImageBtn = document.getElementById('btn-pokkura-image');
     if (pkImageBtn) pkImageBtn.style.display = scoreOk ? '' : 'none';
-    const dirBtn = document.getElementById('grid-dir-btn');
-    if (dirBtn) dirBtn.style.display = GRID_DIR_DEFAULTS[viewMode] ? '' : 'none';
 }
 
 // renderTable の最後に呼ばれる：表・難易度表・スコア表のどれを見せるかを切り替える
@@ -1149,14 +1176,15 @@ function renderDiffGrid(targetSongs) {
     }
 
     let html = buildDirectionBar('grid');
-    buildDiffTableGroups(targetSongs).forEach(g => {
+    const vertical = getGridVertical('grid');
+    orderRowsForVertical(buildDiffTableGroups(targetSongs), vertical).forEach(g => {
         const labelHtml = g.cls === '未定'
             ? '<span class="dg-label-cls">未定</span>'
             : `<span class="dg-label-cls">${escapeHtml(g.cls)}</span><span class="dg-label-idx">${escapeHtml(g.label)}</span>`;
         const lightLabel = (g.cls === '弱' || (g.cls === '中' && g.label.startsWith('-'))) ? ' dg-label-light' : '';
 
         // 強い順の曲を、表の向き（最初は右が強い）に合わせて並べる
-        const ordered = orderForDirection(g.songs, COLS, getGridDirection('grid'));
+        const ordered = orderForDirection(g.songs, COLS, getGridDirection('grid'), vertical);
 
         let cells = '';
         ordered.forEach(song => { cells += buildDiffGridCellHtml(song, showScore); });
@@ -1363,11 +1391,12 @@ function renderMedalGrid(targetSongs) {
         || (a.originalOrder - b.originalOrder);
 
     let html = buildDirectionBar('medal');
-    medalKeys.forEach(k => {
+    const vertical = getGridVertical('medal');
+    orderRowsForVertical(medalKeys, vertical).forEach(k => {
         const list = groups[k];
         if (!list || list.length === 0) return;
         list.sort(strongerFirst);
-        const ordered = orderForDirection(list, COLS, getGridDirection('medal'));
+        const ordered = orderForDirection(list, COLS, getGridDirection('medal'), vertical);
 
         let cells = '';
         ordered.forEach(song => {
@@ -1425,12 +1454,13 @@ function renderScoreGrid(targetSongs) {
     const medalRankOf = song => (MEDAL_TYPES[clearRecords[song.id] || ''] || { rank: 0 }).rank;
 
     let html = buildDirectionBar('score');
-    SCORE_RANK_KEYS.concat(SCORE_RANK_NONE).forEach(k => {
+    const vertical = getGridVertical('score');
+    orderRowsForVertical(SCORE_RANK_KEYS.concat(SCORE_RANK_NONE), vertical).forEach(k => {
         const list = groups[k];
         if (list.length === 0) return;
         // 高い順（スコアなしはメダルの良い順）に、表の向き（最初は左が高い）に合わせて並べる
         list.sort((a, b) => (scoreOf(b) - scoreOf(a)) || (medalRankOf(b) - medalRankOf(a)) || (a.originalOrder - b.originalOrder));
-        const ordered = orderForDirection(list, COLS, getGridDirection('score'));
+        const ordered = orderForDirection(list, COLS, getGridDirection('score'), vertical);
 
         let cells = '';
         ordered.forEach(song => {

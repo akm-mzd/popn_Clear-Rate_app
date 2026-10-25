@@ -570,6 +570,15 @@ body.exporting-image #back-to-top { display: none !important; }
 .dg-dir-arrow::after { content: ''; position: absolute; top: -4px; border: 5px solid transparent; }
 .dg-dir-to-right::after { right: -2px; border-left: 8px solid #d82f66; border-right: none; }
 .dg-dir-to-left::after { left: -2px; border-right: 8px solid #d82f66; border-left: none; }
+/* 入れ替えボタン（⇄ 左右 / ⇅ 上下）と上下の向き */
+.dg-dir-btns { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; flex-shrink: 0; }
+#diff-grid-view .dg-dir-btn {
+    width: 30px; height: 26px; margin: 0; padding: 0; border: 1px solid #d9cce8; border-radius: 8px;
+    background: #f3eef8; color: #6a3fb0; font-size: 15px; font-weight: bold; line-height: 1; cursor: pointer; font-family: inherit;
+    display: inline-flex; align-items: center; justify-content: center;
+}
+#diff-grid-view .dg-dir-btn:hover { background: #e7dcf3; }
+.dg-dir-v { font-size: 11px; color: #888; white-space: nowrap; margin-left: 4px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 /* メダル表の行ラベル（メダル画像＋曲数） */
 .mg-label { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.55); }
