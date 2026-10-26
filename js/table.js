@@ -107,7 +107,7 @@ function updateDynamicFilters() {
     if (viewLevelContainer) {
         viewLevelContainer.innerHTML = '';
         
-        // 「すべて」は一番右端に配置する
+        // 並び：小さいレベル → 大きいレベル（50 が右）→「すべて」→（少し空けて）「更新」「最近」
         const allBtn = document.createElement('button');
         allBtn.className = `level-btn level-btn-all ${currentViewLevel === 'ALL' ? 'active' : ''}`;
         allBtn.innerText = 'すべて';
@@ -121,7 +121,7 @@ function updateDynamicFilters() {
             allBtn.classList.add('active');
         }
         
-        levels.forEach(l => {
+        levels.slice().reverse().forEach(l => {
             const btn = document.createElement('button');
             btn.className = `level-btn ${isNaN(parseInt(l, 10)) ? 'level-btn-text' : ''} ${currentViewLevel === l ? 'active' : ''}`;
             btn.innerText = l;
@@ -129,7 +129,7 @@ function updateDynamicFilters() {
             btn.onclick = () => changeViewLevel(l);
             viewLevelContainer.appendChild(btn);
         });
-        // 「更新」「最近」は「すべて」の左
+        viewLevelContainer.appendChild(allBtn);
         Object.keys(SPECIAL_VIEW_LEVELS).forEach(key => {
             const btn = document.createElement('button');
             btn.className = `level-btn level-btn-text level-btn-special${key === 'UPDATED' ? ' level-btn-special-first' : ''} ${currentViewLevel === key ? 'active' : ''}`;
@@ -138,7 +138,6 @@ function updateDynamicFilters() {
             btn.onclick = () => changeViewLevel(key);
             viewLevelContainer.appendChild(btn);
         });
-        viewLevelContainer.appendChild(allBtn);
     }
 }
 
@@ -228,8 +227,8 @@ function handleSearch() { renderTable(); }
 function clearSearch() { document.getElementById('search-input').value = ''; renderTable(); }
 
 
-function changeViewLevel(level) {
-    toggleMenu(false); // レベルを選んだらメニューを閉じる
+function changeViewLevel(level, keepMenu = false) {
+    if (!keepMenu) toggleMenu(false); // レベルを選んだらメニューを閉じる（統計シートのスライドからは閉じない）
     // ポックラはレベルに関係なく全体を出すので、レベルを選んだら難易度表に切り替える
     //   「更新」「最近」は難易度表の形で見るものなので、いつも難易度表にする
     if (viewMode === 'pokkura' || isSpecialViewLevel(level)) viewMode = 'grid';
@@ -362,6 +361,87 @@ function getDiffSortValue(song) {
     return -999;
 }
 
+// 絞り込み（メダル・バージョン・難易度・相性・スコアランク）を当てる関数。何も選んでいない項目は「すべて」
+function makeSongFilter() {
+    const filterMedals = getFilterValues('filter-medal');
+    const filterVersions = getFilterValues('filter-version');
+    const filterDiffs = getFilterValues('filter-diff');
+    const filterAffinities = getFilterValues('filter-affinity');
+    const filterRanks = getFilterValues('filter-rank');
+    return s => {
+        if (filterMedals.length > 0) {
+            const medalKey = clearRecords[s.id] || '';
+            const medalValue = medalKey === '' ? 'unplayed' : medalKey;
+            if (!filterMedals.includes(medalValue)) return false;
+        }
+        if (filterVersions.length > 0 && !filterVersions.includes(s.version)) return false;
+
+        if (filterDiffs.length > 0) {
+            let dClass = s.diffClass || '未分類';
+            if (dClass === '中') {
+                dClass = (s.diffIndex !== null && s.diffIndex < 0) ? '中(-)' : '中(+)';
+            }
+            if (!filterDiffs.includes(dClass)) return false;
+        }
+
+        if (filterAffinities.length > 0) {
+            const memo = memoRecords[s.id] || {};
+            const aff = memo.affinity || '未設定';
+            if (!filterAffinities.includes(aff)) return false;
+        }
+
+        if (filterRanks.length > 0 && !filterRanks.includes(getSongScoreRank(s) || SCORE_RANK_NONE)) return false;
+        return true;
+    };
+}
+
+// 曲の一覧から統計の数を出す（クリア数・難易度別・メダル数・スコアランク数・スコアの合計・レベル別のスコア）
+//   未解禁の曲は、showUnreleased のときだけクリア率の母数に入れる（メダル数は未解禁も数える）
+const STATS_DIFF_ORDER = ['危険', '別格', '詐称', '強', '中(+)', '中(-)', '弱', '逆詐称', '入門', '未分類'];
+
+function computeStats(statsSongs, showUnreleased) {
+    let kuroHishiClearCount = 0, kuroBoshiClearCount = 0, easyClearCount = 0, normalClearCount = 0, rateTotal = 0;
+    const medalCounts = {};
+    Object.keys(MEDAL_TYPES).forEach(k => { medalCounts[k] = 0; });
+    const rankCounts = {};
+    SCORE_RANK_KEYS.forEach(k => { rankCounts[k] = 0; });
+    rankCounts[SCORE_RANK_NONE] = 0;
+    let scoreSum = 0, scoreCount = 0;
+    const diffStats = {};
+    STATS_DIFF_ORDER.forEach(k => { diffStats[k] = { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 }; });
+    const levelScores = {}; // { レベル: { total: 曲数, count: スコアのある曲数, sum: 合計 } }
+
+    statsSongs.forEach(song => {
+        const medalKey = clearRecords[song.id] || '';
+        const medalInfo = MEDAL_TYPES[medalKey] || MEDAL_TYPES[''];
+        medalCounts[MEDAL_TYPES[medalKey] ? medalKey : '']++;
+
+        let dClass = song.diffClass || '未分類';
+        if (dClass === '中') dClass = (song.diffIndex !== null && song.diffIndex < 0) ? '中(-)' : '中(+)';
+        if (!diffStats[dClass]) dClass = '未分類';
+
+        if (medalInfo.excludeFromRate && !showUnreleased) return;
+        rateTotal++;
+        diffStats[dClass].total++;
+        if (medalInfo.isKuroHishiClear) { kuroHishiClearCount++; diffStats[dClass].kuroHishi++; }
+        if (medalInfo.isKuroBoshiClear) { kuroBoshiClearCount++; diffStats[dClass].kuroBoshi++; }
+        if (medalInfo.isEasyClear) { easyClearCount++; diffStats[dClass].easy++; }
+        if (medalInfo.isNormalClear) { normalClearCount++; diffStats[dClass].normal++; }
+
+        const rank = getSongScoreRank(song);
+        rankCounts[rank || SCORE_RANK_NONE]++;
+        const lv = String(song.level);
+        const ls = levelScores[lv] || (levelScores[lv] = { total: 0, count: 0, sum: 0 });
+        ls.total++;
+        if (rank) {
+            const sc = parseInt(scoreRecords[song.id], 10);
+            scoreSum += sc; scoreCount++;
+            ls.count++; ls.sum += sc;
+        }
+    });
+    return { kuroHishiClearCount, kuroBoshiClearCount, easyClearCount, normalClearCount, rateTotal, medalCounts, rankCounts, scoreSum, scoreCount, diffStats, levelScores };
+}
+
 function renderTable() {
     const searchInput = document.getElementById('search-input');
     const searchQuery = searchInput ? searchInput.value.trim().toLowerCase() : "";
@@ -373,6 +453,7 @@ function renderTable() {
     const filterAffinities = getFilterValues('filter-affinity');
     const filterRanks = getFilterValues('filter-rank');
     const isFiltered = filterMedals.length + filterVersions.length + filterDiffs.length + filterAffinities.length + filterRanks.length > 0;
+    const songFilter = makeSongFilter();
     updateFilterSummaryCount();
 
     const showUnreleased = document.getElementById('show-unreleased') ? document.getElementById('show-unreleased').checked : false;
@@ -403,31 +484,7 @@ function renderTable() {
     });
 
     // 2. 実際にテーブルに表示する楽曲（すべての絞り込みを適用）
-    let displaySongs = baseSongs.filter(s => {
-        if (filterMedals.length > 0) {
-            const medalKey = clearRecords[s.id] || '';
-            const medalValue = medalKey === '' ? 'unplayed' : medalKey;
-            if (!filterMedals.includes(medalValue)) return false;
-        }
-        if (filterVersions.length > 0 && !filterVersions.includes(s.version)) return false;
-
-        if (filterDiffs.length > 0) {
-            let dClass = s.diffClass || '未分類';
-            if (dClass === '中') {
-                dClass = (s.diffIndex !== null && s.diffIndex < 0) ? '中(-)' : '中(+)';
-            }
-            if (!filterDiffs.includes(dClass)) return false;
-        }
-
-        if (filterAffinities.length > 0) {
-            const memo = memoRecords[s.id] || {};
-            const aff = memo.affinity || '未設定';
-            if (!filterAffinities.includes(aff)) return false;
-        }
-
-        if (filterRanks.length > 0 && !filterRanks.includes(getSongScoreRank(s) || SCORE_RANK_NONE)) return false;
-        return true;
-    });
+    let displaySongs = baseSongs.filter(songFilter);
     if (currentSort === 'clear') {
         displaySongs.sort((a, b) => {
             let valA = MEDAL_TYPES[clearRecords[a.id] || ''].rank;
@@ -498,81 +555,12 @@ function renderTable() {
     const tbody = document.getElementById('song-list');
     tbody.innerHTML = '';
 
-    let kuroHishiClearCount = 0;
-    let kuroBoshiClearCount = 0;
-    let easyClearCount = 0; 
-    let normalClearCount = 0; 
-    let rateTotal = 0; 
-    
-    let medalCounts = {};
-    Object.keys(MEDAL_TYPES).forEach(k => {
-        medalCounts[k] = 0;
-    });
-
-    // スコア内訳（ランクごとの曲数・登録したスコアの合計）
-    const rankCounts = {};
-    SCORE_RANK_KEYS.forEach(k => { rankCounts[k] = 0; });
-    rankCounts[SCORE_RANK_NONE] = 0;
-    let scoreSum = 0, scoreCount = 0;
-
-    let diffStats = {
-        '危険': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 },
-        '別格': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 },
-        '詐称': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 },
-        '強': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 },
-        '中(+)': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 },
-        '中(-)': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 },
-        '弱': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 },
-        '逆詐称': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 },
-        '入門': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 },
-        '未分類': { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 }
-    };
-
     const isMobile = isNarrowScreen();
 
     // ★ 絞り込み中は絞り込んだ曲だけで、そうでなければ表示レベル・検索の全曲で統計を出す
     const statsSongs = isFiltered ? displaySongs : baseSongs;
-    statsSongs.forEach(song => {
-        const medalKey = clearRecords[song.id] || '';
-        const medalInfo = MEDAL_TYPES[medalKey];
-        
-        medalCounts[medalKey]++;
-        
-        let dClass = song.diffClass || '未分類';
-        if (dClass === '中') {
-            if (song.diffIndex !== null && song.diffIndex < 0) { dClass = '中(-)'; } else { dClass = '中(+)'; }
-        }
-        
-        if (!diffStats[dClass]) dClass = '未分類';
-        
-        if (medalInfo.excludeFromRate && !showUnreleased) {
-            // 除外
-        } else {
-            rateTotal++;
-            diffStats[dClass].total++;
-            
-            if (medalInfo.isKuroHishiClear) {
-                kuroHishiClearCount++;
-                diffStats[dClass].kuroHishi++;
-            }
-            if (medalInfo.isKuroBoshiClear) {
-                kuroBoshiClearCount++;
-                diffStats[dClass].kuroBoshi++;
-            }
-            if (medalInfo.isEasyClear) {
-                easyClearCount++;
-                diffStats[dClass].easy++;
-            }
-            if (medalInfo.isNormalClear) {
-                normalClearCount++;
-                diffStats[dClass].normal++;
-            }
-
-            const rank = getSongScoreRank(song);
-            rankCounts[rank || SCORE_RANK_NONE]++;
-            if (rank) { scoreSum += parseInt(scoreRecords[song.id], 10); scoreCount++; }
-        }
-    });
+    const stats = computeStats(statsSongs, showUnreleased);
+    const { kuroHishiClearCount, kuroBoshiClearCount, easyClearCount, normalClearCount, rateTotal, medalCounts, rankCounts, scoreSum, scoreCount, diffStats } = stats;
 
     // ★ テーブルの描画は「絞り込み後」の displaySongs で行う
     displaySongs.forEach(song => {
@@ -718,6 +706,7 @@ function renderTable() {
     });
 
     lastDisplaySongs = displaySongs;
+    lastStatsContext = { baseSongs, isFiltered, songFilter, searchQuery, showUnreleased };
     applyViewMode(displaySongs);
     updateSortHeaders();
 
@@ -935,6 +924,192 @@ function renderTable() {
     
     document.getElementById('stats-display').innerHTML = statsHtml;
     document.getElementById('extended-stats-display').innerHTML = extendedStatsHtml;
+    if (isStatsSheetOpen()) renderNewUiStats();
+}
+
+// ==========================================
+// ★ 統計シート（新しいデザイン）：レベルごとのページを横にスライド（46 → 50 → 全体）。
+//   スライドで止まったページのレベルに、メイン画面の表示レベルも切り替える。
+//   「更新」「最近」・検索中・文字のレベルは、その内容のページを左端に1枚足す
+// ==========================================
+let lastStatsContext = null;
+let nsScrollTimer = null;
+
+function isStatsSheetOpen() {
+    const panel = document.getElementById('menu-panel');
+    return !!panel && panel.classList.contains('open') && panel.dataset.sheet === 'stats';
+}
+
+function getStatsPages() {
+    const ctx = lastStatsContext;
+    const numeric = getSortedLevels().filter(l => !isNaN(parseInt(l, 10))).sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
+    const pages = numeric.map(l => ({ key: l, label: l, title: `Lv${l}` }));
+    pages.push({ key: 'ALL', label: '全体', title: '全体' });
+    const searching = ctx && ctx.searchQuery;
+    const cur = searching ? 'CUR' : (pages.some(p => p.key === currentViewLevel) ? currentViewLevel : 'CUR');
+    if (cur === 'CUR') {
+        const label = searching ? '検索' : (isSpecialViewLevel(currentViewLevel) ? SPECIAL_VIEW_LEVELS[currentViewLevel] : String(currentViewLevel));
+        pages.unshift({ key: 'CUR', label, title: searching ? `検索結果（${ctx.searchQuery}）` : label });
+    }
+    return { pages, active: cur };
+}
+
+function getStatsPageSongs(key) {
+    const ctx = lastStatsContext;
+    const base = key === 'CUR' ? ctx.baseSongs : key === 'ALL' ? songs : songs.filter(s => s.level === key);
+    return ctx.isFiltered ? base.filter(ctx.songFilter) : base;
+}
+
+function renderNewUiStats() {
+    const root = document.getElementById('ns-root');
+    if (!root || !lastStatsContext || typeof isNewUi !== 'function' || !isNewUi()) return;
+    const { pages, active } = getStatsPages();
+    const showUnreleased = lastStatsContext.showUnreleased;
+    const tabs = pages.map(p => `<button type="button" role="tab" class="ns-tab${p.key === active ? ' active' : ''}" data-key="${escapeHtml(p.key)}" onclick="scrollStatsToPage('${jsStringAttr(p.key)}')" aria-selected="${p.key === active}">${escapeHtml(p.label)}</button>`).join('');
+    const panels = pages.map(p => `<div class="ns-page" data-key="${escapeHtml(p.key)}" role="tabpanel">${buildStatsPageHtml(p, computeStats(getStatsPageSongs(p.key), showUnreleased))}</div>`).join('');
+    root.innerHTML = `
+        <div class="ns-tabs" role="tablist" aria-label="統計のレベル">${tabs}</div>
+        <div class="ns-hint">スライドでレベルを切り替え</div>
+        <div class="ns-slider" id="ns-slider">${panels}</div>`;
+
+    const slider = document.getElementById('ns-slider');
+    const index = Math.max(0, pages.findIndex(p => p.key === active));
+    slider.scrollLeft = index * slider.clientWidth;
+    fitStatsSliderHeight();
+    if (window.ResizeObserver) {
+        const ro = new ResizeObserver(() => {
+            if (!slider.isConnected) { ro.disconnect(); return; }
+            fitStatsSliderHeight();
+        });
+        slider.querySelectorAll('.ns-page').forEach(pg => ro.observe(pg));
+    }
+    slider.addEventListener('scroll', () => {
+        clearTimeout(nsScrollTimer);
+        nsScrollTimer = setTimeout(() => {
+            if (!slider.isConnected) return;
+            const i = Math.round(slider.scrollLeft / Math.max(1, slider.clientWidth));
+            const page = pages[Math.min(pages.length - 1, Math.max(0, i))];
+            if (!page || page.key === active || page.key === 'CUR') return;
+            changeViewLevel(page.key, true);
+        }, 120);
+    }, { passive: true });
+}
+
+// 高さは今のページに合わせる（ほかのページの長さで下に空白ができないように）
+function fitStatsSliderHeight() {
+    const slider = document.getElementById('ns-slider');
+    if (!slider) return;
+    const { pages, active } = getStatsPages();
+    const pageEl = slider.children[Math.max(0, pages.findIndex(p => p.key === active))];
+    if (pageEl) slider.style.height = pageEl.offsetHeight + 'px';
+}
+
+function scrollStatsToPage(key) {
+    const slider = document.getElementById('ns-slider');
+    if (!slider) return;
+    const i = Array.from(slider.children).findIndex(el => el.dataset.key === key);
+    if (i >= 0) slider.scrollTo({ left: i * slider.clientWidth, behavior: 'smooth' });
+}
+
+function setStatsUnreleased(checked) {
+    const cb = document.getElementById('show-unreleased');
+    if (cb) cb.checked = checked;
+    renderTable();
+}
+
+const NS_CLEAR_ROWS = [
+    ['ノーマル以上', 'normalClearCount', 'normal', '#d32f2f'],
+    ['イージー以上', 'easyClearCount', 'easy', '#2e9d2a'],
+    ['黒星以上', 'kuroBoshiClearCount', 'kuroBoshi', '#000051'],
+    ['黒菱以上', 'kuroHishiClearCount', 'kuroHishi', '#1a237e']
+];
+
+function buildStatsPageHtml(page, st) {
+    const total = st.rateTotal;
+    const pct = (n, d) => d > 0 ? n / d * 100 : 0;
+    const filtered = lastStatsContext.isFiltered;
+    let html = `<div class="ns-head"><span class="ns-title">${escapeHtml(page.title)}</span>${filtered ? '<span class="ns-filtered">絞り込み中</span>' : ''}
+        <label class="ns-unreleased"><input type="checkbox" ${lastStatsContext.showUnreleased ? 'checked' : ''} onchange="setStatsUnreleased(this.checked)"> 未解禁を含む</label></div>`;
+
+    // クリア率
+    html += `<section class="ns-card"><div class="ns-card-title">クリア率</div>
+        <table class="ns-table ns-clear"><thead><tr><th>区分</th><th>曲数</th><th>クリア率</th></tr></thead><tbody>`;
+    NS_CLEAR_ROWS.forEach(([label, key, , color]) => {
+        const n = st[key];
+        html += `<tr><th style="color: ${color};">${label}</th><td class="ns-num">${n} / ${total}</td>
+            <td class="ns-rate-cell"><span class="ns-rate rate-toggle" onclick="toggleRateFormat()" title="タップで表示形式を切替">${formatRate(n, total)}%</span><span class="ns-bar"><span style="width: ${pct(n, total).toFixed(1)}%; background: ${color};"></span></span></td></tr>`;
+    });
+    html += `</tbody></table></section>`;
+
+    // 難易度別クリア率
+    const diffRows = STATS_DIFF_ORDER.filter(k => st.diffStats[k].total > 0);
+    if (diffRows.length > 0) {
+        html += `<section class="ns-card"><div class="ns-card-title">難易度別クリア率</div>
+            <div class="ns-table-wrap"><table class="ns-table ns-diff"><thead><tr><th>難易度</th><th>曲数</th>${NS_CLEAR_ROWS.map(r => `<th style="color: ${r[3]};">${r[0].replace('以上', '')}</th>`).join('')}</tr></thead><tbody>`;
+        diffRows.forEach(k => {
+            const d = st.diffStats[k];
+            const baseClass = k.startsWith('中') ? '中' : k;
+            const style = getDifficultyColor(baseClass, k === '中(+)' ? 0.5 : (k === '中(-)' ? -0.5 : 0));
+            const nameColor = k === '危険' ? '#b8860b' : style.color.replace('0.3', '1').replace('0.8', '1');
+            html += `<tr><th style="color: ${nameColor};">${escapeHtml(k)}</th><td class="ns-num">${d.total}</td>${NS_CLEAR_ROWS.map(r => {
+                const p = pct(d[r[2]], d.total);
+                return `<td class="ns-pct" style="background: rgba(194,24,91,${(p / 100 * 0.22).toFixed(3)});">${formatRate(d[r[2]], d.total)}%</td>`;
+            }).join('')}</tr>`;
+        });
+        html += `</tbody></table></div></section>`;
+    }
+
+    // メダル
+    const medalKeys = Object.keys(MEDAL_TYPES).sort((a, b) => MEDAL_TYPES[b].rank - MEDAL_TYPES[a].rank)
+        .filter(k => st.medalCounts[k] > 0 && (!MEDAL_TYPES[k].excludeFromRate || lastStatsContext.showUnreleased));
+    const medalTotal = medalKeys.reduce((a, k) => a + st.medalCounts[k], 0);
+    if (medalTotal > 0) {
+        const curMedal = getFilterValues('filter-medal');
+        const pie = generatePieChartBase64(medalKeys.map(k => ({ count: st.medalCounts[k], color: MEDAL_COLORS[k] || '#ccc' })), 200);
+        const cells = medalKeys.map(k => {
+            const m = MEDAL_TYPES[k];
+            const value = k === '' ? 'unplayed' : k;
+            const active = curMedal.length === 1 && curMedal[0] === value;
+            const icon = isImageSrc(m.imgUrl) ? `<img src="${escapeHtml(m.imgUrl)}" alt="${escapeHtml(m.label)}">` : `<span class="ns-chip-text">${k === '未解禁' ? '🔒' : '未'}</span>`;
+            return `<button type="button" class="ns-chip${active ? ' active' : ''}" onclick="toggleStatCardFilter('medal', '${jsStringAttr(value)}')" title="${escapeHtml(m.label)}で絞り込む"><span class="ns-swatch" style="background: ${MEDAL_COLORS[k] || '#ccc'};"></span>${icon}<b>${st.medalCounts[k]}</b><span class="ns-chip-pct">${formatRate(st.medalCounts[k], medalTotal)}%</span></button>`;
+        }).join('');
+        html += `<section class="ns-card"><div class="ns-card-title">メダル</div>
+            <div class="ns-chart"><img class="ns-pie" src="${pie}" alt="メダルの円グラフ"><div class="ns-chips">${cells}</div></div></section>`;
+    }
+
+    // スコア
+    const rankKeys = SCORE_RANK_KEYS.concat(SCORE_RANK_NONE).filter(k => st.rankCounts[k] > 0);
+    const rankTotal = rankKeys.reduce((a, k) => a + st.rankCounts[k], 0);
+    if (rankTotal > 0) {
+        const curRank = getFilterValues('filter-rank');
+        const pie = generatePieChartBase64(rankKeys.map(k => { const c = SCORE_RANK_COLORS[k]; return typeof c === 'string' ? { count: st.rankCounts[k], color: c } : { count: st.rankCounts[k], gradient: c.gradient }; }), 200);
+        const cells = rankKeys.map(k => {
+            const c = SCORE_RANK_COLORS[k];
+            const swatch = typeof c === 'string' ? c : `linear-gradient(90deg, ${c.gradient.join(', ')})`;
+            const active = curRank.length === 1 && curRank[0] === k;
+            const icon = k === SCORE_RANK_NONE ? '<span class="ns-chip-text">なし</span>' : `<img class="ns-rank-img" src="${escapeHtml(RANK_IMAGES[k])}" alt=""><span class="ns-rank-label">${escapeHtml(k)}</span>`;
+            return `<button type="button" class="ns-chip${active ? ' active' : ''}" onclick="toggleStatCardFilter('rank', '${jsStringAttr(k)}')" title="${k === SCORE_RANK_NONE ? 'スコアなし' : escapeHtml(k)}で絞り込む"><span class="ns-swatch" style="background: ${swatch};"></span>${icon}<b>${st.rankCounts[k]}</b><span class="ns-chip-pct">${formatRate(st.rankCounts[k], rankTotal)}%</span></button>`;
+        }).join('');
+        const avg = st.scoreCount > 0 ? Math.round(st.scoreSum / st.scoreCount) : null;
+        html += `<section class="ns-card"><div class="ns-card-title">スコア<span class="ns-card-sub">登録 ${st.scoreCount} / ${total}曲${avg !== null ? `・平均 ${avg.toLocaleString('ja-JP')}` : ''}</span></div>
+            <div class="ns-chart"><img class="ns-pie" src="${pie}" alt="スコアの円グラフ"><div class="ns-chips">${cells}</div></div></section>`;
+    }
+
+    // レベル別スコア平均
+    const lvs = Object.keys(st.levelScores).sort((a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0));
+    if (lvs.length > 0) {
+        html += `<section class="ns-card"><div class="ns-card-title">レベル別スコア平均</div>
+            <table class="ns-table ns-avg"><thead><tr><th>Lv</th><th>登録曲数</th><th>平均スコア</th><th>ランク</th></tr></thead><tbody>`;
+        lvs.forEach(lv => {
+            const ls = st.levelScores[lv];
+            const avg = ls.count > 0 ? Math.round(ls.sum / ls.count) : null;
+            const rank = avg !== null ? getScoreRankInfo(avg, true).rank : '';
+            html += `<tr><th>${escapeHtml(lv)}</th><td class="ns-num">${ls.count} / ${ls.total}</td><td class="ns-num ns-avg-score">${avg !== null ? avg.toLocaleString('ja-JP') : '-'}</td>
+                <td>${rank ? `<img class="ns-rank-img" src="${escapeHtml(RANK_IMAGES[rank])}" alt=""><span class="ns-rank-label">${escapeHtml(rank)}</span>` : '-'}</td></tr>`;
+        });
+        html += `</tbody></table></section>`;
+    }
+    return html;
 }
 
 // スコア内訳の円グラフと凡例（割合は「なし」を含めた全曲に対して）
