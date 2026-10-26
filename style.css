@@ -1427,3 +1427,19 @@ body.ui-new #nu-stats-slot #extended-stats-display { display: none !important; }
     .ns-rate { font-size: 15px; min-width: 50px; }
     .ns-bar { width: calc(100% - 56px); }
 }
+
+/* ポックラ：計算のしかた（いちばん下） */
+.pk-explain { margin-top: 12px; border: 1px solid #e7dfea; border-radius: 10px; background: #fff; }
+.pk-explain > summary { cursor: pointer; padding: 10px 12px; font-size: 13px; font-weight: bold; color: #6a3fb0; }
+.pk-explain-body { padding: 0 14px 12px; font-size: 13px; line-height: 1.6; color: #444; }
+.pk-explain-body h4 { margin: 10px 0 4px; font-size: 13px; color: #d82f66; }
+.pk-explain-body ul { margin: 2px 0; padding-left: 1.3em; }
+.pk-explain-body li { margin: 2px 0; }
+.pk-formula { margin: 4px 0; padding: 6px 10px; border-radius: 6px; background: #f6f2f8; font-size: 13px; font-weight: bold; color: #333; overflow-wrap: anywhere; }
+.pk-next { font-size: 12px; color: #6a3fb0; font-weight: bold; margin-top: 4px; line-height: 1.4; }
+.pk-explain-table { width: 100%; border-collapse: collapse; background: transparent; box-shadow: none; margin: 4px 0 6px; font-size: 13px; }
+.pk-explain .pk-explain-table th, .pk-explain .pk-explain-table td { border: 0; border-bottom: 1px solid #f0eaf2; background: transparent; padding: 5px 6px; text-align: left; }
+.pk-explain .pk-explain-table thead th { font-size: 11px; color: #888; }
+.pk-explain-big { margin: 4px 0; font-size: 14px; }
+.pk-explain-big b { color: #6a3fb0; font-size: 16px; }
+.pk-explain-note { margin: 2px 0 4px; font-size: 12px; color: #888; }

@@ -1747,7 +1747,12 @@ function calcOldPokkura() {
     points.sort((a, b) => b - a);
     const top = points.slice(0, OLD_POKKURA_COUNT);
     const sum = top.reduce((acc, p) => acc + p, 0);
-    return { total: pkFloor(pkRound(sum / OLD_POKKURA_COUNT, 8), 2), count: top.length };
+    const raw = pkRound(sum / OLD_POKKURA_COUNT, 8);
+    // 次の 0.01 まであと何点（旧ポックラはスコアに Lv が掛からないので、どの曲でも 1点で 1 ÷ 5440 ÷ 50 上がる。
+    //   ssdh233/popn-class のブックマークレットと同じ計算）
+    const next = (Math.floor(raw * 100 + 1e-9) + 1) / 100;
+    const toNext = Math.ceil((next - raw) * 5440 * OLD_POKKURA_COUNT);
+    return { total: pkFloor(raw, 2), count: top.length, raw, next, toNext, per001: 5440 * OLD_POKKURA_COUNT / 100 };
 }
 
 // ---------- イージーの曲の裏メダルと旧筐体EC ----------
@@ -1833,7 +1838,9 @@ function calcPokkura() {
         restOld: entries.old.slice(POKKURA_OLD_COUNT),
         newPoint: pkFloor(pkRound(sum(topNew), 8) / 60, 2),
         oldPoint: pkFloor(pkRound(sum(topOld), 8) / 60, 2),
-        total: pkFloor(pkRound(sum(topNew) + sum(topOld), 8) / 60, 2)
+        total: pkFloor(pkRound(sum(topNew) + sum(topOld), 8) / 60, 2),
+        // 切り捨てる前の計算値（次の 0.01 まであと何点かを出すのに使う）
+        rawTotal: pkRound(sum(topNew) + sum(topOld), 8) / 60
     };
 }
 
@@ -1972,6 +1979,74 @@ function formatPokkuraDate(iso) {
 const POKKURA_TABS = ['top', 'rest', 'up'];
 let pokkuraTab = 'top';
 
+// 次の 0.01 まで、対象曲のスコアをあと何点（合計）伸ばせばよいか（レベルごと）。
+//   対象曲のスコアを 1点上げると、ポックラは Lv ÷ 3881250 上がる（曲ごとの切り捨てがあるので目安）
+const POKKURA_PER_POINT_DIV = 3881250;
+const POKKURA_HINT_LEVELS = [50, 49, 48, 47, 46];
+
+//   レベルをまとめた目安は、今の対象曲の平均レベルで出す（レベルによる差は Lv48 と Lv50 で 4% ほど）
+function getPokkuraPointsToNext(pk) {
+    const next = (Math.floor(pk.rawTotal * 100 + 1e-9) + 1) / 100;
+    const gap = Math.max(0, next - pk.rawTotal);
+    const lvOf = e => e.song ? parseInt(getPokkuraLevel(e.song), 10) : parseInt(e.extra.level, 10);
+    const target = pk.topNew.concat(pk.topOld).map(lvOf).filter(lv => lv > 0);
+    const avgLv = target.length > 0 ? target.reduce((a, b) => a + b, 0) / target.length : 49;
+    return {
+        next, avgLv,
+        points: Math.ceil(gap * POKKURA_PER_POINT_DIV / avgLv),
+        per001: Math.ceil(0.01 * POKKURA_PER_POINT_DIV / avgLv),
+        levels: POKKURA_HINT_LEVELS.map(lv => ({ lv, points: Math.ceil(gap * POKKURA_PER_POINT_DIV / lv) }))
+    };
+}
+
+// ポックラの計算のしかた（ポックラ画面のいちばん下）
+function buildPokkuraExplainHtml(pk) {
+    const oldPk = calcOldPokkura();
+    const bonus = (k) => POKKURA_MEDAL_BONUS[k].toLocaleString('ja-JP');
+    const toNext = getPokkuraPointsToNext(pk);
+    const rows = POKKURA_HINT_LEVELS.map((lv, i) => `<tr><th>Lv${lv}</th><td>あと 約${toNext.levels[i].points.toLocaleString('ja-JP')}点</td><td>約${Math.ceil(0.01 * POKKURA_PER_POINT_DIV / lv).toLocaleString('ja-JP')}点</td></tr>`).join('');
+    return `
+        <details class="pk-explain">
+            <summary>ポックラの計算のしかた</summary>
+            <div class="pk-explain-body">
+                <h4>1曲のポイント</h4>
+                <p class="pk-formula">Lv × ( 3750 × Lv ＋ メダルボーナス ＋ ( スコア − 50000 ) ) ÷ 3881250 × 60</p>
+                <ul>
+                    <li>小数第2位で切り捨て。スコアが 50000 未満の曲は 0。</li>
+                    <li>メダルボーナス：金星 ${bonus('金星')}／銀 ${bonus('銀星')}／銅 ${bonus('銅星')}／ロングオフ ${bonus('ロングオフ')}／イージー ${bonus('イージー')}／黒・未クリア 0</li>
+                    <li>画面の各曲の右下の数（例 0.712）は、このポイント ÷ 60 ＝ その曲がポックラに足している量。</li>
+                </ul>
+                <h4>ポックラ</h4>
+                <p class="pk-formula">（新曲の上位${POKKURA_NEW_COUNT}曲 ＋ 旧曲の上位${POKKURA_OLD_COUNT}曲 のポイントの合計）÷ 60</p>
+                <ul>
+                    <li>小数第2位で切り捨て。</li>
+                    <li>新曲：今作（${escapeHtml(pk.newVersionLabel)}）の Lv49 以下。旧曲：それより前の Lv48〜50。</li>
+                    <li>旧曲は、公式データ取り込みで読んだ「今作のスコア」で数える（読んでいなければ歴代ベスト）。</li>
+                    <li>アプリの計算値は、公式の値と少しずれることがある。</li>
+                </ul>
+                <h4>上げるには</h4>
+                <p class="pk-explain-big">次の ${toNext.next.toFixed(2)} まで：対象曲の合計であと <b>約${toNext.points.toLocaleString('ja-JP')}点</b>（その後は 0.01 ごとに 約${toNext.per001.toLocaleString('ja-JP')}点）</p>
+                <p class="pk-explain-note">今の対象曲の平均レベル ${toNext.avgLv.toFixed(1)} で計算した目安です（計算値 ${pk.rawTotal.toFixed(4)} から）。1点の重みはレベルで少し違うので、レベルごとの数は下の表のとおりです。</p>
+                <table class="pk-explain-table">
+                    <thead><tr><th>伸ばす曲</th><th>次の ${toNext.next.toFixed(2)} まで</th><th>0.01 ごと</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+                <ul>
+                    <li>対象曲のスコアを 1点上げると、ポックラは Lv ÷ 3881250 上がる（0.01 ごと ＝ 38812.5 ÷ Lv 点）。</li>
+                    <li>いろいろなレベルの曲で伸ばすときは、それぞれのレベルの割合で足し合わせる（例：Lv50 で 400点 ＋ Lv49 で 400点 ≒ 0.01）。</li>
+                    <li>メダルが上がると、ボーナスの差の分だけスコアが上がったのと同じ（例：銅→銀で ＋5000点分、Lv49 なら約 ＋0.06）。</li>
+                    <li>圏外の曲は、上がったポイントが対象の一番下の曲を超えたときだけ、その差の分だけ上がる。</li>
+                </ul>
+                <h4>旧ポックラ（Jam&amp;Fizz までの計算）</h4>
+                <p class="pk-formula">1曲 ＝ ( 10000 × Lv ＋ スコア − 50000 ＋ ボーナス ) ÷ 5440</p>
+                <ul>
+                    <li>ボーナス：金・銀 5000／銅・イージー・ロングオフ 3000。Lv48〜50 の歴代ベスト上位${OLD_POKKURA_COUNT}曲の平均。</li>
+                    <li>スコアに Lv が掛からないので、どの曲でも 1点で 1 ÷ 5440 ÷ ${OLD_POKKURA_COUNT} 上がる。0.01 ごとに対象曲の合計で ${(5440 * OLD_POKKURA_COUNT / 100).toLocaleString('ja-JP')}点。${oldPk.count > 0 ? `今は次の ${oldPk.next.toFixed(2)} まで あと約${oldPk.toNext.toLocaleString('ja-JP')}点。` : ''}</li>
+                </ul>
+            </div>
+        </details>`;
+}
+
 function renderPokkuraGrid() {
     const grid = document.getElementById('diff-grid-view');
     const narrow = isNarrowScreen();
@@ -1988,19 +2063,25 @@ function renderPokkuraGrid() {
     // 公式サイトの値があれば、それを大きく出し、アプリの計算値は下に小さく出す
     const official = pk.version && typeof pk.version.pc === 'number' ? pk.version.pc : null;
     const oldPk = calcOldPokkura();
-    const oldPkHtml = `<div class="pk-calc">旧ポックラ <b>${oldPk.total.toFixed(2)}</b></div>`;
+    const oldPkHtml = `<div class="pk-calc">旧ポックラ ${oldPk.total.toFixed(2)}${oldPk.count > 0 ? `（次の ${oldPk.next.toFixed(2)} まで あと約${oldPk.toNext.toLocaleString('ja-JP')}点）` : ''}</div>`;
     const partsText = `新曲 ${pk.newPoint.toFixed(2)} ＋ 旧曲 ${pk.oldPoint.toFixed(2)}`;
+    const toNext = getPokkuraPointsToNext(pk);
+    const nextHtml = pk.topNew.length + pk.topOld.length > 0
+        ? `<div class="pk-next" title="対象曲の平均レベル（${toNext.avgLv.toFixed(1)}）で計算した目安。Lv50 の曲なら少し少なく、Lv48 の曲なら少し多くなります">計算値で次の ${toNext.next.toFixed(2)} まで：対象曲の合計であと 約${toNext.points.toLocaleString('ja-JP')}点</div>`
+        : '';
     let html = official !== null ? `
         <div class="pk-summary">
             <div class="pk-total"><span class="pk-total-label">ポックラ</span><span class="pk-total-value">${official.toFixed(2)}</span></div>
             <div class="pk-source">公式 ${escapeHtml(formatPokkuraDate(pk.version.at))} 時点</div>
             <div class="pk-calc">計算値 ${pk.total.toFixed(2)}（${partsText}）</div>
+            ${nextHtml}
             ${oldPkHtml}
         </div>` : `
         <div class="pk-summary">
             <div class="pk-total"><span class="pk-total-label">推定ポックラ</span><span class="pk-total-value">${pk.total.toFixed(2)}</span></div>
             <div class="pk-parts">${partsText}</div>
             <div class="pk-source${pk.version ? '' : ' pk-source-none'}">${escapeHtml(sourceText)}</div>
+            ${nextHtml}
             ${oldPkHtml}
         </div>`;
     html += `
@@ -2080,7 +2161,8 @@ function renderPokkuraGrid() {
             <div class="pk-panel" id="pk-panel-top" role="tabpanel" aria-labelledby="pk-tab-top">${topHtml}</div>
             <div class="pk-panel pk-panel-rest" id="pk-panel-rest" role="tabpanel" aria-labelledby="pk-tab-rest">${restHtml}</div>
             <div class="pk-panel pk-panel-up" id="pk-panel-up" role="tabpanel" aria-labelledby="pk-tab-up">${buildPokkuraRecHtml(pk)}</div>
-        </div>`;
+        </div>
+        ${buildPokkuraExplainHtml(pk)}`;
     grid.innerHTML = html;
 
     const slider = document.getElementById('pk-slider');
