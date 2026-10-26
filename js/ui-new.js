@@ -72,6 +72,7 @@ function openNewUiSheet(key) {
     setNewUiNavActive(key);
     toggleMenu(true);
     panel.scrollTop = 0;
+    if (key === 'stats') renderNewUiStats();
 }
 
 function closeNewUiSheet() {
