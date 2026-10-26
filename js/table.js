@@ -1747,7 +1747,12 @@ function calcOldPokkura() {
     points.sort((a, b) => b - a);
     const top = points.slice(0, OLD_POKKURA_COUNT);
     const sum = top.reduce((acc, p) => acc + p, 0);
-    return { total: pkFloor(pkRound(sum / OLD_POKKURA_COUNT, 8), 2), count: top.length };
+    const raw = pkRound(sum / OLD_POKKURA_COUNT, 8);
+    // 次の 0.01 まであと何点（旧ポックラはスコアに Lv が掛からないので、どの曲でも 1点で 1 ÷ 5440 ÷ 50 上がる。
+    //   ssdh233/popn-class のブックマークレットと同じ計算）
+    const next = (Math.floor(raw * 100 + 1e-9) + 1) / 100;
+    const toNext = Math.ceil((next - raw) * 5440 * OLD_POKKURA_COUNT);
+    return { total: pkFloor(raw, 2), count: top.length, raw, next, toNext, per001: 5440 * OLD_POKKURA_COUNT / 100 };
 }
 
 // ---------- イージーの曲の裏メダルと旧筐体EC ----------
@@ -1996,6 +2001,7 @@ function getPokkuraPointsToNext(pk) {
 
 // ポックラの計算のしかた（ポックラ画面のいちばん下）
 function buildPokkuraExplainHtml(pk) {
+    const oldPk = calcOldPokkura();
     const bonus = (k) => POKKURA_MEDAL_BONUS[k].toLocaleString('ja-JP');
     const toNext = getPokkuraPointsToNext(pk);
     const rows = POKKURA_HINT_LEVELS.map((lv, i) => `<tr><th>Lv${lv}</th><td>あと 約${toNext.levels[i].points.toLocaleString('ja-JP')}点</td><td>約${Math.ceil(0.01 * POKKURA_PER_POINT_DIV / lv).toLocaleString('ja-JP')}点</td></tr>`).join('');
@@ -2035,6 +2041,7 @@ function buildPokkuraExplainHtml(pk) {
                 <p class="pk-formula">1曲 ＝ ( 10000 × Lv ＋ スコア − 50000 ＋ ボーナス ) ÷ 5440</p>
                 <ul>
                     <li>ボーナス：金・銀 5000／銅・イージー・ロングオフ 3000。Lv48〜50 の歴代ベスト上位${OLD_POKKURA_COUNT}曲の平均。</li>
+                    <li>スコアに Lv が掛からないので、どの曲でも 1点で 1 ÷ 5440 ÷ ${OLD_POKKURA_COUNT} 上がる。0.01 ごとに対象曲の合計で ${(5440 * OLD_POKKURA_COUNT / 100).toLocaleString('ja-JP')}点。${oldPk.count > 0 ? `今は次の ${oldPk.next.toFixed(2)} まで あと約${oldPk.toNext.toLocaleString('ja-JP')}点。` : ''}</li>
                 </ul>
             </div>
         </details>`;
@@ -2056,7 +2063,7 @@ function renderPokkuraGrid() {
     // 公式サイトの値があれば、それを大きく出し、アプリの計算値は下に小さく出す
     const official = pk.version && typeof pk.version.pc === 'number' ? pk.version.pc : null;
     const oldPk = calcOldPokkura();
-    const oldPkHtml = `<div class="pk-calc">旧ポックラ ${oldPk.total.toFixed(2)}</div>`;
+    const oldPkHtml = `<div class="pk-calc">旧ポックラ ${oldPk.total.toFixed(2)}${oldPk.count > 0 ? `（次の ${oldPk.next.toFixed(2)} まで あと約${oldPk.toNext.toLocaleString('ja-JP')}点）` : ''}</div>`;
     const partsText = `新曲 ${pk.newPoint.toFixed(2)} ＋ 旧曲 ${pk.oldPoint.toFixed(2)}`;
     const toNext = getPokkuraPointsToNext(pk);
     const nextHtml = pk.topNew.length + pk.topOld.length > 0
