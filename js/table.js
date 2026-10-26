@@ -1833,7 +1833,9 @@ function calcPokkura() {
         restOld: entries.old.slice(POKKURA_OLD_COUNT),
         newPoint: pkFloor(pkRound(sum(topNew), 8) / 60, 2),
         oldPoint: pkFloor(pkRound(sum(topOld), 8) / 60, 2),
-        total: pkFloor(pkRound(sum(topNew) + sum(topOld), 8) / 60, 2)
+        total: pkFloor(pkRound(sum(topNew) + sum(topOld), 8) / 60, 2),
+        // 切り捨てる前の計算値（次の 0.01 まであと何点かを出すのに使う）
+        rawTotal: pkRound(sum(topNew) + sum(topOld), 8) / 60
     };
 }
 
@@ -1972,10 +1974,22 @@ function formatPokkuraDate(iso) {
 const POKKURA_TABS = ['top', 'rest', 'up'];
 let pokkuraTab = 'top';
 
+// 次の 0.01 まで、対象曲のスコアをあと何点（合計）伸ばせばよいか（レベルごと）。
+//   対象曲のスコアを 1点上げると、ポックラは Lv ÷ 3881250 上がる（曲ごとの切り捨てがあるので目安）
+const POKKURA_PER_POINT_DIV = 3881250;
+const POKKURA_HINT_LEVELS = [50, 49, 48, 47, 46];
+
+function getPokkuraPointsToNext(pk) {
+    const next = (Math.floor(pk.rawTotal * 100 + 1e-9) + 1) / 100;
+    const gap = Math.max(0, next - pk.rawTotal);
+    return { next, levels: POKKURA_HINT_LEVELS.map(lv => ({ lv, points: Math.ceil(gap * POKKURA_PER_POINT_DIV / lv) })) };
+}
+
 // ポックラの計算のしかた（ポックラ画面のいちばん下）
 function buildPokkuraExplainHtml(pk) {
     const bonus = (k) => POKKURA_MEDAL_BONUS[k].toLocaleString('ja-JP');
-    const per001 = [50, 49, 48, 47, 46].map(lv => `Lv${lv} 約${Math.ceil(0.01 * 3881250 / lv).toLocaleString('ja-JP')}点`).join('・');
+    const toNext = getPokkuraPointsToNext(pk);
+    const rows = POKKURA_HINT_LEVELS.map((lv, i) => `<tr><th>Lv${lv}</th><td>あと 約${toNext.levels[i].points.toLocaleString('ja-JP')}点</td><td>約${Math.ceil(0.01 * POKKURA_PER_POINT_DIV / lv).toLocaleString('ja-JP')}点</td></tr>`).join('');
     return `
         <details class="pk-explain">
             <summary>ポックラの計算のしかた</summary>
@@ -1996,9 +2010,14 @@ function buildPokkuraExplainHtml(pk) {
                     <li>アプリの計算値は、公式の値と少しずれることがある。</li>
                 </ul>
                 <h4>上げるには</h4>
+                <p>対象曲のスコアを、合計で何点伸ばせばよいか（計算値 ${pk.rawTotal.toFixed(4)} から）</p>
+                <table class="pk-explain-table">
+                    <thead><tr><th>伸ばす曲</th><th>次の ${toNext.next.toFixed(2)} まで</th><th>0.01 ごと</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
                 <ul>
-                    <li>対象曲のスコアを 1点上げると、ポックラは Lv ÷ 3881250 上がる。</li>
-                    <li>0.01 上げるのに必要なスコア（対象曲の合計）：${per001}（＝ 38812.5 ÷ Lv）。</li>
+                    <li>対象曲のスコアを 1点上げると、ポックラは Lv ÷ 3881250 上がる（0.01 ごと ＝ 38812.5 ÷ Lv 点）。</li>
+                    <li>いろいろなレベルの曲で伸ばすときは、それぞれのレベルの割合で足し合わせる（例：Lv50 で 400点 ＋ Lv49 で 400点 ≒ 0.01）。</li>
                     <li>メダルが上がると、ボーナスの差の分だけスコアが上がったのと同じ（例：銅→銀で ＋5000点分、Lv49 なら約 ＋0.06）。</li>
                     <li>圏外の曲は、上がったポイントが対象の一番下の曲を超えたときだけ、その差の分だけ上がる。</li>
                 </ul>
@@ -2029,17 +2048,23 @@ function renderPokkuraGrid() {
     const oldPk = calcOldPokkura();
     const oldPkHtml = `<div class="pk-calc">旧ポックラ ${oldPk.total.toFixed(2)}</div>`;
     const partsText = `新曲 ${pk.newPoint.toFixed(2)} ＋ 旧曲 ${pk.oldPoint.toFixed(2)}`;
+    const toNext = getPokkuraPointsToNext(pk);
+    const nextHtml = pk.topNew.length + pk.topOld.length > 0
+        ? `<div class="pk-next">計算値で次の ${toNext.next.toFixed(2)} まで：対象曲の合計であと ${toNext.levels.slice(0, 3).map(x => `Lv${x.lv} 約${x.points.toLocaleString('ja-JP')}点`).join('／')}</div>`
+        : '';
     let html = official !== null ? `
         <div class="pk-summary">
             <div class="pk-total"><span class="pk-total-label">ポックラ</span><span class="pk-total-value">${official.toFixed(2)}</span></div>
             <div class="pk-source">公式 ${escapeHtml(formatPokkuraDate(pk.version.at))} 時点</div>
             <div class="pk-calc">計算値 ${pk.total.toFixed(2)}（${partsText}）</div>
+            ${nextHtml}
             ${oldPkHtml}
         </div>` : `
         <div class="pk-summary">
             <div class="pk-total"><span class="pk-total-label">推定ポックラ</span><span class="pk-total-value">${pk.total.toFixed(2)}</span></div>
             <div class="pk-parts">${partsText}</div>
             <div class="pk-source${pk.version ? '' : ' pk-source-none'}">${escapeHtml(sourceText)}</div>
+            ${nextHtml}
             ${oldPkHtml}
         </div>`;
     html += `
