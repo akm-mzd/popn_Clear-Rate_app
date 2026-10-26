@@ -407,10 +407,12 @@ function openPokkuraForGoal() {
 function openGoalDetail(id) {
     const g = getGoalRecords()[id];
     if (!g) return;
-    if (g.kind === 'pokkura') { openPokkuraForGoal(); return; }
     goalDetailId = id;
     renderGoalDetail();
-    document.getElementById('goal-detail-filter').onclick = () => { closeGoalDetail(); showGoalSongs(id); };
+    // ポップンクラスの目標は「ポックラを見る」、それ以外は「一覧で絞り込む」
+    const filterBtn = document.getElementById('goal-detail-filter');
+    filterBtn.textContent = g.kind === 'pokkura' ? 'ポックラを見る' : '一覧で絞り込む';
+    filterBtn.onclick = () => { closeGoalDetail(); showGoalSongs(id); };
     document.getElementById('goal-detail-modal').style.display = 'flex';
     document.getElementById('goal-detail-body').scrollTop = 0;
 }
@@ -453,10 +455,39 @@ function goalSongRowHtml(goal, song, done) {
         </div>`;
 }
 
+// ポップンクラスの目標の詳細：今の値・目標までの点数の目安と、ポックラを上げるおすすめの曲
+function renderPokkuraGoalDetail(goal, p) {
+    const pk = calcPokkura();
+    const toNext = getPokkuraPointsToNext(pk);
+    const gap = Math.max(0, p.target - p.cur);
+    const toGoal = Math.ceil(gap * POKKURA_PER_POINT_DIV / toNext.avgLv);
+    const status = p.complete
+        ? `<span class="goal-done">✓ 達成${goal.done ? `（${formatGoalDate(goal.done)}）` : ''}</span>`
+        : `<span class="goal-rest">あと ${gap.toFixed(2)}</span>`;
+    const start = typeof goal.st === 'number' ? `・作ったとき ${goal.st.toFixed(2)}` : '';
+    document.getElementById('goal-detail-head').innerHTML = `
+        <h3 class="gd-head-title">🎯 ${escapeHtml(goalTitle(goal))}</h3>
+        ${goal.name ? `<div class="goal-desc">${escapeHtml(describeGoal(goal))}</div>` : ''}
+        <div class="${p.complete ? 'goal-item is-done gd-head-bar' : 'gd-head-bar'}">${goalBarHtml(p)}</div>
+        <div class="goal-meta"><span>今 ${p.cur.toFixed(2)} / 目標 ${p.target.toFixed(2)}（${p.value}%）${start}</span>${status}</div>`;
+    const body = document.getElementById('goal-detail-body');
+    const scrollTop = body.scrollTop;
+    body.innerHTML = (p.complete ? '<div class="gd-section gd-all-done">🎉 達成しています</div>' : `
+        <div class="gd-pk-points">
+            <div>目標まで：対象曲の合計で <b>約${toGoal.toLocaleString('ja-JP')}点</b></div>
+            <div>+0.01まで：約${toNext.points.toLocaleString('ja-JP')}点</div>
+            <div class="gd-pk-note">対象曲の平均レベル ${toNext.avgLv.toFixed(1)} で計算した目安（アプリの計算値をもとにしています）</div>
+        </div>`) + `
+        <div class="gd-section">おすすめの曲 <span>（やりやすい順。押すとメダル・スコアを変えられます）</span></div>
+        ${buildPokkuraRecHtml(pk)}`;
+    body.scrollTop = scrollTop;
+}
+
 function renderGoalDetail() {
     const goal = getGoalRecords()[goalDetailId];
     if (!goal) { closeGoalDetail(); return; }
     const p = getGoalProgress(goal);
+    if (goal.kind === 'pokkura') { renderPokkuraGoalDetail(goal, p); return; }
     const targets = getGoalTargetSongs(goal);
     const todo = targets.filter(s => !isGoalSongDone(goal, s))
         .sort((a, b) => (goalCloseness(goal, b) - goalCloseness(goal, a)) || (getDiffSortValue(b) - getDiffSortValue(a)) || (a.originalOrder - b.originalOrder));
