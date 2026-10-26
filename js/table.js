@@ -1051,7 +1051,7 @@ function buildStatsPageHtml(page, st) {
             const baseClass = k.startsWith('中') ? '中' : k;
             const style = getDifficultyColor(baseClass, k === '中(+)' ? 0.5 : (k === '中(-)' ? -0.5 : 0));
             const nameColor = k === '危険' ? '#b8860b' : style.color.replace('0.3', '1').replace('0.8', '1');
-            html += `<tr><th style="color: ${nameColor};">${escapeHtml(k)}</th><td class="ns-num">${d.total}</td>${NS_CLEAR_ROWS.map(r => {
+            html += `<tr><th style="color: ${nameColor};">${escapeHtml(k)}</th><td class="ns-num" title="ノーマルクリア以上の曲数 / 曲数">${d.normal}/${d.total}</td>${NS_CLEAR_ROWS.map(r => {
                 const p = pct(d[r[2]], d.total);
                 return `<td class="ns-pct" style="background: rgba(194,24,91,${(p / 100 * 0.22).toFixed(3)});">${formatRate(d[r[2]], d.total)}%</td>`;
             }).join('')}</tr>`;
@@ -1098,7 +1098,7 @@ function buildStatsPageHtml(page, st) {
     // レベル別スコア平均
     const lvs = Object.keys(st.levelScores).sort((a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0));
     if (lvs.length > 0) {
-        html += `<section class="ns-card"><div class="ns-card-title">レベル別スコア平均</div>
+        html += `<section class="ns-card"><div class="ns-card-title">スコア平均</div>
             <table class="ns-table ns-avg"><thead><tr><th>Lv</th><th>登録曲数</th><th>平均スコア</th><th>ランク</th></tr></thead><tbody>`;
         lvs.forEach(lv => {
             const ls = st.levelScores[lv];
