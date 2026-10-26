@@ -1273,7 +1273,6 @@ body.ui-new #nu-stats-slot #extended-stats-display > div { background: var(--nu-
 .goal-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .goal-actions button { width: auto; margin: 0; padding: 5px 12px; border: 1px solid #ccc; border-radius: 6px; background: #fff; color: #333; font-size: 0.85em; cursor: pointer; font-family: inherit; }
 .goal-actions .goal-see { border-color: #ab47bc; color: #7b1fa2; font-weight: bold; }
-.goal-actions .goal-move { padding: 5px 10px; color: #666; }
 .goal-actions .goal-delete { margin-left: auto; color: #c62828; border-color: #ef9a9a; }
 .goal-section { font-size: 0.85em; font-weight: bold; color: #2e7d32; margin: 10px 2px 6px; }
 .goal-add-btn { width: 100%; margin: 4px 0 0; padding: 10px; border: 1px dashed #ab47bc; border-radius: 10px; background: #faf5fc; color: #7b1fa2; font-weight: bold; cursor: pointer; font-family: inherit; }
@@ -1436,10 +1435,13 @@ body.ui-new #nu-stats-slot #extended-stats-display { display: none !important; }
 .pk-explain-body ul { margin: 2px 0; padding-left: 1.3em; }
 .pk-explain-body li { margin: 2px 0; }
 .pk-formula { margin: 4px 0; padding: 6px 10px; border-radius: 6px; background: #f6f2f8; font-size: 13px; font-weight: bold; color: #333; overflow-wrap: anywhere; }
-.pk-next { font-size: 12px; color: #6a3fb0; font-weight: bold; margin-top: 4px; line-height: 1.4; }
 .pk-explain-table { width: 100%; border-collapse: collapse; background: transparent; box-shadow: none; margin: 4px 0 6px; font-size: 13px; }
 .pk-explain .pk-explain-table th, .pk-explain .pk-explain-table td { border: 0; border-bottom: 1px solid #f0eaf2; background: transparent; padding: 5px 6px; text-align: left; }
 .pk-explain .pk-explain-table thead th { font-size: 11px; color: #888; }
 .pk-explain-big { margin: 4px 0; font-size: 14px; }
 .pk-explain-big b { color: #6a3fb0; font-size: 16px; }
 .pk-explain-note { margin: 2px 0 4px; font-size: 12px; color: #888; }
+/* ポックラの上の枠：左が新、右が旧（上の行に値、下の行に +0.01 まで）。すべて灰色 */
+.pk-sub { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; margin-top: 6px; padding-top: 6px; border-top: 1px dashed #e0d6e4; font-size: 11px; line-height: 1.5; color: #999; }
+.pk-sub-col { min-width: 0; }
+.pk-sub-col + .pk-sub-col { border-left: 1px solid #eee; }

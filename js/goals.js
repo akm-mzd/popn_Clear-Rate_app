@@ -2,9 +2,11 @@
 // goals.js
 // 目標（例：Lv49 の弱を全部ノーマルクリア、Lv47 で銅菱以上を100曲）と、その進み具合。
 // 目標はユーザーごとに goalRecords（{ 目標ID: 目標 }）としてクラウドに保存する。
-//   目標 = { name, lv: [レベル], df: [難易度], af: [相性], kind: 'medal'|'score'|'rank',
+//   目標 = { name, lv: [レベル], df: [難易度], af: [相性], kind: 'medal'|'score'|'rank'|'pokkura',
 //           medal: 条件キー, score: 点数, rank: ランク, n: 曲数（null = 全曲）, t: 作った日時, done: 初めて達成した日時,
-//           o: 並び順（小さいほど上。↑↓で並べ替えたときに付く） }
+//           pc: ポップンクラスの目標値, st: 作ったときのポップンクラス（進み具合の起点） }
+//   並び順は、達成まで近い順（進み具合の割合が大きい順。達成した目標は下）。
+//   ポップンクラスの目標は、ポックラ画面で見せる（公式の値。なければアプリの計算値で判定）
 // 進み具合は renderTable のたびに数え直す（updateGoalsAfterRender）。
 // ==========================================
 
@@ -65,16 +67,37 @@ function isGoalSongDone(goal, song) {
     return !!(opt && m && opt.test(m));
 }
 
-// { total: 対象の曲数, achieved: 達成した曲数, need: 目標の曲数, value: 進んだ数, complete }
+// 今のポップンクラス（ポックラ画面で大きく出している値：公式の値、なければ計算値）
+function getCurrentPokkuraValue() {
+    const pk = calcPokkura();
+    return pk.version && typeof pk.version.pc === 'number' ? pk.version.pc : pk.total;
+}
+
+// { total: 対象の曲数, achieved: 達成した曲数, need: 目標の曲数, value: 進んだ数, complete, ratio: 進み具合（0〜1） }
+//   ポップンクラスの目標は { pokkura: true, cur: 今の値, target: 目標値, ratio, complete }（value / need は割合の％）
 function getGoalProgress(goal) {
+    if (goal.kind === 'pokkura') {
+        const cur = getCurrentPokkuraValue();
+        const target = goal.pc || 0;
+        const complete = cur >= target - 1e-9;
+        const start = typeof goal.st === 'number' ? goal.st : 0;
+        const ratio = complete ? 1 : (target > start ? Math.max(0, Math.min(1, (cur - start) / (target - start))) : 0);
+        return { pokkura: true, cur, target, ratio, complete, value: Math.floor(ratio * 100), need: 100, total: 1, achieved: complete ? 1 : 0 };
+    }
     const targets = getGoalTargetSongs(goal);
     const achieved = targets.filter(s => isGoalSongDone(goal, s)).length;
     const need = goal.n ? goal.n : targets.length;
     const value = Math.min(achieved, need);
-    return { total: targets.length, achieved, need, value, complete: need > 0 && value >= need };
+    return { total: targets.length, achieved, need, value, complete: need > 0 && value >= need, ratio: need > 0 ? value / need : 0 };
+}
+
+// 進んだ数の文字（ポップンクラスは「今の値 / 目標値」、それ以外は「曲数 / 目標の曲数」）
+function goalCountText(p) {
+    return p.pokkura ? `${p.cur.toFixed(2)}/${p.target.toFixed(2)}` : `${p.value}/${p.need}`;
 }
 
 function describeGoalCondition(goal) {
+    if (goal.kind === 'pokkura') return `ポップンクラス ${(goal.pc || 0).toFixed(2)}以上`;
     if (goal.kind === 'score') return `スコア${goal.score}以上`;
     if (goal.kind === 'rank') return `${goal.rank}以上`;
     const opt = GOAL_MEDAL_OPTIONS.find(o => o.value === goal.medal);
@@ -82,6 +105,7 @@ function describeGoalCondition(goal) {
 }
 
 function describeGoal(goal) {
+    if (goal.kind === 'pokkura') return describeGoalCondition(goal);
     const parts = [];
     parts.push(goal.lv && goal.lv.length > 0 ? goal.lv.map(l => isNaN(parseInt(l, 10)) ? l : `Lv${l}`).join('・') : '全レベル');
     if (goal.df && goal.df.length > 0) parts.push(goal.df.join('・'));
@@ -100,46 +124,31 @@ function formatGoalDate(ms) {
     return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
 }
 
-// 並び順（↑↓で決めた順。決めていない目標は、新しいものが上）
+// 並び順：達成まで近い順（進み具合の割合が大きい順。同じなら新しいものが上）。達成した目標は下
+//   返り値の各要素には進み具合 p も付ける
 function getSortedGoals() {
     const records = getGoalRecords();
-    const hasO = g => typeof g.o === 'number';
     return Object.keys(records).map(id => ({ id, goal: records[id] }))
         .filter(x => x.goal && typeof x.goal === 'object')
-        .sort((a, b) => {
-            if (hasO(a.goal) && hasO(b.goal) && a.goal.o !== b.goal.o) return a.goal.o - b.goal.o;
-            if (hasO(a.goal) !== hasO(b.goal)) return hasO(a.goal) ? 1 : -1; // 並べ替えたあとに作った目標は上
-            return (b.goal.t || 0) - (a.goal.t || 0);
-        });
+        .map(x => Object.assign(x, { p: getGoalProgress(x.goal) }))
+        .sort((a, b) => (a.p.complete - b.p.complete)
+            || (a.p.complete ? (b.goal.done || 0) - (a.goal.done || 0) : b.p.ratio - a.p.ratio)
+            || ((b.goal.t || 0) - (a.goal.t || 0)));
 }
 
-// 目標を1つ上（dir = -1）か下（dir = 1）へ。達成済み・未達成それぞれのまとまりの中で動かす
-function moveGoal(id, dir) {
-    const full = getSortedGoals();
-    const doneOf = x => getGoalProgress(x.goal).complete;
-    const me = full.find(x => x.id === id);
-    if (!me) return;
-    const section = full.filter(x => doneOf(x) === doneOf(me));
-    const idx = section.indexOf(me);
-    const other = section[idx + dir];
-    if (!other) return;
-    const i = full.indexOf(me), j = full.indexOf(other);
-    full[i] = other;
-    full[j] = me;
-    full.forEach((x, k) => { x.goal.o = k; });
-    scheduleAutoSave();
-    renderTable();
-}
-
-// 今の表示レベルで見せる目標か（レベルを決めていない目標と「すべて」表示のときは、いつも見せる）
+// 今の画面で一覧の上に見せる目標か
+//   ポックラ画面ではポップンクラスの目標だけ。それ以外の画面では、ポップンクラス以外の目標を表示レベルに合わせて
+//   （レベルを決めていない目標と「すべて」表示のときは、いつも見せる）
 function isGoalForCurrentLevel(goal) {
+    if (viewMode === 'pokkura') return goal.kind === 'pokkura';
+    if (goal.kind === 'pokkura') return false;
     if (currentViewLevel === 'ALL' || isSpecialViewLevel(currentViewLevel) || !goal.lv || goal.lv.length === 0) return true;
     return goal.lv.includes(String(currentViewLevel));
 }
 
 // ---------- 描画（renderTable の最後に呼ばれる） ----------
 function updateGoalsAfterRender() {
-    const list = getSortedGoals().map(x => Object.assign(x, { p: getGoalProgress(x.goal) }));
+    const list = getSortedGoals();
 
     // 初めて達成した目標は、達成日を残して知らせる
     list.forEach(({ goal, p }) => {
@@ -175,7 +184,7 @@ function renderGoalStrip(list) {
     strip.style.display = '';
     strip.innerHTML = active.map(({ id, goal, p }) => `
         <button type="button" class="goal-chip" onclick="openGoalDetail('${jsStringAttr(id)}')" title="${escapeHtml(describeGoal(goal))}（押すと詳細）">
-            <span class="goal-chip-head"><span class="goal-chip-name">🎯 ${escapeHtml(goalTitle(goal))}</span><span class="goal-chip-num">${p.value}/${p.need}</span></span>
+            <span class="goal-chip-head"><span class="goal-chip-name">🎯 ${escapeHtml(goalTitle(goal))}</span><span class="goal-chip-num">${goalCountText(p)}</span></span>
             ${goalBarHtml(p)}
         </button>`).join('');
 }
@@ -192,22 +201,21 @@ function renderGoalList(list) {
         const safeId = jsStringAttr(id);
         const status = p.complete
             ? `<span class="goal-done">✓ 達成${goal.done ? `（${formatGoalDate(goal.done)}）` : ''}</span>`
-            : `<span class="goal-rest">あと ${p.need - p.value}曲</span>`;
-        const warn = goal.n && p.total < goal.n ? `<div class="goal-warn">対象の曲が ${p.total}曲しかありません</div>` : '';
+            : `<span class="goal-rest">あと ${p.pokkura ? (p.target - p.cur).toFixed(2) : `${p.need - p.value}曲`}</span>`;
+        const meta = p.pokkura ? `今 ${p.cur.toFixed(2)} / 目標 ${p.target.toFixed(2)}` : `${p.value} / ${p.need}曲（${pct}%）`;
+        const warn = !p.pokkura && goal.n && p.total < goal.n ? `<div class="goal-warn">対象の曲が ${p.total}曲しかありません</div>` : '';
         return `
             <div class="goal-item${p.complete ? ' is-done' : ''}">
-                <button type="button" class="goal-open" onclick="openGoalDetail('${safeId}')" title="押すと、対象の曲と今のメダル・スコアが見られます">
+                <button type="button" class="goal-open" onclick="openGoalDetail('${safeId}')" title="${p.pokkura ? '押すと、ポックラ画面を開きます' : '押すと、対象の曲と今のメダル・スコアが見られます'}">
                     <span class="goal-name">${escapeHtml(goalTitle(goal))}</span>
                     ${goal.name ? `<span class="goal-desc">${escapeHtml(describeGoal(goal))}</span>` : ''}
                     ${goalBarHtml(p)}
                     <span class="goal-open-hint">詳細 ›</span>
                 </button>
-                <div class="goal-meta"><span>${p.value} / ${p.need}曲（${pct}%）</span>${status}</div>
+                <div class="goal-meta"><span>${meta}</span>${status}</div>
                 ${warn}
                 <div class="goal-actions">
-                    <button type="button" class="goal-move" onclick="moveGoal('${safeId}', -1)" title="上へ" aria-label="上へ">↑</button>
-                    <button type="button" class="goal-move" onclick="moveGoal('${safeId}', 1)" title="下へ" aria-label="下へ">↓</button>
-                    <button type="button" class="goal-see" onclick="showGoalSongs('${safeId}')">曲を見る</button>
+                    <button type="button" class="goal-see" onclick="showGoalSongs('${safeId}')">${p.pokkura ? 'ポックラを見る' : '曲を見る'}</button>
                     <button type="button" onclick="openGoalForm('${safeId}')">編集</button>
                     <button type="button" class="goal-delete" onclick="deleteGoal('${safeId}')">削除</button>
                 </div>
@@ -234,6 +242,7 @@ function openGoalSheet() {
 function showGoalSongs(id) {
     const goal = getGoalRecords()[id];
     if (!goal) return;
+    if (goal.kind === 'pokkura') { openPokkuraForGoal(); return; }
     const searchInput = document.getElementById('search-input');
     if (searchInput) searchInput.value = '';
     FILTER_IDS.forEach(fid => setFilterValues(fid, []));
@@ -276,15 +285,17 @@ function openGoalForm(id) {
     goalEditingId = id || null;
     const goal = id ? getGoalRecords()[id] : null;
     const g = goal || { lv: [], df: [], af: [], kind: 'medal', medal: 'normal', score: 95000, rank: 'AA', n: null, name: '' };
+    const curPc = getCurrentPokkuraValue();
+    const pcDefault = typeof g.pc === 'number' ? g.pc : Math.floor(curPc) + 1;
     const form = document.getElementById('goal-form');
     const levels = getSortedLevels();
     form.innerHTML = `
         <div class="goal-form-title">${goal ? '目標を編集' : '新しい目標'}</div>
-        <div class="goal-field"><div class="goal-label">レベル <span>（選ばなければ全レベル）</span></div>
+        <div class="goal-field goal-song-only"><div class="goal-label">レベル <span>（選ばなければ全レベル）</span></div>
             <div class="goal-opts">${goalChipsHtml('goal-lv', levels, g.lv || [])}</div></div>
-        <div class="goal-field"><div class="goal-label">難易度 <span>（選ばなければすべて）</span></div>
+        <div class="goal-field goal-song-only"><div class="goal-label">難易度 <span>（選ばなければすべて）</span></div>
             <div class="goal-opts">${goalChipsHtml('goal-df', GOAL_DIFF_VALUES, g.df || [])}</div></div>
-        <div class="goal-field"><div class="goal-label">相性 <span>（選ばなければすべて）</span></div>
+        <div class="goal-field goal-song-only"><div class="goal-label">相性 <span>（選ばなければすべて）</span></div>
             <div class="goal-opts">${goalChipsHtml('goal-af', GOAL_AFFINITY_VALUES, g.af || [])}</div></div>
         <div class="goal-field"><div class="goal-label">達成の条件</div>
             <div class="goal-row">
@@ -292,12 +303,14 @@ function openGoalForm(id) {
                     <option value="medal"${g.kind === 'medal' ? ' selected' : ''}>メダル</option>
                     <option value="score"${g.kind === 'score' ? ' selected' : ''}>スコア</option>
                     <option value="rank"${g.kind === 'rank' ? ' selected' : ''}>ランク</option>
+                    <option value="pokkura"${g.kind === 'pokkura' ? ' selected' : ''}>ポップンクラス</option>
                 </select>
                 <select id="goal-medal" onchange="updateGoalFormPreview()">${GOAL_MEDAL_OPTIONS.map(o => `<option value="${o.value}"${o.value === g.medal ? ' selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}</select>
                 <span id="goal-score-wrap"><input type="number" id="goal-score" min="0" max="100000" step="100" value="${g.score || 95000}" oninput="updateGoalFormPreview()"> 点以上</span>
+                <span id="goal-pc-wrap"><input type="number" id="goal-pc" min="0" max="999" step="0.01" value="${pcDefault.toFixed(2)}" oninput="updateGoalFormPreview()"> 以上</span>
                 <span id="goal-rank-wrap"><select id="goal-rank" onchange="updateGoalFormPreview()">${SCORE_RANK_KEYS.map(k => `<option value="${k}"${k === g.rank ? ' selected' : ''}>${k}</option>`).join('')}</select> 以上</span>
             </div></div>
-        <div class="goal-field"><div class="goal-label">曲数</div>
+        <div class="goal-field goal-song-only"><div class="goal-label">曲数</div>
             <div class="goal-row">
                 <label class="goal-radio"><input type="radio" name="goal-n-mode" value="all"${g.n ? '' : ' checked'} onchange="updateGoalFormPreview()"> 全曲</label>
                 <label class="goal-radio"><input type="radio" name="goal-n-mode" value="num"${g.n ? ' checked' : ''} onchange="updateGoalFormPreview()"> <input type="number" id="goal-n" min="1" step="1" value="${g.n || 100}" oninput="updateGoalFormPreview()"> 曲</label>
@@ -332,6 +345,10 @@ function readGoalForm() {
     if (kind === 'medal') goal.medal = document.getElementById('goal-medal').value;
     if (kind === 'score') goal.score = Math.max(0, Math.min(100000, parseInt(document.getElementById('goal-score').value, 10) || 0));
     if (kind === 'rank') goal.rank = document.getElementById('goal-rank').value;
+    if (kind === 'pokkura') {
+        goal.pc = Math.round((parseFloat(document.getElementById('goal-pc').value) || 0) * 100) / 100;
+        goal.lv = []; goal.df = []; goal.af = []; goal.n = null;
+    }
     return goal;
 }
 
@@ -341,9 +358,13 @@ function updateGoalFormPreview() {
     document.getElementById('goal-medal').style.display = kind === 'medal' ? '' : 'none';
     document.getElementById('goal-score-wrap').style.display = kind === 'score' ? '' : 'none';
     document.getElementById('goal-rank-wrap').style.display = kind === 'rank' ? '' : 'none';
+    document.getElementById('goal-pc-wrap').style.display = kind === 'pokkura' ? '' : 'none';
+    document.querySelectorAll('#goal-form .goal-song-only').forEach(el => { el.style.display = kind === 'pokkura' ? 'none' : ''; });
     const goal = readGoalForm();
     const p = getGoalProgress(goal);
-    document.getElementById('goal-preview').textContent = `対象 ${p.total}曲・いま ${p.achieved}曲 達成（${describeGoal(goal)}）`;
+    document.getElementById('goal-preview').textContent = kind === 'pokkura'
+        ? `いまのポップンクラス ${getCurrentPokkuraValue().toFixed(2)}（${describeGoal(goal)}）`
+        : `対象 ${p.total}曲・いま ${p.achieved}曲 達成（${describeGoal(goal)}）`;
 }
 
 function saveGoalForm() {
@@ -352,14 +373,19 @@ function saveGoalForm() {
         alert('曲数は 1 以上の数字で入力してください。');
         return;
     }
-    if (getGoalTargetSongs(goal).length === 0) {
+    if (goal.kind === 'pokkura' && !(goal.pc > 0)) {
+        alert('ポップンクラスの目標の値を入力してください。');
+        return;
+    }
+    if (goal.kind !== 'pokkura' && getGoalTargetSongs(goal).length === 0) {
         alert('この条件に合う曲がありません。条件を見直してください。');
         return;
     }
     const records = getGoalRecords();
     const old = goalEditingId ? records[goalEditingId] : null;
     goal.t = old ? old.t : Date.now();
-    if (old && typeof old.o === 'number') goal.o = old.o;
+    // ポップンクラスの目標は、作ったとき（目標値を変えたとき）の値を進み具合の起点にする
+    if (goal.kind === 'pokkura') goal.st = old && old.kind === 'pokkura' && old.pc === goal.pc && typeof old.st === 'number' ? old.st : getCurrentPokkuraValue();
     // 条件を変えたら、達成日は付け直す（すでに達成していれば、描き直しのときに今日の日付が入る）
     if (old && old.done && describeGoal(old) === describeGoal(goal)) goal.done = old.done;
     const id = goalEditingId || (Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7));
@@ -370,8 +396,18 @@ function saveGoalForm() {
 }
 
 // ---------- 目標の詳細（対象の曲・今のメダル・スコア） ----------
+// ポップンクラスの目標：ポックラ画面を開く
+function openPokkuraForGoal() {
+    closeGoalDetail();
+    toggleMenu(false);
+    if (viewMode !== 'pokkura') setViewMode('pokkura');
+    window.scrollTo(0, 0);
+}
+
 function openGoalDetail(id) {
-    if (!getGoalRecords()[id]) return;
+    const g = getGoalRecords()[id];
+    if (!g) return;
+    if (g.kind === 'pokkura') { openPokkuraForGoal(); return; }
     goalDetailId = id;
     renderGoalDetail();
     document.getElementById('goal-detail-filter').onclick = () => { closeGoalDetail(); showGoalSongs(id); };
