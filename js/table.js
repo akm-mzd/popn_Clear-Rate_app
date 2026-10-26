@@ -1979,10 +1979,19 @@ let pokkuraTab = 'top';
 const POKKURA_PER_POINT_DIV = 3881250;
 const POKKURA_HINT_LEVELS = [50, 49, 48, 47, 46];
 
+//   レベルをまとめた目安は、今の対象曲の平均レベルで出す（レベルによる差は Lv48 と Lv50 で 4% ほど）
 function getPokkuraPointsToNext(pk) {
     const next = (Math.floor(pk.rawTotal * 100 + 1e-9) + 1) / 100;
     const gap = Math.max(0, next - pk.rawTotal);
-    return { next, levels: POKKURA_HINT_LEVELS.map(lv => ({ lv, points: Math.ceil(gap * POKKURA_PER_POINT_DIV / lv) })) };
+    const lvOf = e => e.song ? parseInt(getPokkuraLevel(e.song), 10) : parseInt(e.extra.level, 10);
+    const target = pk.topNew.concat(pk.topOld).map(lvOf).filter(lv => lv > 0);
+    const avgLv = target.length > 0 ? target.reduce((a, b) => a + b, 0) / target.length : 49;
+    return {
+        next, avgLv,
+        points: Math.ceil(gap * POKKURA_PER_POINT_DIV / avgLv),
+        per001: Math.ceil(0.01 * POKKURA_PER_POINT_DIV / avgLv),
+        levels: POKKURA_HINT_LEVELS.map(lv => ({ lv, points: Math.ceil(gap * POKKURA_PER_POINT_DIV / lv) }))
+    };
 }
 
 // ポックラの計算のしかた（ポックラ画面のいちばん下）
@@ -2010,7 +2019,8 @@ function buildPokkuraExplainHtml(pk) {
                     <li>アプリの計算値は、公式の値と少しずれることがある。</li>
                 </ul>
                 <h4>上げるには</h4>
-                <p>対象曲のスコアを、合計で何点伸ばせばよいか（計算値 ${pk.rawTotal.toFixed(4)} から）</p>
+                <p class="pk-explain-big">次の ${toNext.next.toFixed(2)} まで：対象曲の合計であと <b>約${toNext.points.toLocaleString('ja-JP')}点</b>（その後は 0.01 ごとに 約${toNext.per001.toLocaleString('ja-JP')}点）</p>
+                <p class="pk-explain-note">今の対象曲の平均レベル ${toNext.avgLv.toFixed(1)} で計算した目安です（計算値 ${pk.rawTotal.toFixed(4)} から）。1点の重みはレベルで少し違うので、レベルごとの数は下の表のとおりです。</p>
                 <table class="pk-explain-table">
                     <thead><tr><th>伸ばす曲</th><th>次の ${toNext.next.toFixed(2)} まで</th><th>0.01 ごと</th></tr></thead>
                     <tbody>${rows}</tbody>
@@ -2050,7 +2060,7 @@ function renderPokkuraGrid() {
     const partsText = `新曲 ${pk.newPoint.toFixed(2)} ＋ 旧曲 ${pk.oldPoint.toFixed(2)}`;
     const toNext = getPokkuraPointsToNext(pk);
     const nextHtml = pk.topNew.length + pk.topOld.length > 0
-        ? `<div class="pk-next">計算値で次の ${toNext.next.toFixed(2)} まで：対象曲の合計であと ${toNext.levels.slice(0, 3).map(x => `Lv${x.lv} 約${x.points.toLocaleString('ja-JP')}点`).join('／')}</div>`
+        ? `<div class="pk-next" title="対象曲の平均レベル（${toNext.avgLv.toFixed(1)}）で計算した目安。Lv50 の曲なら少し少なく、Lv48 の曲なら少し多くなります">計算値で次の ${toNext.next.toFixed(2)} まで：対象曲の合計であと 約${toNext.points.toLocaleString('ja-JP')}点</div>`
         : '';
     let html = official !== null ? `
         <div class="pk-summary">
