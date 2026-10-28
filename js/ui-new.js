@@ -32,11 +32,6 @@ function applyUiMode(mode) {
         document.getElementById('main-stats-anchor').after(stats, extended);
     }
 
-    // 管理者メニュー：新しいデザインでは一覧の下へ（以前の見た目ではタイトルの下）
-    const admin = document.getElementById('admin-controls');
-    if (isNew) document.getElementById('app-main').appendChild(admin);
-    else document.getElementById('current-user-label').after(admin);
-
     // レベル・表示方法の枠：新しいデザインでは常に一覧の上（固定の帯）
     applyLevelButtonPlacement(isNew ? true : storageGet('popn_level_btn_main') !== '0');
 
