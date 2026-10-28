@@ -9,7 +9,7 @@
 //   何もチェックしていない項目は「すべて」。
 //   同じ項目の中は「どれか」（OR）、違う項目どうしは「すべて」（AND）で絞り込む。
 // ==========================================
-const FILTER_IDS = ['filter-medal', 'filter-version', 'filter-diff', 'filter-affinity', 'filter-rank'];
+const FILTER_IDS = ['filter-medal', 'filter-version', 'filter-diff', 'filter-affinity', 'filter-attr', 'filter-rank'];
 
 // スコアランク（高い順）と、スコア未登録を表す値
 const SCORE_RANK_KEYS = Object.keys(RANK_IMAGES);
@@ -78,6 +78,7 @@ function updateFilterSummaryCount() {
     setCount('filter-summary-count', countActiveFilters());
     setCount('filter-version-count', getFilterValues('filter-version').length);
     setCount('filter-affinity-count', getFilterValues('filter-affinity').length);
+    setCount('filter-attr-count', getFilterValues('filter-attr').length);
     setCount('filter-rank-count', getFilterValues('filter-rank').length);
 }
 
@@ -108,6 +109,7 @@ function updateDynamicFilters() {
         .sort((a, b) => getVersionSortValue(a) - getVersionSortValue(b));
     buildFilterChecks('filter-version', versions.map(v => ({ value: v, label: v })));
     buildMemoFilterChecks();
+    buildFilterChecks('filter-attr', getAllSongAttrs().map(a => ({ value: a, label: a })));
 
     updateStartupSettingsUI();
 
@@ -376,6 +378,7 @@ function makeSongFilter() {
     const filterDiffs = getFilterValues('filter-diff');
     const filterAffinities = getFilterValues('filter-affinity');
     const filterRanks = getFilterValues('filter-rank');
+    const filterAttrs = getFilterValues('filter-attr');
     return s => {
         if (filterMedals.length > 0) {
             const medalKey = clearRecords[s.id] || '';
@@ -405,6 +408,8 @@ function makeSongFilter() {
         }
 
         if (filterRanks.length > 0 && !filterRanks.includes(getSongScoreRank(s) || SCORE_RANK_NONE)) return false;
+        // 属性（攻略wiki）：選んだもののどれかを持つ曲
+        if (filterAttrs.length > 0 && !getSongAttrs(s).some(a => filterAttrs.includes(a))) return false;
         return true;
     };
 }
@@ -466,7 +471,7 @@ function renderTable() {
     const filterDiffs = getFilterValues('filter-diff');
     const filterAffinities = getFilterValues('filter-affinity');
     const filterRanks = getFilterValues('filter-rank');
-    const isFiltered = filterMedals.length + filterVersions.length + filterDiffs.length + filterAffinities.length + filterRanks.length > 0;
+    const isFiltered = filterMedals.length + filterVersions.length + filterDiffs.length + filterAffinities.length + filterRanks.length + getFilterValues('filter-attr').length > 0;
     const songFilter = makeSongFilter();
     updateFilterSummaryCount();
 
@@ -493,8 +498,8 @@ function renderTable() {
     let baseSongs = songs.filter(s => {
         if (specialIds) return specialIds.has(s.id);
         if (!searchQuery && currentViewLevel !== 'ALL' && s.level !== currentViewLevel) return false;
-        // フリーワード検索：曲名・ジャンルと、メモ（コメント・タグ・ハイスピード・サドプラ・オプション）
-        if (searchQuery && !(s.genre.toLowerCase().includes(searchQuery) || s.title.toLowerCase().includes(searchQuery) || getMemoSearchText(getMemo(s.id)).includes(searchQuery))) return false;
+        // フリーワード検索：曲名・ジャンルと、メモ（コメント・タグ・ハイスピード・サドプラ・オプション）・属性
+        if (searchQuery && !(s.genre.toLowerCase().includes(searchQuery) || s.title.toLowerCase().includes(searchQuery) || getMemoSearchText(getMemo(s.id)).includes(searchQuery) || getSongAttrs(s).join(' ').toLowerCase().includes(searchQuery))) return false;
         return true;
     });
 
@@ -700,6 +705,7 @@ function renderTable() {
                             ${escapeHtml(song.title)} <span style="font-size: 0.8em; color: #2196F3;">🔗</span>
                         </a>
                     </div>
+                    ${getSongAttrs(song).length ? `<div class="song-attrs">${getSongAttrs(song).map(a => `<span>${escapeHtml(a)}</span>`).join('')}</div>` : ''}
                 </div>
             </td>
             <td class="col-bpm" style="text-align: right;"><span>${escapeHtml(song.bpm || '-')}</span></td>
@@ -1418,7 +1424,7 @@ function buildSvSongInfoHtml(song, fallback) {
     const style = getDifficultyColor(song.diffClass, song.diffIndex);
     return `<div class="sv-song">
         <span class="sv-song-lv">${escapeHtml(song.level)}</span>
-        <span class="sv-song-text"><span class="sv-song-genre">${escapeHtml(song.genre || '')}</span><span class="sv-song-title">${escapeHtml(song.title)}</span></span>
+        <span class="sv-song-text"><span class="sv-song-genre">${escapeHtml(song.genre || '')}</span><span class="sv-song-title">${escapeHtml(song.title)}</span>${getSongAttrs(song).length ? `<span class="song-attrs">${getSongAttrs(song).map(a => `<span>${escapeHtml(a)}</span>`).join('')}</span>` : ''}</span>
         ${diff ? `<span class="sv-song-diff" style="color: ${style.color}; text-shadow: ${style.shadow};">${escapeHtml(diff)}</span>` : ''}
     </div>`;
 }

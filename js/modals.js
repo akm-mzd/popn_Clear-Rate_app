@@ -270,6 +270,7 @@ function openEditModal(id) {
     document.getElementById('edit-diff').value = song.diffRaw || "";
     document.getElementById('edit-banner-url').value = song.bannerUrl || "";
     document.getElementById('edit-wiki-url').value = song.wikiUrl || "";
+    document.getElementById('edit-attrs').value = getSongAttrs(song).join('、');
 
     document.getElementById('edit-modal').style.display = 'flex';
 }
@@ -357,6 +358,7 @@ async function saveEditModal() {
             originalOrder: songs.length
         });
         applyPokkuraLevel(songs[songs.length - 1]);
+        setSongAttrs(songs[songs.length - 1], parseAttrText(document.getElementById('edit-attrs').value));
         alert("楽曲を新規追加しました！");
     } else {
         const songIndex = songs.findIndex(s => s.id === originalId);
@@ -395,6 +397,7 @@ async function saveEditModal() {
         songs[songIndex].diffClass = parsed.diffClass;
         songs[songIndex].diffIndex = parsed.diffIndex;
         applyPokkuraLevel(songs[songIndex]);
+        setSongAttrs(songs[songIndex], parseAttrText(document.getElementById('edit-attrs').value));
     }
 
     updateDynamicFilters();
