@@ -29,17 +29,6 @@ const UPDATED_FILTER_ITEMS = [
     { value: 'none', label: '更新なし', test: d => d === null }
 ];
 
-// よく使う条件（押すとその項目をこの値にする。もう一度押すと外す）
-const FILTER_PRESETS = [
-    { label: '未クリア', set: { 'filter-medal': ['unplayed', '黒丸', '黒菱', '黒星', 'イージー'] } },
-    { label: 'フルコンまだ', set: { 'filter-medal': ['unplayed', '黒丸', '黒菱', '黒星', 'イージー', 'ロングオフ', '銅丸', '銅菱', '銅星'] } },
-    { label: '未プレイ', set: { 'filter-medal': ['unplayed'] } },
-    { label: 'スコアなし', set: { 'filter-rank': ['none'] } },
-    { label: '★練習したい', set: { 'filter-affinity': ['★'] } },
-    { label: '1週間以内に更新', set: { 'filter-updated': ['w1'] } },
-    { label: '1か月以上更新なし', set: { 'filter-updated': ['old1', 'none'] } }
-];
-
 // スコアランク（高い順）と、スコア未登録を表す値
 const SCORE_RANK_KEYS = Object.keys(RANK_IMAGES);
 const SCORE_RANK_NONE = 'none';
@@ -116,134 +105,61 @@ function clearAllFilters() {
     setScoreRange(null, null);
 }
 
-// 条件の組み合わせ { s: { 項目: [値] }, r: スコアの範囲 or null }（値は並べ替えておく。空の項目は入れない）
-function getCurrentFilterCombo() {
-    const set = {};
-    FILTER_IDS.forEach(id => {
-        const values = getFilterValues(id);
-        if (values.length > 0) set[id] = values.slice().sort();
-    });
-    return { s: set, r: getScoreRange() };
+// ---------- レベル（絞り込みの欄と、上のレベルボタンをそろえる） ----------
+//   絞り込みを開くと、今表示しているレベルにチェックが付いている。チェックを変えると表示も変わる：
+//   1つ → そのレベル、2つ以上 → 「すべて」にして選んだレベルで絞る、なし → 「すべて」。
+//   検索中・「更新」「最近」のときは、上のレベルはそのままで、選んだレベルで絞るだけ。
+//   今表示しているレベル1つだけのチェックは「絞り込み」には数えない（チップにも出さない）
+function isRealViewLevel(level) {
+    return level !== 'ALL' && !isSpecialViewLevel(level);
 }
 
-function filterComboKey(combo) {
-    const r = combo.r ? [combo.r.min, combo.r.max] : null;
-    return JSON.stringify([FILTER_IDS.map(id => (combo.s[id] || []).slice().sort()), r]);
+function isSearching() {
+    const input = document.getElementById('search-input');
+    return !!(input && input.value.trim());
 }
 
-function isFilterComboEmpty(combo) {
-    return Object.keys(combo.s).length === 0 && !combo.r;
+function getActiveFilterValues(id) {
+    const values = getFilterValues(id);
+    if (id === 'filter-level' && values.length === 1 && values[0] === currentViewLevel) return [];
+    return values;
 }
 
-// 組み合わせを、1つずつの条件に分ける（よく使う条件そのままのものは1つにまとめる）。
-//   チップと、覚えた組み合わせの名前に使う。返り値 [{ text, ids: 外すときの項目, value: 1つだけ外すときの値 }]
-function describeFilterCombo(combo) {
-    const parts = [];
-    const covered = new Set();
-    const same = (a, b) => a.length === b.length && a.every(v => b.includes(v));
-    FILTER_PRESETS.forEach(p => {
-        const ids = Object.keys(p.set);
-        if (ids.some(id => covered.has(id)) || !ids.every(id => same(combo.s[id] || [], p.set[id]))) return;
-        ids.forEach(id => covered.add(id));
-        parts.push({ text: p.label, ids });
-    });
-    FILTER_IDS.filter(id => !covered.has(id)).forEach(id => {
-        (combo.s[id] || []).forEach(v => parts.push({ text: `${FILTER_GROUP_NAMES[id]}：${getFilterValueLabel(id, v)}`, ids: [id], value: v }));
-    });
-    if (combo.r) parts.push({ text: `スコア：${formatScoreRange(combo.r)}`, range: true });
-    return parts;
+// 表示しているレベルとチェックを合わせる（renderTable の最初に呼ぶ）
+function syncLevelSelection() {
+    if (isSearching() || isSpecialViewLevel(currentViewLevel)) return;
+    const values = getFilterValues('filter-level');
+    if (values.length === 0) {
+        if (isRealViewLevel(currentViewLevel)) setFilterValues('filter-level', [currentViewLevel]);
+        return;
+    }
+    const next = values.length === 1 ? values[0] : 'ALL';
+    if (next !== currentViewLevel) {
+        currentViewLevel = next;
+        updateDynamicFilters(); // 上のレベルボタンの選択を付け替える
+    }
 }
 
-// 今かかっている条件を1つずつ（チップ用）。remove で外せる
-function getActiveFilterItems() {
-    return describeFilterCombo(getCurrentFilterCombo()).map(part => ({
-        text: part.text,
-        remove: () => {
-            if (part.range) setScoreRange(null, null);
-            else if (part.value !== undefined) setFilterValues(part.ids[0], getFilterValues(part.ids[0]).filter(x => x !== part.value));
-            else part.ids.forEach(id => setFilterValues(id, []));
-            renderTable();
-        }
-    }));
-}
-
-// ---------- よく使う条件：使った組み合わせを覚える（この端末に、ユーザーごと） ----------
-//   絞り込みのシートを閉じたときの条件を「使った」として数える（同じ条件のまま閉じ直しても数えない）。
-//   2回以上使った組み合わせを、回数の多い順に「よく使う条件」の前の方に出す
-const FILTER_USAGE_MAX = 30;
-const FILTER_USAGE_MIN_COUNT = 2;
-const FILTER_QUICK_MAX = 7;
-let lastCountedFilterKey = null;
-
-function filterUsageStorageKey() {
-    return 'popn_filter_usage_' + currentUser;
-}
-
-function loadFilterUsage() {
-    let list;
-    try { list = JSON.parse(storageGet(filterUsageStorageKey()) || '[]'); } catch (e) { list = []; }
-    if (!Array.isArray(list)) return [];
-    return list.filter(e => e && e.s && typeof e.s === 'object' && typeof e.n === 'number').map(e => {
-        const set = {};
-        FILTER_IDS.forEach(id => { if (Array.isArray(e.s[id]) && e.s[id].length > 0) set[id] = e.s[id].filter(v => typeof v === 'string').sort(); });
-        const r = e.r && typeof e.r === 'object' ? { min: Number.isFinite(e.r.min) ? e.r.min : null, max: Number.isFinite(e.r.max) ? e.r.max : null } : null;
-        return { s: set, r: r && (r.min !== null || r.max !== null) ? r : null, n: e.n, t: typeof e.t === 'number' ? e.t : 0 };
-    }).filter(e => !isFilterComboEmpty(e));
-}
-
-function saveFilterUsage(list) {
-    storageSet(filterUsageStorageKey(), JSON.stringify(list));
-}
-
-function recordFilterUsage() {
-    const combo = getCurrentFilterCombo();
-    if (isFilterComboEmpty(combo)) { lastCountedFilterKey = null; return; }
-    const key = filterComboKey(combo);
-    if (key === lastCountedFilterKey) return;
-    lastCountedFilterKey = key;
-    const list = loadFilterUsage();
-    const hit = list.find(e => filterComboKey(e) === key);
-    if (hit) { hit.n++; hit.t = Date.now(); }
-    else list.push({ s: combo.s, r: combo.r, n: 1, t: Date.now() });
-    list.sort((a, b) => (b.n - a.n) || (b.t - a.t));
-    saveFilterUsage(list.slice(0, FILTER_USAGE_MAX));
-}
-
-function clearFilterUsage() {
-    if (!confirm('この端末で覚えた「よく使う条件」を消して、最初の並びに戻しますか？')) return;
-    storageRemove(filterUsageStorageKey());
-    lastCountedFilterKey = null;
-    renderTable();
-}
-
-// 組み合わせにする（今と全く同じなら全部外す）
-function applyFilterCombo(combo) {
-    const same = filterComboKey(combo) === filterComboKey(getCurrentFilterCombo());
-    clearAllFilters();
-    if (!same) {
-        Object.keys(combo.s).forEach(id => setFilterValues(id, combo.s[id]));
-        if (combo.r) setScoreRange(combo.r.min, combo.r.max);
+function onLevelFilterChange() {
+    if (!isSearching() && !isSpecialViewLevel(currentViewLevel) && getFilterValues('filter-level').length === 0) {
+        currentViewLevel = 'ALL';
+        updateDynamicFilters();
     }
     renderTable();
 }
 
-// 「よく使う条件」に出すもの：覚えた組み合わせ（2回以上）→ 決まった条件 で、最大7つ
-function getQuickFilterEntries() {
-    const entries = [];
-    const keys = new Set();
-    loadFilterUsage().filter(e => e.n >= FILTER_USAGE_MIN_COUNT).forEach(e => {
-        if (entries.length >= FILTER_QUICK_MAX) return;
-        const key = filterComboKey(e);
-        keys.add(key);
-        const label = describeFilterCombo(e).map(p => p.text).join('＋');
-        entries.push({ kind: 'learned', combo: e, label, count: e.n });
+// 今かかっている条件を1つずつ（チップ用）。remove で外せる
+function getActiveFilterItems() {
+    const items = [];
+    FILTER_IDS.forEach(id => {
+        getActiveFilterValues(id).forEach(v => items.push({
+            text: `${FILTER_GROUP_NAMES[id]}：${getFilterValueLabel(id, v)}`,
+            remove: () => { setFilterValues(id, getFilterValues(id).filter(x => x !== v)); renderTable(); }
+        }));
     });
-    FILTER_PRESETS.forEach((p, i) => {
-        if (entries.length >= FILTER_QUICK_MAX) return;
-        if (keys.has(filterComboKey({ s: p.set, r: null }))) return;
-        entries.push({ kind: 'preset', index: i, label: p.label });
-    });
-    return entries;
+    const range = getScoreRange();
+    if (range) items.push({ text: `スコア：${formatScoreRange(range)}`, remove: () => { setScoreRange(null, null); renderTable(); } });
+    return items;
 }
 
 // チェックリストの中身を作る（items: [{ value, label }]）。すでにチェックされていた値は残す
@@ -268,7 +184,7 @@ function buildFilterChecks(id, items) {
 }
 
 function countActiveFilters() {
-    return FILTER_IDS.reduce((n, id) => n + getFilterValues(id).length, 0) + (getScoreRange() ? 1 : 0);
+    return FILTER_IDS.reduce((n, id) => n + getActiveFilterValues(id).length, 0) + (getScoreRange() ? 1 : 0);
 }
 
 // 「さらに条件で絞り込む」と、各項目の見出しに、選んでいる数を出す（shown：今出ている曲数）
@@ -278,7 +194,7 @@ function updateFilterSummaryCount(shown) {
         if (el) el.textContent = n > 0 ? `（${n}）` : '';
     };
     setCount('filter-summary-count', countActiveFilters());
-    FILTER_IDS.filter(id => id !== 'filter-rank').forEach(id => setCount(`${id}-count`, getFilterValues(id).length));
+    FILTER_IDS.filter(id => id !== 'filter-rank').forEach(id => setCount(`${id}-count`, getActiveFilterValues(id).length));
     setCount('filter-score-count', getFilterValues('filter-rank').length + (getScoreRange() ? 1 : 0));
     const shownEl = document.getElementById('filter-summary-shown');
     if (shownEl) shownEl.textContent = typeof shown === 'number' ? ` ${shown}曲` : '';
@@ -286,21 +202,23 @@ function updateFilterSummaryCount(shown) {
 
 // 選択肢の横に「選ぶと出る曲の数」を出す（ほかの項目の条件はそのまま、その項目だけ入れ替えて数える）
 //   今の表示レベル・検索の曲に1曲もない選択肢は出さない（選んでいるものは出す）。
-//   出す選択肢がない項目は、項目ごと隠す（レベルは1つしかないときも隠す）
-//   よく使う条件のボタンと、今の条件のチップもここで作り直す
-function updateFilterOptionCounts(baseSongs) {
+//   出す選択肢がない項目は、項目ごと隠す
+//   レベルだけは、表示しているレベルに関係なく数える（levelBaseSongs：検索・「更新」「最近」だけを当てた曲）
+//   今の条件のチップもここで作り直す
+function updateFilterOptionCounts(baseSongs, levelBaseSongs) {
     const ctx = makeFilterContext();
     FILTER_IDS.forEach(id => {
         const box = document.getElementById(id);
         if (!box) return;
-        const pool = baseSongs.filter(makeSongFilter({ skip: id, ctx }));
+        const base = id === 'filter-level' && levelBaseSongs ? levelBaseSongs : baseSongs;
+        const pool = base.filter(makeSongFilter({ skip: id, ctx }));
         const test = FILTER_GROUP_TESTS[id];
         let visible = 0, checked = 0;
         box.querySelectorAll('label').forEach(lbl => {
             const cb = lbl.querySelector('input[type="checkbox"]');
             if (!cb) return;
             const n = pool.reduce((c, s) => c + (test(s, [cb.value], ctx) ? 1 : 0), 0);
-            const exists = baseSongs.some(s => test(s, [cb.value], ctx));
+            const exists = base.some(s => test(s, [cb.value], ctx));
             let span = lbl.querySelector('.fc-n');
             if (!span) { span = document.createElement('span'); span.className = 'fc-n'; lbl.appendChild(span); }
             span.textContent = n;
@@ -311,61 +229,9 @@ function updateFilterOptionCounts(baseSongs) {
         });
         // スコアはランクのほかに点数の範囲もあるので、項目ごとは隠さない
         const group = box.closest('details.filter-group');
-        if (group && id !== 'filter-rank') group.classList.toggle('fc-none', checked === 0 && visible <= (id === 'filter-level' ? 1 : 0));
+        if (group && id !== 'filter-rank') group.classList.toggle('fc-none', checked === 0 && visible === 0);
     });
-    renderFilterPresets(baseSongs, ctx);
     renderFilterActiveChips();
-}
-
-function isPresetActive(preset) {
-    return Object.keys(preset.set).every(id => {
-        const cur = getFilterValues(id);
-        return cur.length === preset.set[id].length && preset.set[id].every(v => cur.includes(v));
-    });
-}
-
-let quickFilterEntries = [];
-
-function renderFilterPresets(baseSongs, ctx) {
-    const box = document.getElementById('filter-presets');
-    if (!box) return;
-    // 一覧で条件を全部外したら、次に同じ条件を使ったときにまた数える
-    const current = getCurrentFilterCombo();
-    if (isFilterComboEmpty(current)) lastCountedFilterKey = null;
-    const currentKey = filterComboKey(current);
-    quickFilterEntries = getQuickFilterEntries();
-    box.innerHTML = quickFilterEntries.map((e, i) => {
-        let active, n;
-        if (e.kind === 'learned') {
-            active = filterComboKey(e.combo) === currentKey;
-            const override = {};
-            FILTER_IDS.forEach(id => { override[id] = e.combo.s[id] || []; });
-            n = baseSongs.filter(makeSongFilter({ override, range: e.combo.r, ctx })).length;
-        } else {
-            const p = FILTER_PRESETS[e.index];
-            active = isPresetActive(p);
-            n = baseSongs.filter(makeSongFilter({ override: p.set, ctx })).length;
-        }
-        const title = e.kind === 'learned' ? ` title="${escapeHtml(e.label)}（${e.count}回使用）"` : '';
-        return `<button type="button" class="filter-preset${e.kind === 'learned' ? ' learned' : ''}${active ? ' active' : ''}" aria-pressed="${active}"${title} onclick="toggleQuickFilter(${i})"><span class="fp-label">${escapeHtml(e.label)}</span><span class="fc-n">${n}</span></button>`;
-    }).join('');
-    const clearBtn = document.getElementById('filter-usage-clear');
-    if (clearBtn) clearBtn.hidden = loadFilterUsage().length === 0;
-}
-
-function toggleQuickFilter(i) {
-    const e = quickFilterEntries[i];
-    if (!e) return;
-    if (e.kind === 'learned') applyFilterCombo(e.combo);
-    else toggleFilterPreset(e.index);
-}
-
-function toggleFilterPreset(i) {
-    const preset = FILTER_PRESETS[i];
-    if (!preset) return;
-    const active = isPresetActive(preset);
-    Object.keys(preset.set).forEach(id => setFilterValues(id, active ? [] : preset.set[id]));
-    renderTable();
 }
 
 // 絞り込みの欄の上に、今の条件を1つずつ（× で外す）
@@ -430,6 +296,7 @@ function updateDynamicFilters() {
     // レベル：小さいレベル → 大きいレベル（文字のレベルは後ろ）。レベルボタンと同じ並び
     const lvItems = getSortedLevels().slice().reverse().sort((a, b) => isNaN(parseInt(a, 10)) - isNaN(parseInt(b, 10)));
     buildFilterChecks('filter-level', lvItems.map(l => ({ value: String(l), label: isNaN(parseInt(l, 10)) ? String(l) : `Lv${l}` })));
+    document.querySelectorAll('#filter-level input[type="checkbox"]').forEach(cb => { cb.onchange = onLevelFilterChange; });
 
     updateStartupSettingsUI();
 
@@ -587,6 +454,8 @@ function handleSearch() {
 }
 function clearSearch() {
     document.getElementById('search-input').value = '';
+    // 検索中に選んだレベルは外して、表示しているレベルに戻す
+    setFilterValues('filter-level', isRealViewLevel(currentViewLevel) ? [currentViewLevel] : []);
     hideSearchSuggest();
     renderTable();
 }
@@ -673,6 +542,8 @@ function changeViewLevel(level, keepMenu = false) {
     if (viewMode === 'pokkura' || isSpecialViewLevel(level)) viewMode = 'grid';
     document.getElementById('search-input').value = '';
     currentViewLevel = level;
+    // 絞り込みのレベルも、選んだレベルだけにする（「すべて」「更新」「最近」なら外す）
+    setFilterValues('filter-level', isRealViewLevel(level) ? [level] : []);
     updateDynamicFilters();
     renderTable();
 }
@@ -849,7 +720,7 @@ function makeFilterContext() {
 function makeSongFilter(opts = {}) {
     const ctx = opts.ctx || makeFilterContext();
     const groups = FILTER_IDS.filter(id => id !== opts.skip).map(id => {
-        const values = opts.override && opts.override[id] ? opts.override[id] : getFilterValues(id);
+        const values = opts.override && opts.override[id] ? opts.override[id] : getActiveFilterValues(id);
         return values.length > 0 ? [FILTER_GROUP_TESTS[id], values] : null;
     }).filter(Boolean);
     const range = opts.range !== undefined ? opts.range : getScoreRange();
@@ -913,6 +784,7 @@ function computeStats(statsSongs, showUnreleased) {
 function renderTable() {
     const searchInput = document.getElementById('search-input');
     const searchQuery = searchInput ? searchInput.value.trim().toLowerCase() : "";
+    syncLevelSelection();
 
     // 絞り込み条件（空配列 = すべて）
     const isFiltered = countActiveFilters() > 0;
@@ -950,7 +822,9 @@ function renderTable() {
     // 2. 実際にテーブルに表示する楽曲（すべての絞り込みを適用）
     let displaySongs = baseSongs.filter(songFilter);
     updateFilterSummaryCount(displaySongs.length);
-    updateFilterOptionCounts(baseSongs);
+    // レベルの選択肢の曲数は、表示しているレベルに関係なく数える
+    const levelBaseSongs = specialIds ? baseSongs : searchQuery ? baseSongs : songs;
+    updateFilterOptionCounts(baseSongs, levelBaseSongs);
     if (currentSort === 'clear') {
         displaySongs.sort((a, b) => {
             let valA = MEDAL_TYPES[clearRecords[a.id] || ''].rank;
