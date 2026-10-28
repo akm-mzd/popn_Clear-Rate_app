@@ -6,7 +6,7 @@
     <title>Pop’n Clear Rate app</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
-    <link rel="stylesheet" href="style.css?v=3.21.2.0">
+    <link rel="stylesheet" href="style.css?v=3.22.0.0">
 </head>
 <body>
     <!-- 新しいデザイン（ver 3）の上部バーとナビ。以前の見た目では隠れる（js/ui-new.js） -->
@@ -191,6 +191,7 @@
 
             <!-- ④ 統計表示 -->
             <section class="menu-card goal-card" id="goal-card" data-sheet="goal">
+                <div id="practice-box" class="practice-box"></div>
                 <div class="menu-card-title"><span><span class="menu-emoji">🎯</span> 目標</span></div>
                 <div id="goal-list"></div>
                 <button type="button" id="goal-add-btn" class="goal-add-btn" onclick="openGoalForm()">＋ 目標を追加</button>
@@ -365,6 +366,7 @@
                     <button id="btn-overview-image" onclick="generateOverviewImage()" class="btn-image">全体統計画像</button>
                     <button id="btn-diff-image" onclick="generateDiffTableImage()" class="btn-image">難易度順画像</button>
                     <button onclick="exportAsImage(event)" class="btn-image">表示曲画像</button>
+                    <button type="button" onclick="toggleMenu(false); openDailySummary(false)" class="btn-image">今日のまとめ</button>
                     <button id="btn-pokkura-image" onclick="generatePokkuraImage()" class="btn-image" style="display: none;">ポックラ画像</button>
 
                     <details class="export-col-details" style="position: relative;">
@@ -576,6 +578,7 @@
             <div id="medal-grid" class="medal-grid"></div>
             <div id="ura-medal-box" class="ura-medal-box" style="display: none;"></div>
             <div id="memo-editor-medal"></div>
+            <div id="song-history-box" class="song-history-box"></div>
             <div class="modal-actions" style="justify-content: center; margin-top: 20px;">
                 <button onclick="closeMedalModal()" style="border: 1px solid #ccc; background: #eee; padding: 8px 30px;">閉じる</button>
             </div>
@@ -639,6 +642,18 @@
             <div class="modal-actions" style="justify-content: flex-end; gap: 10px; margin-top: 10px;">
                 <button onclick="closeWikiAttrModal()" style="border: 1px solid #ccc; background: #eee;">キャンセル</button>
                 <button id="wiki-attr-apply" onclick="applyWikiAttrImport()" style="background-color: #7b1fa2; color: white; font-weight: bold;">反映する</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 今日のまとめ（公式データを取り込んだあと・画像シートから） -->
+    <div id="daily-summary-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content daily-summary-content">
+            <h3 style="margin: 0 0 6px;">今日のまとめ</h3>
+            <div id="daily-summary-body" style="flex: 1; min-height: 0; overflow-y: auto;"></div>
+            <div class="modal-actions" style="justify-content: flex-end; gap: 10px; margin-top: 10px;">
+                <button onclick="closeDailySummary()" style="border: 1px solid #ccc; background: #eee;">閉じる</button>
+                <button id="btn-daily-summary-image" onclick="generateDailySummaryImage(this)" style="background-color: #c2185b; color: white; font-weight: bold;">画像にする</button>
             </div>
         </div>
     </div>
@@ -731,22 +746,23 @@
     <button id="back-to-top" onclick="scrollToTop()" title="トップに戻る">↑</button>
 
     <!-- 読み込み順に意味があります（config が最初、app が最後） -->
-    <script src="js/config.js?v=3.21.2.0"></script>
-    <script src="js/utils.js?v=3.21.2.0"></script>
-    <script src="js/cloud.js?v=3.21.2.0"></script>
-    <script src="js/users.js?v=3.21.2.0"></script>
-    <script src="js/table.js?v=3.21.2.0"></script>
-    <script src="js/modals.js?v=3.21.2.0"></script>
-    <script src="js/memo.js?v=3.21.2.0"></script>
-    <script src="js/history.js?v=3.21.2.0"></script>
-    <script src="js/goals.js?v=3.21.2.0"></script>
-    <script src="js/admin.js?v=3.21.2.0"></script>
-    <script src="js/image-export.js?v=3.21.2.0"></script>
-    <script src="js/eagate-import.js?v=3.21.2.0"></script>
-    <script src="js/wiki-import.js?v=3.21.2.0"></script>
-    <script src="js/menu.js?v=3.21.2.0"></script>
-    <script src="js/ui-new.js?v=3.21.2.0"></script>
-    <script src="js/app.js?v=3.21.2.0"></script>
+    <script src="js/config.js?v=3.22.0.0"></script>
+    <script src="js/utils.js?v=3.22.0.0"></script>
+    <script src="js/cloud.js?v=3.22.0.0"></script>
+    <script src="js/users.js?v=3.22.0.0"></script>
+    <script src="js/table.js?v=3.22.0.0"></script>
+    <script src="js/modals.js?v=3.22.0.0"></script>
+    <script src="js/memo.js?v=3.22.0.0"></script>
+    <script src="js/history.js?v=3.22.0.0"></script>
+    <script src="js/growth.js?v=3.22.0.0"></script>
+    <script src="js/goals.js?v=3.22.0.0"></script>
+    <script src="js/admin.js?v=3.22.0.0"></script>
+    <script src="js/image-export.js?v=3.22.0.0"></script>
+    <script src="js/eagate-import.js?v=3.22.0.0"></script>
+    <script src="js/wiki-import.js?v=3.22.0.0"></script>
+    <script src="js/menu.js?v=3.22.0.0"></script>
+    <script src="js/ui-new.js?v=3.22.0.0"></script>
+    <script src="js/app.js?v=3.22.0.0"></script>
 
 </body>
 </html>

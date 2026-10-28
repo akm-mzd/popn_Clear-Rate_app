@@ -166,6 +166,7 @@ function updateGoalsAfterRender() {
     saveGoalBackup();
     renderGoalStrip(list);
     renderGoalList(list);
+    if (isPracticeBoxVisible()) renderPracticeBox();
     // 詳細を開いたままメダル・スコアを変えたら、詳細も描き直す
     if (goalDetailId) renderGoalDetail();
 }
@@ -556,4 +557,118 @@ function checkGoalBackup() {
     scheduleAutoSave();
     renderTable();
     showToast('toast-goal', `目標を ${ids.length}件 戻しました`, '#7b1fa2', 4000);
+}
+
+// ==========================================
+// 今日の練習メニュー（目標シートの一番上）
+//   次の中から8曲を、順番に1曲ずつ（それぞれの中はランダムに）選ぶ。同じ曲は1回だけ。
+//   ★練習したい → 目標のまだの曲（達成に近いもの）→ ポックラのおすすめ → クリアまであと少し → 苦手な属性の曲
+//   選んだメニューは、同じ日のうちはこの端末に残す（popn_practice_ユーザー名）。「入れ替える」で選び直す
+// ==========================================
+const PRACTICE_COUNT = 8;
+const PRACTICE_NEAR_CLEAR = ['黒星', 'イージー', '黒菱'];
+
+function practiceStorageKey() {
+    return 'popn_practice_' + currentUser;
+}
+
+function isPracticeBoxVisible() {
+    const box = document.getElementById('practice-box');
+    return !!box && box.offsetParent !== null;
+}
+
+function shuffleList(list) {
+    const a = list.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
+
+function buildPracticePools() {
+    const isNormal = s => !!(MEDAL_TYPES[clearRecords[s.id] || ''] || {}).isNormalClear;
+    const pools = [];
+    pools.push(songs.filter(s => getMemo(s.id).star).map(s => ({ id: s.id, r: '★練習したい' })));
+    const goalPool = [];
+    Object.values(getGoalRecords()).forEach(goal => {
+        if (!goal || goal.kind === 'pokkura' || getGoalProgress(goal).complete) return;
+        getGoalTargetSongs(goal).filter(s => !isGoalSongDone(goal, s))
+            .sort((a, b) => goalCloseness(goal, b) - goalCloseness(goal, a)).slice(0, 4)
+            .forEach(s => goalPool.push({ id: s.id, r: `目標：${goalTitle(goal)}` }));
+    });
+    pools.push(goalPool);
+    let recs = [];
+    try { recs = calcPokkuraRecommendations(calcPokkura()); } catch (e) { recs = []; }
+    pools.push(recs.slice(0, 8).filter(rec => rec.song).map(rec => ({ id: rec.song.id, r: `ポックラ +${rec.gain.toFixed(2)}` })));
+    pools.push(songs.filter(s => PRACTICE_NEAR_CLEAR.includes(clearRecords[s.id])).map(s => ({ id: s.id, r: 'クリアまであと少し' })));
+    const weak = getWeakAttrs(songs);
+    pools.push(songs.filter(s => !isNormal(s) && clearRecords[s.id] !== '未解禁' && getSongAttrs(s).some(a => weak.includes(a)))
+        .map(s => ({ id: s.id, r: `苦手：${getSongAttrs(s).find(a => weak.includes(a))}` })));
+    return pools;
+}
+
+function pickPracticeMenu() {
+    const pools = buildPracticePools().map(shuffleList);
+    const picked = [];
+    const used = new Set();
+    for (let round = 0; picked.length < PRACTICE_COUNT; round++) {
+        let added = false;
+        pools.forEach(pool => {
+            if (picked.length >= PRACTICE_COUNT) return;
+            while (pool.length > 0) {
+                const c = pool.shift();
+                if (used.has(c.id)) continue;
+                used.add(c.id);
+                picked.push(c);
+                added = true;
+                break;
+            }
+        });
+        if (!added) break;
+    }
+    return picked;
+}
+
+function loadPracticeMenu(forceNew) {
+    const today = localDateKey(Date.now());
+    if (!forceNew) {
+        try {
+            const saved = JSON.parse(storageGet(practiceStorageKey()) || 'null');
+            if (saved && saved.d === today && Array.isArray(saved.items)) {
+                const items = saved.items.filter(c => c && songs.some(s => s.id === c.id));
+                if (items.length > 0) return items;
+            }
+        } catch (e) { /* 作り直す */ }
+    }
+    const items = pickPracticeMenu();
+    storageSet(practiceStorageKey(), JSON.stringify({ d: today, items }));
+    return items;
+}
+
+function shufflePractice() {
+    renderPracticeBox(true);
+}
+
+function renderPracticeBox(forceNew) {
+    const box = document.getElementById('practice-box');
+    if (!box || songs.length === 0) return;
+    const items = loadPracticeMenu(!!forceNew);
+    const since = new Date(); since.setHours(0, 0, 0, 0);
+    const doneToday = new Set(Object.values(getHistoryRecords()).filter(e => e && e.t >= since.getTime()).map(e => e.id));
+    const rows = items.map(c => {
+        const song = songs.find(s => s.id === c.id);
+        if (!song) return '';
+        const done = doneToday.has(song.id);
+        return `<button type="button" class="pr-row${done ? ' done' : ''}" onclick="openMedalModal('${jsStringAttr(song.id)}')">
+            <span class="level-badge">${escapeHtml(song.level)}</span>
+            <span class="pr-text"><span class="pr-title">${escapeHtml(song.title)}</span><span class="pr-reason">${escapeHtml(c.r)}</span></span>
+            ${done ? '<span class="pr-done" title="今日更新しました">✓</span>' : ''}
+            <span class="pr-medal">${historyMedalHtml(clearRecords[song.id] || '')}</span>
+        </button>`;
+    }).join('');
+    const doneCount = items.filter(c => doneToday.has(c.id)).length;
+    box.innerHTML = `<div class="pr-head"><span class="pr-heading">今日の練習</span><span class="pr-count">${doneCount}/${items.length}</span>
+        <button type="button" class="pr-shuffle" onclick="shufflePractice()">入れ替える</button></div>
+        ${rows || '<div class="pr-empty">練習する曲が見つかりません。メモの★練習したい・目標・ポックラのおすすめ・属性から選びます。</div>'}`;
 }

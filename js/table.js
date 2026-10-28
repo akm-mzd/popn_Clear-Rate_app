@@ -1442,6 +1442,11 @@ function buildStatsPageHtml(page, st) {
         });
         html += `</tbody></table></section>`;
     }
+
+    // 属性別（苦手な属性）と、伸びのグラフ（growth.js）
+    const pageSongs = getStatsPageSongs(page.key);
+    html += buildAttrCardHtml(pageSongs);
+    html += buildGrowthCardHtml(page, pageSongs);
     return html;
 }
 

@@ -10,7 +10,7 @@
 //   小数第2位: UI・操作感の変更 / 小数第3位: バグ修正
 //   ※ 変更を加えるたびに必ず更新する（CLAUDE.md 参照）
 // ==========================================
-const APP_VERSION = '3.21.2.0';
+const APP_VERSION = '3.22.0.0';
 
 // ==========================================
 // ★ 端末の判定（スマホ表示に切り替える画面幅）
@@ -101,7 +101,7 @@ let lastDisplaySongs = []; // 現在テーブルに表示中の楽曲（難易�
 const STORAGE_KEY_CACHE = 'popn_cloud_cache_v1';
 let dataLoaded = false; // キャッシュかクラウドのどちらかを読めたか
 
-const emptyUser = () => ({ clearRecords: {}, scoreRecords: {}, memoRecords: {}, historyRecords: {}, pokkuraRecords: {}, goalRecords: {}, pokkuraFlagRecords: {}, recentRecords: {}, memoConfigRecords: {}, attrConfigRecords: {} });
+const emptyUser = () => ({ clearRecords: {}, scoreRecords: {}, memoRecords: {}, historyRecords: {}, pokkuraRecords: {}, goalRecords: {}, pokkuraFlagRecords: {}, recentRecords: {}, memoConfigRecords: {}, attrConfigRecords: {}, pokkuraHistRecords: {} });
 
 // メダル・ランクの画像はリポジトリの images/ に置いている（公式サイトの画像を使うと、公式が止まったときに出なくなるため）
 // 画像として使える場所か（リポジトリの images/・http(s)・data:）。'URLをペースト' などの仮の値は使わない

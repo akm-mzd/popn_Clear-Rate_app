@@ -43,6 +43,8 @@ function toggleMenu(force) {
     if (!panel) return;
     const open = (typeof force === 'boolean') ? force : !panel.classList.contains('open');
     panel.classList.toggle('open', open);
+    // 以前の見た目では、メニューを開くと目標の欄（今日の練習）も見えるので描き直す
+    if (open && typeof renderPracticeBox === 'function' && !(typeof isNewUi === 'function' && isNewUi())) renderPracticeBox();
     document.getElementById('menu-backdrop').classList.toggle('open', open);
     document.getElementById('menu-btn').textContent = open ? '✕' : '☰';
     if (!open && typeof onMenuClosed === 'function') onMenuClosed();

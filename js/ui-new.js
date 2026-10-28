@@ -68,6 +68,7 @@ function openNewUiSheet(key) {
     toggleMenu(true);
     panel.scrollTop = 0;
     if (key === 'stats') renderNewUiStats();
+    if (key === 'goal') renderPracticeBox();
 }
 
 function closeNewUiSheet() {

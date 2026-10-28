@@ -399,10 +399,14 @@ function applyEagateImport() {
     }
     const hasRecent = pending.recent.length > 0;
     if (hasRecent) saveRecentRecords(currentUser, pending.recent, pending.rt, pending.at);
+    // その日のポックラ（公式の値・計算値）を記録する（伸びのグラフ・今日のまとめで使う）
+    recordPokkuraHistory();
     closeEagateImportModal();
-    if (pending.changes.length > 0 || hasPokkuraData || hasRecent) scheduleAutoSave();
+    scheduleAutoSave();
     renderTable();
     showToast('toast-eagate', `公式データを反映しました（${pending.changes.length}曲）`, '#4caf50', 3000);
+    // 何か上がったら、今日のまとめを出す
+    if (pending.changes.length > 0) openDailySummary(true);
 }
 
 // ---------- 最近プレーした曲：ユーザーごとにクラウドに保存（recentRecords） ----------
