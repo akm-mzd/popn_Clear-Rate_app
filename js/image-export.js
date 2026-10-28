@@ -853,7 +853,8 @@ function buildDailySummaryRoot(sum, pk) {
         <div style="flex: 1; ${EXPORT_CENTER} font-size: 28px; line-height: 1.2; font-weight: bold; color: ${accent};">今日のまとめ</div>
         <div style="text-align: right; color: #555; font-size: 14px; font-weight: bold; flex-shrink: 0;">User: ${escapeHtml(currentUser)}</div>
     </div>`;
-    html += `<div style="display: flex; gap: 8px; margin-bottom: 12px;">${stat(sum.medalUp.length, 'メダルが上がった')}${stat(sum.scoreUp.length, 'スコアが上がった')}${stat(sum.newNormal, '初クリア')}${stat(sum.newFc, '初フルコン')}</div>`;
+    const tiles = getDailySummaryTiles(sum);
+    if (tiles.length > 0) html += `<div style="display: flex; gap: 8px; margin-bottom: 12px;">${tiles.map(([n, label]) => stat(n, label)).join('')}</div>`;
     if (pk && pk.cur !== null) {
         const diff = pk.prev !== null ? pk.cur - pk.prev : null;
         html += `<div style="background: #fff; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; font-size: 15px; font-weight: bold;">ポップンクラス <span style="font-size: 22px; color: #7b1fa2;">${pk.cur.toFixed(2)}</span>${diff !== null ? ` <span style="color: ${diff >= 0 ? '#2e7d32' : '#c62828'};">（${diff >= 0 ? '+' : '−'}${Math.abs(diff).toFixed(2)}）</span>` : ''}</div>`;

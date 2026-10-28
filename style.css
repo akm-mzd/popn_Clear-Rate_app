@@ -1653,8 +1653,8 @@ button.sh-more { width: 100%; margin: 6px 0 0; padding: 6px; border: 1px solid #
 /* 今日のまとめ */
 .daily-summary-content { max-width: 480px; width: 95vw; max-height: 90vh; display: flex; flex-direction: column; box-sizing: border-box; }
 .ds-date { font-size: 12px; color: #888; margin-bottom: 8px; }
-.ds-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 8px; }
-.ds-stats div { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 2px; border-radius: 10px; background: #fce4ef; }
+.ds-stats { display: flex; gap: 6px; margin-bottom: 8px; }
+.ds-stats div { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 2px; border-radius: 10px; background: #fce4ef; }
 .ds-stats b { font-size: 22px; color: #c2185b; line-height: 1; }
 .ds-stats span { font-size: 10px; color: #666; text-align: center; }
 .ds-pokkura { margin-bottom: 8px; padding: 8px 10px; border-radius: 10px; background: #f3e5f5; font-size: 13px; }

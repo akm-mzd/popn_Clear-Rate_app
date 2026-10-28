@@ -354,15 +354,17 @@ function closeDailySummary() {
     document.getElementById('daily-summary-modal').style.display = 'none';
 }
 
+// 今日のまとめの数（0 のものは外す）：[[数, 名前]]
+function getDailySummaryTiles(sum) {
+    return [[sum.medalUp.length, 'メダルが上がった'], [sum.scoreUp.length, 'スコアが上がった'], [sum.newNormal, '初クリア'], [sum.newFc, '初フルコン']].filter(([n]) => n > 0);
+}
+
 function buildDailySummaryHtml(sum, pk) {
     const d = new Date();
+    // 0 のものは出さない
+    const tiles = getDailySummaryTiles(sum).map(([n, label]) => `<div><b>${n}</b><span>${label}</span></div>`).join('');
     let html = `<div class="ds-date">${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}（${HISTORY_WEEKDAYS[d.getDay()]}）</div>
-        <div class="ds-stats">
-            <div><b>${sum.medalUp.length}</b><span>メダルが上がった</span></div>
-            <div><b>${sum.scoreUp.length}</b><span>スコアが上がった</span></div>
-            <div><b>${sum.newNormal}</b><span>初クリア</span></div>
-            <div><b>${sum.newFc}</b><span>初フルコン</span></div>
-        </div>`;
+        ${tiles ? `<div class="ds-stats">${tiles}</div>` : ''}`;
     if (pk && pk.cur !== null) {
         const diff = pk.prev !== null ? pk.cur - pk.prev : null;
         html += `<div class="ds-pokkura">ポップンクラス <b>${pk.cur.toFixed(2)}</b>${diff !== null ? `<span class="${diff >= 0 ? 'up' : 'down'}">（${diff >= 0 ? '+' : '−'}${Math.abs(diff).toFixed(2)}）</span>` : ''}${pk.official ? '' : '<small>計算値</small>'}</div>`;
