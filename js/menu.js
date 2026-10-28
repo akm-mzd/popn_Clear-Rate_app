@@ -41,7 +41,10 @@ function scrollToTop() {
 function toggleMenu(force) {
     const panel = document.getElementById('menu-panel');
     if (!panel) return;
-    const open = (typeof force === 'boolean') ? force : !panel.classList.contains('open');
+    const wasOpen = panel.classList.contains('open');
+    const open = (typeof force === 'boolean') ? force : !wasOpen;
+    // 絞り込みを入れてメニューを閉じたら「よく使う条件」として数える
+    if (wasOpen && !open && typeof recordFilterUsage === 'function') recordFilterUsage();
     panel.classList.toggle('open', open);
     document.getElementById('menu-backdrop').classList.toggle('open', open);
     document.getElementById('menu-btn').textContent = open ? '✕' : '☰';

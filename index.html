@@ -6,7 +6,7 @@
     <title>Pop’n Clear Rate app</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
-    <link rel="stylesheet" href="style.css?v=3.19.0.0">
+    <link rel="stylesheet" href="style.css?v=3.21.0.0">
 </head>
 <body>
     <!-- 新しいデザイン（ver 3）の上部バーとナビ。以前の見た目では隠れる（js/ui-new.js） -->
@@ -128,26 +128,21 @@
                     <summary style="cursor: pointer; font-weight: bold; color: #555; user-select: none;"><span class="menu-emoji">🔍</span> さらに条件で絞り込む<span id="filter-summary-count"></span><span id="filter-summary-shown" class="filter-summary-shown"></span></summary>
                     <div class="filter-groups">
                         <div class="filter-quick">
-                            <div class="filter-quick-title">よく使う条件</div>
+                            <div class="filter-quick-head">
+                                <span class="filter-quick-title">よく使う条件</span>
+                                <button type="button" id="filter-usage-clear" class="filter-usage-clear" onclick="clearFilterUsage()" hidden>覚えた条件を消す</button>
+                            </div>
                             <div id="filter-presets" class="filter-presets"></div>
                         </div>
                         <div id="filter-active" class="filter-active" hidden></div>
 
                         <details class="filter-group filter-sub-details" open>
+                            <summary class="filter-group-title">レベル<span id="filter-level-count" class="filter-count"></span></summary>
+                            <div class="filter-checks" id="filter-level"></div>
+                        </details>
+                        <details class="filter-group filter-sub-details" open>
                             <summary class="filter-group-title">メダル<span id="filter-medal-count" class="filter-count"></span></summary>
                             <div class="filter-checks" id="filter-medal"></div>
-                        </details>
-                        <details class="filter-group filter-sub-details">
-                            <summary class="filter-group-title">スコア<span id="filter-score-count" class="filter-count"></span></summary>
-                            <div class="filter-sub-label">ランク</div>
-                            <div class="filter-checks" id="filter-rank"></div>
-                            <div class="filter-sub-label">点数の範囲</div>
-                            <div class="filter-range">
-                                <input type="number" id="filter-score-min" inputmode="numeric" min="0" max="100000" step="1000" placeholder="下限" aria-label="スコアの下限" oninput="onScoreRangeInput()">
-                                <span>〜</span>
-                                <input type="number" id="filter-score-max" inputmode="numeric" min="0" max="100000" step="1000" placeholder="上限" aria-label="スコアの上限" oninput="onScoreRangeInput()">
-                                <span class="filter-range-unit">点</span>
-                            </div>
                         </details>
                         <details class="filter-group filter-sub-details" open>
                             <summary class="filter-group-title">難易度<span id="filter-diff-count" class="filter-count"></span></summary>
@@ -165,21 +160,33 @@
                             </div>
                         </details>
                         <details class="filter-group filter-sub-details">
-                            <summary class="filter-group-title">最後に更新した日<span id="filter-updated-count" class="filter-count"></span></summary>
-                            <div class="filter-checks" id="filter-updated"></div>
-                            <div class="filter-note">メダル・スコアの更新履歴から数えます</div>
-                        </details>
-                        <details class="filter-group filter-sub-details">
-                            <summary class="filter-group-title">タグ・メモ<span id="filter-affinity-count" class="filter-count"></span></summary>
-                            <div class="filter-checks" id="filter-affinity"></div>
-                        </details>
-                        <details class="filter-group filter-sub-details">
                             <summary class="filter-group-title">属性<span id="filter-attr-count" class="filter-count"></span></summary>
                             <div class="filter-checks" id="filter-attr"></div>
                         </details>
                         <details class="filter-group filter-sub-details">
                             <summary class="filter-group-title">バージョン<span id="filter-version-count" class="filter-count"></span></summary>
                             <div class="filter-checks" id="filter-version"></div>
+                        </details>
+                        <details class="filter-group filter-sub-details">
+                            <summary class="filter-group-title">スコア<span id="filter-score-count" class="filter-count"></span></summary>
+                            <div class="filter-sub-label">ランク</div>
+                            <div class="filter-checks" id="filter-rank"></div>
+                            <div class="filter-sub-label">点数の範囲</div>
+                            <div class="filter-range">
+                                <input type="number" id="filter-score-min" inputmode="numeric" min="0" max="100000" step="1000" placeholder="下限" aria-label="スコアの下限" oninput="onScoreRangeInput()">
+                                <span>〜</span>
+                                <input type="number" id="filter-score-max" inputmode="numeric" min="0" max="100000" step="1000" placeholder="上限" aria-label="スコアの上限" oninput="onScoreRangeInput()">
+                                <span class="filter-range-unit">点</span>
+                            </div>
+                        </details>
+                        <details class="filter-group filter-sub-details">
+                            <summary class="filter-group-title">タグ・メモ<span id="filter-affinity-count" class="filter-count"></span></summary>
+                            <div class="filter-checks" id="filter-affinity"></div>
+                        </details>
+                        <details class="filter-group filter-sub-details">
+                            <summary class="filter-group-title">最後に更新した日<span id="filter-updated-count" class="filter-count"></span></summary>
+                            <div class="filter-checks" id="filter-updated"></div>
+                            <div class="filter-note">メダル・スコアの更新履歴から数えます</div>
                         </details>
                         <div class="filter-group-footer">
                             <span class="filter-hint">何も選ばない項目は「すべて」。同じ項目の中は「どれか」、項目どうしは「全部」に当てはまる曲を出します。数字は、選ぶと出る曲の数です</span>
@@ -731,22 +738,22 @@
     <button id="back-to-top" onclick="scrollToTop()" title="トップに戻る">↑</button>
 
     <!-- 読み込み順に意味があります（config が最初、app が最後） -->
-    <script src="js/config.js?v=3.19.0.0"></script>
-    <script src="js/utils.js?v=3.19.0.0"></script>
-    <script src="js/cloud.js?v=3.19.0.0"></script>
-    <script src="js/users.js?v=3.19.0.0"></script>
-    <script src="js/table.js?v=3.19.0.0"></script>
-    <script src="js/modals.js?v=3.19.0.0"></script>
-    <script src="js/memo.js?v=3.19.0.0"></script>
-    <script src="js/history.js?v=3.19.0.0"></script>
-    <script src="js/goals.js?v=3.19.0.0"></script>
-    <script src="js/admin.js?v=3.19.0.0"></script>
-    <script src="js/image-export.js?v=3.19.0.0"></script>
-    <script src="js/eagate-import.js?v=3.19.0.0"></script>
-    <script src="js/wiki-import.js?v=3.19.0.0"></script>
-    <script src="js/menu.js?v=3.19.0.0"></script>
-    <script src="js/ui-new.js?v=3.19.0.0"></script>
-    <script src="js/app.js?v=3.19.0.0"></script>
+    <script src="js/config.js?v=3.21.0.0"></script>
+    <script src="js/utils.js?v=3.21.0.0"></script>
+    <script src="js/cloud.js?v=3.21.0.0"></script>
+    <script src="js/users.js?v=3.21.0.0"></script>
+    <script src="js/table.js?v=3.21.0.0"></script>
+    <script src="js/modals.js?v=3.21.0.0"></script>
+    <script src="js/memo.js?v=3.21.0.0"></script>
+    <script src="js/history.js?v=3.21.0.0"></script>
+    <script src="js/goals.js?v=3.21.0.0"></script>
+    <script src="js/admin.js?v=3.21.0.0"></script>
+    <script src="js/image-export.js?v=3.21.0.0"></script>
+    <script src="js/eagate-import.js?v=3.21.0.0"></script>
+    <script src="js/wiki-import.js?v=3.21.0.0"></script>
+    <script src="js/menu.js?v=3.21.0.0"></script>
+    <script src="js/ui-new.js?v=3.21.0.0"></script>
+    <script src="js/app.js?v=3.21.0.0"></script>
 
 </body>
 </html>
