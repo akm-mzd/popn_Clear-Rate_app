@@ -1621,3 +1621,14 @@ body.ui-new #menu-panel .filter-quick-title, body.ui-new #menu-panel .filter-sub
 body.ui-new #menu-panel .filter-range input { height: 40px; border: 1px solid var(--nu-line); border-radius: 12px; background: var(--nu-bg); }
 #menu-panel .filter-presets > button, #menu-panel .filter-active > button { width: auto !important; flex: 0 0 auto; }
 #menu-panel .filter-active > button.filter-active-clear { margin-left: auto; }
+
+/* よく使う条件：覚えた組み合わせ（よく使う順） */
+.filter-quick-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.filter-quick-head .filter-quick-title { margin: 0; }
+#menu-panel button.filter-usage-clear { width: auto !important; margin: 0; padding: 0; min-height: 0; border: none; background: none; color: #999; font-size: 11px; text-decoration: underline; cursor: pointer; }
+#menu-panel button.filter-usage-clear[hidden] { display: none; }
+button.filter-preset .fp-label { max-width: 16em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+button.filter-preset.learned { border-color: #90caf9; background: #e3f2fd; color: #0d47a1; }
+button.filter-preset.learned::before { content: '↻'; margin-right: 4px; font-size: 0.9em; opacity: 0.7; }
+button.filter-preset.learned:hover { background: #bbdefb; }
+button.filter-preset.learned.active { background: #1565c0; border-color: #1565c0; color: #fff; }
