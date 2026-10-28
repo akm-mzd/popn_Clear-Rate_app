@@ -820,3 +820,53 @@ async function exportAsImage(event) {
     const fileLevel = getExportLevelText() === '検索' ? 'Search' : currentViewLevel;
     await outputExportImage(root, `popn_clearrate_${currentUser}_Lv${fileLevel}_${exportDateStr()}.png`, exportBtn, originalText);
 }
+
+// ==========================================
+// ★ 今日のまとめ画像（growth.js の getTodayChanges）
+// ==========================================
+async function generateDailySummaryImage(btn) {
+    const sum = getTodayChanges();
+    if (sum.count === 0) { alert('今日はまだ更新がありません。'); return; }
+    closeDailySummary();
+    const originalText = await prepareExport(btn);
+    if (originalText === null) return;
+    await outputExportImage(buildDailySummaryRoot(sum, getTodayPokkuraChange()), `popn_today_${currentUser}_${exportDateStr()}.png`, btn, originalText);
+}
+
+function buildDailySummaryRoot(sum, pk) {
+    const root = createExportRoot(560);
+    const accent = '#c2185b';
+    const stat = (n, label) => `<div style="flex: 1; background: #fff; border-radius: 10px; padding: 10px 4px; text-align: center;">
+        <div style="font-size: 26px; font-weight: bold; color: ${accent}; line-height: 1;">${n}</div>
+        <div style="font-size: 12px; color: #666; margin-top: 6px;">${label}</div></div>`;
+    const lvBox = lv => `<div style="width: 34px; height: 22px; flex-shrink: 0; ${EXPORT_CENTER} background: #555; color: #fff; border-radius: 4px; font-size: 12px; font-weight: bold;">${escapeHtml(lv)}</div>`;
+    const row = (lv, title, right) => `<div style="display: flex; align-items: center; gap: 8px; background: #fff; border-radius: 8px; padding: 6px 8px; margin-bottom: 4px;">
+        ${lvBox(lv)}<div style="flex: 1; min-width: 0; font-size: 14px; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">${escapeHtml(title)}</div>${right}</div>`;
+    const medal = k => k ? buildMedalIconHtml(k, 26) : `<span style="font-size: 11px; color: #999;">未プレイ</span>`;
+    const now = new Date();
+    let html = `<div style="display: flex; align-items: center; gap: 16px; margin-bottom: 14px;">
+        <div style="background: #fff; border: 3px solid ${accent}; border-radius: 12px; width: 104px; height: 84px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0;">
+            <div style="font-size: 14px; line-height: 1; font-weight: bold; color: ${accent};">${now.getFullYear()}</div>
+            <div style="font-size: 30px; line-height: 1; font-weight: bold; color: ${accent}; margin-top: 6px;">${now.getMonth() + 1}/${now.getDate()}</div>
+            <div style="font-size: 12px; line-height: 1; color: ${accent}; margin-top: 4px;">（${HISTORY_WEEKDAYS[now.getDay()]}）</div>
+        </div>
+        <div style="flex: 1; ${EXPORT_CENTER} font-size: 28px; line-height: 1.2; font-weight: bold; color: ${accent};">今日のまとめ</div>
+        <div style="text-align: right; color: #555; font-size: 14px; font-weight: bold; flex-shrink: 0;">User: ${escapeHtml(currentUser)}</div>
+    </div>`;
+    const tiles = getDailySummaryTiles(sum);
+    if (tiles.length > 0) html += `<div style="display: flex; gap: 8px; margin-bottom: 12px;">${tiles.map(([n, label]) => stat(n, label)).join('')}</div>`;
+    if (pk && pk.cur !== null) {
+        const diff = pk.prev !== null ? pk.cur - pk.prev : null;
+        html += `<div style="background: #fff; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; font-size: 15px; font-weight: bold;">ポップンクラス <span style="font-size: 22px; color: #7b1fa2;">${pk.cur.toFixed(2)}</span>${diff !== null ? ` <span style="color: ${diff >= 0 ? '#2e7d32' : '#c62828'};">（${diff >= 0 ? '+' : '−'}${Math.abs(diff).toFixed(2)}）</span>` : ''}</div>`;
+    }
+    if (sum.medalUp.length > 0) {
+        html += `<div style="font-size: 13px; font-weight: bold; color: #666; margin: 6px 0 4px;">メダル</div>`;
+        html += sum.medalUp.map(c => row(c.lv, c.ti, `<div style="display: flex; align-items: center; gap: 4px;">${medal(c.om)}<span style="color: #999;">→</span>${medal(c.nm)}</div>`)).join('');
+    }
+    if (sum.scoreUp.length > 0) {
+        html += `<div style="font-size: 13px; font-weight: bold; color: #666; margin: 10px 0 4px;">スコア</div>`;
+        html += sum.scoreUp.map(c => row(c.lv, c.ti, `<div style="font-size: 15px; font-weight: bold;">${c.ns.toLocaleString('ja-JP')}<span style="font-size: 12px; color: #2e7d32; margin-left: 4px;">${c.diff !== null ? '+' + c.diff.toLocaleString('ja-JP') : '初'}</span></div>`)).join('');
+    }
+    root.innerHTML = html;
+    return root;
+}

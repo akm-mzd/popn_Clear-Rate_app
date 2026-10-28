@@ -30,6 +30,7 @@ function openMedalModal(id) {
     currentMedalEditId = id;
     renderUraMedalBox();
     renderMemoEditor('memo-editor-medal', id);
+    renderSongHistoryBox(id, false);
     document.getElementById('medal-modal').style.display = 'flex';
 }
 

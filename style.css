@@ -1616,3 +1616,75 @@ body.ui-new #menu-panel .filter-range input { height: 40px; border: 1px solid va
 
 /* 今の表示レベル・検索の曲にない選択肢（と、出すものがない項目）は隠す */
 #menu-panel .check-label.fc-none, #menu-panel details.filter-group.fc-none { display: none !important; }
+
+/* 伸びのグラフ（統計シート） */
+.gr-card .ns-card-title { align-items: center; }
+.gr-units { margin-left: auto; display: inline-flex; gap: 2px; background: #f1ecf3; border-radius: 8px; padding: 2px; }
+#menu-panel button.gr-unit { width: auto; min-height: 0; margin: 0; padding: 3px 10px; border: none; border-radius: 6px; background: transparent; color: #6d6475; font-size: 12px; font-weight: 700; cursor: pointer; }
+#menu-panel button.gr-unit.active { background: #fff; color: var(--nu-accent, #c2185b); box-shadow: 0 1px 2px rgba(0,0,0,0.12); }
+.gr-sub { font-size: 12px; font-weight: 700; color: #555; margin: 8px 0 2px; }
+.gr-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11px; color: #666; }
+.gr-legend i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
+.gr-legend b { margin-left: 4px; color: #333; }
+.gr-svg { display: block; width: 100%; height: auto; }
+.gr-grid { stroke: #eee; stroke-width: 1; }
+.gr-axis { font-size: 9px; fill: #999; }
+.gr-empty { font-size: 12px; color: #888; padding: 6px 0; }
+.gr-note { font-size: 10px; color: #aaa; margin-top: 4px; }
+
+/* 属性別（統計シート） */
+.at-table tbody tr { cursor: pointer; }
+.at-table tbody tr:hover { background: #faf5fc; }
+.at-table tr.at-few { opacity: 0.5; }
+.at-table th { text-align: left; }
+.at-weak { margin-left: 4px; padding: 1px 5px; border-radius: 8px; background: #ffebee; color: #c62828; font-size: 10px; font-weight: 700; }
+
+/* この曲の記録（メダルを選ぶ画面） */
+.song-history-box { margin-top: 12px; padding-top: 10px; border-top: 1px solid #eee; }
+.sh-title { font-size: 13px; font-weight: bold; color: #555; margin-bottom: 4px; }
+.sh-title span { margin-left: 6px; font-weight: normal; color: #999; font-size: 11px; }
+.sh-empty { font-size: 12px; color: #999; }
+.sh-chart { margin: 2px 0 6px; }
+.sh-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; border-bottom: 1px solid #f5f5f5; font-size: 12px; }
+.sh-date { flex-shrink: 0; width: 4.8em; color: #888; }
+.sh-body { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+button.sh-more { width: 100%; margin: 6px 0 0; padding: 6px; border: 1px solid #ddd; border-radius: 6px; background: #fafafa; font-size: 12px; cursor: pointer; }
+
+/* 今日のまとめ */
+.daily-summary-content { max-width: 480px; width: 95vw; max-height: 90vh; display: flex; flex-direction: column; box-sizing: border-box; }
+.ds-date { font-size: 12px; color: #888; margin-bottom: 8px; }
+.ds-stats { display: flex; gap: 6px; margin-bottom: 8px; }
+.ds-stats div { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 2px; border-radius: 10px; background: #fce4ef; }
+.ds-stats b { font-size: 22px; color: #c2185b; line-height: 1; }
+.ds-stats span { font-size: 10px; color: #666; text-align: center; }
+.ds-pokkura { margin-bottom: 8px; padding: 8px 10px; border-radius: 10px; background: #f3e5f5; font-size: 13px; }
+.ds-pokkura b { font-size: 18px; color: #7b1fa2; margin-left: 4px; }
+.ds-pokkura .up { color: #2e7d32; font-weight: bold; } .ds-pokkura .down { color: #c62828; font-weight: bold; }
+.ds-pokkura small { margin-left: 6px; color: #999; }
+.ds-sub { font-size: 12px; font-weight: bold; color: #666; margin: 8px 0 4px; }
+.ds-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid #f3f3f3; font-size: 13px; }
+.ds-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: bold; }
+.ds-score { font-weight: bold; white-space: nowrap; }
+.ds-score small { margin-left: 4px; color: #2e7d32; }
+
+/* 今日の練習（目標シートの一番上） */
+.practice-box { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--nu-line, #eee); }
+.practice-box:empty { display: none; }
+.pr-head { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+.pr-heading { font-weight: bold; font-size: 14px; color: #333; }
+.pr-count { font-size: 12px; color: #888; }
+#menu-panel button.pr-shuffle { width: auto !important; min-height: 0; margin: 0 0 0 auto; padding: 4px 10px; border: 1px solid #ce93d8; border-radius: 14px; background: #faf5fc; color: #7b1fa2; font-size: 12px; font-weight: bold; cursor: pointer; }
+#menu-panel button.pr-row { display: flex; align-items: center; gap: 8px; width: 100%; margin: 0; padding: 6px 8px; border: 1px solid #eee; border-radius: 10px; background: #fff; color: #333; text-align: left; font-family: inherit; cursor: pointer; }
+#menu-panel button.pr-row:hover { background: #faf5fc; }
+#menu-panel button.pr-row.done { background: #f1f8e9; border-color: #c5e1a5; }
+.pr-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.pr-title { font-weight: bold; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pr-reason { font-size: 11px; color: #888; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pr-done { color: #2e7d32; font-weight: bold; }
+.pr-medal { flex-shrink: 0; }
+.pr-empty { font-size: 12px; color: #888; }
+.at-table { table-layout: auto; }
+.at-table th { white-space: normal; }
+.at-weak { display: inline-block; }
+#ns-root .at-table { table-layout: auto; }
+#ns-root .at-table tbody th { white-space: normal; line-height: 1.5; }
