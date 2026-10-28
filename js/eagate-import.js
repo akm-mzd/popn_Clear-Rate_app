@@ -149,17 +149,30 @@ function parseEagatePayload(text) {
 // ---------- 曲の突き合わせ ----------
 const UPPER_RE = /\s*\(upper\)/gi;
 
+// UPPER の書き方（Ⓤ・UPPER・(UPPER)・upper・全角）を、すべて「 (upper)」にそろえる（全角/半角もそろえる）
+function unifyUpperText(s) {
+    return String(s || '')
+        .replace(/[\u24CA\u24E4]/g, ' (upper)') // Ⓤ ⓤ（NFKC だと「U」になるので先に）
+        .normalize('NFKC')
+        .replace(/\s*(?:[(\[]\s*upper\s*[)\]]|(?<![\p{L}\p{N}])upper(?![\p{L}\p{N}]))/giu, ' (upper)');
+}
+
 // 公式と攻略wikiで表記が違っても合うように、文字をそろえる。
-// 「(UPPER)」を消したあと、文字と数字以外（空白・記号・波線・「＼」・見えない制御文字）をすべて消す
+// UPPER の表記を消したあと、文字と数字以外（空白・記号・波線・「＼」・見えない制御文字）をすべて消す
 function normalizeSongText(s) {
-    return String(s || '').normalize('NFKC').toLowerCase()
+    return unifyUpperText(s).toLowerCase()
         .replace(UPPER_RE, '')
         .replace(/[^\p{L}\p{N}]/gu, '');
 }
 
-// 「(UPPER)」が付いているか（公式は UPPER 譜面の曲名とジャンルに付ける）
+// UPPER と書いてあるか（Ⓤ・UPPER・(UPPER)・upper のどれでも）
 function isUpperText(s) {
-    return /\(upper\)/i.test(String(s || '').normalize('NFKC'));
+    return /\(upper\)/i.test(unifyUpperText(s));
+}
+
+// アプリの曲が UPPER 譜面か（曲名・ジャンル・バージョン・難易度のどこかに UPPER と書いてある）
+function songSaysUpper(s) {
+    return isUpperText(`${s.title || ''} ${s.genre || ''} ${s.version || ''} ${s.diffRaw || ''}`);
 }
 
 function isEagateTargetSong(song) {
@@ -190,7 +203,7 @@ function matchEagateCharts(charts) {
     const used = new Set();     // 割り当て済みの公式の譜面
     const assign = (song, chart, how) => { assigned.set(song.id, { chart, how }); used.add(chart); };
     const songLv = s => parseInt(s.level, 10);
-    const appSaysUpper = s => /upper/i.test(`${s.genre || ''} ${s.version || ''} ${s.diffRaw || ''}`);
+    const appSaysUpper = songSaysUpper;
 
     // ① レベルが分かる譜面：同じレベル・同じ曲名で合わせる（ジャンルは、同じ曲名が複数あるときだけ使う）
     const groups = new Map();
@@ -411,7 +424,7 @@ function loadRecentRecords(user = currentUser) {
 // 最近プレーした曲を、アプリの曲に合わせる（曲名で。「(UPPER)」付きは、アプリで UPPER と書いてある曲を優先）
 //   同じ曲名の曲が複数ある（EX と HYPER など）ときは全部。返り値 [{ t, g, songs: [曲] }]（合わなければ songs は空）
 function matchRecentSongs(list) {
-    const appSaysUpper = s => /upper/i.test(`${s.genre || ''} ${s.version || ''} ${s.diffRaw || ''}`);
+    const appSaysUpper = songSaysUpper;
     return list.map(c => {
         const title = normalizeSongText(c.t);
         let hit = title ? songs.filter(s => normalizeSongText(s.title) === title) : [];
