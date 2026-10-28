@@ -343,8 +343,10 @@ function calcHistoryImport(state) {
     const existing = Object.entries(records).filter(([, e]) => e && typeof e.t === 'number');
     // 曲ごとの、今ある一番古い履歴（写真以外）の日時と、写真以外の履歴
     const earliest = {}, ownById = {};
+    // 前に写真から取り込んだ履歴（同じ曲・同じ日時）。取り込み直したときは、足さずにこれに書き足す
+    const photoAt = {};
     existing.forEach(([key, e]) => {
-        if (e.src === 'p') return;
+        if (e.src === 'p') { photoAt[e.id + '|' + e.t] = key; return; }
         if (!(earliest[e.id] <= e.t)) earliest[e.id] = e.t;
         (ownById[e.id] || (ownById[e.id] = [])).push({ key, e });
     });
@@ -352,7 +354,7 @@ function calcHistoryImport(state) {
     const have = new Set(existing.map(([, e]) => sameKey(e)));
     const toNum = v => (v === undefined || v === null || v === '' || isNaN(parseInt(v, 10))) ? null : parseInt(v, 10);
 
-    const add = [], merges = [], unmatched = [];
+    const add = [], merges = [], fills = [], unmatched = [];
     let newer = 0, dup = 0, bad = 0, same = 0;
     const mergedKeys = new Set();
     // ファイルの中に同じ曲の更新がいくつかあれば、日付の古い順に並べてつなぐ：
@@ -394,6 +396,15 @@ function calcHistoryImport(state) {
             } else newer++;
             return;
         }
+        // 前に写真から取り込んだ同じ写真（同じ曲・同じ日時）があれば、足りない項目だけ書き足す
+        const pk = photoAt[song.id + '|' + t];
+        if (pk) {
+            const x = records[pk];
+            const fill = {};
+            [['nm', 'om'], ['ns', 'os'], ['nb', 'ob']].forEach(([n, o]) => { if (n in e && !(n in x)) { fill[n] = e[n]; fill[o] = e[o]; } });
+            if (Object.keys(fill).length) fills.push({ key: pk, fill }); else dup++;
+            return;
+        }
         if (have.has(sameKey(e))) { dup++; return; }
         have.add(sameKey(e));
         add.push(e);
@@ -409,7 +420,7 @@ function calcHistoryImport(state) {
         const cur = toBadNum(badRecs[song.id]);
         if ((cur === null || n < cur) && !(badSet[song.id] <= n)) badSet[song.id] = n;
     });
-    return { add, merges, badSet, unmatched, newer, dup, bad, same, existingCount: existing.length };
+    return { add, merges, fills, badSet, unmatched, newer, dup, bad, same, existingCount: existing.length };
 }
 
 function renderHistoryImport() {
@@ -430,6 +441,7 @@ function renderHistoryImport() {
             <div>${escapeHtml(currentUser)} さんの更新履歴に <b>${c.add.length}</b> 件を足します</div>
             ${c.same ? `<div class="hi-note">今の履歴と同じ更新 ${c.same} 件は、今の履歴を残します${c.merges.length ? `（BAD を ${c.merges.length} 件に書き足します）` : ''}</div>` : ''}
             ${c.newer ? `<div class="hi-note">今の履歴より新しい日付の ${c.newer} 件は飛ばします</div>` : ''}
+            ${c.fills.length ? `<div class="hi-note">前に取り込んだ写真の履歴 ${c.fills.length} 件に、足りない項目（最初のメダルなど）を書き足します</div>` : ''}
             ${c.dup ? `<div class="hi-note">すでに取り込んでいる ${c.dup} 件は飛ばします</div>` : ''}
             ${c.bad ? `<div class="hi-note">読めなかった ${c.bad} 件は飛ばします</div>` : ''}
             ${over ? `<div class="hi-warn">履歴が ${HISTORY_MAX} 件を超えるため、古いものから消えます</div>` : ''}
@@ -439,7 +451,7 @@ function renderHistoryImport() {
         ${days.length ? `<details class="hi-days-wrap"><summary>日付ごとの件数（${days.length}日）</summary><div class="hi-days">${days.map(k => `<div><span>${escapeHtml(k.replace(/-/g, '/'))}</span><b>${byDay[k]}件</b></div>`).join('')}</div></details>` : ''}
         ${unmatchedNames.length ? `<details class="eagate-unmatched"><summary>アプリの曲と合わなかった曲（${unmatchedNames.length}曲）</summary><ul>${unmatchedNames.slice(0, 300).map(n => `<li>${escapeHtml(n)}</li>`).join('')}</ul></details>` : ''}`;
     body.scrollTop = scrollTop;
-    document.getElementById('history-import-apply').disabled = (c.add.length === 0 && badCount === 0 && c.merges.length === 0) || !!(state.progress && state.progress.done < state.progress.total);
+    document.getElementById('history-import-apply').disabled = (c.add.length === 0 && badCount === 0 && c.merges.length === 0 && c.fills.length === 0) || !!(state.progress && state.progress.done < state.progress.total);
 }
 
 // 曲名で合わなかった曲：写真のバナーと、似ている順の候補（押して選ぶ）
@@ -565,6 +577,7 @@ function applyHistoryImport() {
     c.add.forEach(e => { records[e.t.toString(36) + '_p' + Math.random().toString(36).slice(2, 7)] = e; });
     // 今の履歴と同じ更新：今の履歴は残し、BAD だけ書き足す
     c.merges.forEach(m => { const x = records[m.key]; if (x && !('nb' in x)) { x.ob = m.ob; x.nb = m.nb; } });
+    c.fills.forEach(f => { const x = records[f.key]; if (x) Object.assign(x, f.fill); });
     const badRecs = getBadRecords();
     Object.keys(c.badSet).forEach(id => { badRecs[id] = c.badSet[id]; });
     const keys = Object.keys(records);
@@ -575,5 +588,5 @@ function applyHistoryImport() {
     scheduleAutoSave();
     renderTable();
     const nBad = Object.keys(c.badSet).length;
-    showToast('toast-eagate', `過去の更新履歴を取り込みました（${c.add.length}件${c.merges.length ? `・BAD 書き足し ${c.merges.length}件` : ''}${nBad ? `・BAD ${nBad}曲` : ''}）`, '#4caf50', 3000);
+    showToast('toast-eagate', `過去の更新履歴を取り込みました（${c.add.length}件${c.merges.length ? `・BAD 書き足し ${c.merges.length}件` : ''}${c.fills.length ? `・書き足し ${c.fills.length}件` : ''}${nBad ? `・BAD ${nBad}曲` : ''}）`, '#4caf50', 3000);
 }
