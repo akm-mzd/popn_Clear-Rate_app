@@ -784,8 +784,8 @@ async function exportAsImage(event) {
         { id: 4, w: 44, head: th('Ver', 44), cell: (s) => td(escapeHtml(s.version)) },
         { id: 5, w: 140, head: th('バナー', 140), cell: (s) => td(`<div style="${EXPORT_CENTER}">${buildBannerBoxHtml(s, 128, 32)}</div>`) },
         { id: 6, w: 240, head: th('ジャンル / 曲名', 240, 'left'), cell: (s) => {
-            const memo = memoRecords[s.id] || {};
-            const memoParts = [memo.affinity, memo.sudden ? `SUD+ ${memo.sudden}` : '', memo.comment].filter(Boolean);
+            const memo = getMemo(s.id);
+            const memoParts = [memo.star ? '★' : '', getMemoTags(memo).join('・'), memo.hs ? `HS ${memo.hs}` : '', memo.opt || '', memo.sudden ? `SUD+ ${memo.sudden}` : '', memo.comment].filter(Boolean);
             const memoHtml = memoParts.length ? `<div style="font-size: 11px; color: #e65100; margin-top: 2px;">📝 ${escapeHtml(memoParts.join(' / '))}</div>` : '';
             return td(`<div style="font-size: 11px; color: #777;">${escapeHtml(s.genre)}</div><div style="font-weight: bold;">${escapeHtml(s.title)}</div>${memoHtml}`, 'left');
         } },

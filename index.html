@@ -6,7 +6,7 @@
     <title>Pop’n Clear Rate app</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
-    <link rel="stylesheet" href="style.css?v=3.15.1.0">
+    <link rel="stylesheet" href="style.css?v=3.16.0.0">
 </head>
 <body>
     <!-- 新しいデザイン（ver 3）の上部バーとナビ。以前の見た目では隠れる（js/ui-new.js） -->
@@ -213,6 +213,9 @@
                     <span class="menu-row-label">ランダムセレクト</span>
                     <button onclick="openRandomModal()" class="random-ready-btn">Are You Ready?</button>
                 </div>
+                <div class="menu-memo-row">
+                    <button type="button" onclick="openMemoListModal()" class="memo-list-open"><span class="menu-emoji">📝</span> メモ一覧</button>
+                </div>
                 <details class="menu-filter-details">
                     <summary style="cursor: pointer; font-weight: bold; color: #555; user-select: none;"><span class="menu-emoji">🔍</span> さらに条件で絞り込む<span id="filter-summary-count"></span></summary>
                     <div class="filter-groups">
@@ -240,15 +243,8 @@
                             <div class="filter-checks" id="filter-version"></div>
                         </details>
                         <details class="filter-group filter-sub-details">
-                            <summary class="filter-group-title">相性 (メモ)<span id="filter-affinity-count" class="filter-count"></span></summary>
-                            <div class="filter-checks" id="filter-affinity">
-                                <label class="check-label"><input type="checkbox" value="得意" onchange="renderTable()"> 得意</label>
-                                <label class="check-label"><input type="checkbox" value="苦手" onchange="renderTable()"> 苦手</label>
-                                <label class="check-label"><input type="checkbox" value="噛み合い待ち" onchange="renderTable()"> 噛み合い待ち</label>
-                                <label class="check-label"><input type="checkbox" value="敵" onchange="renderTable()"> 敵</label>
-                                <label class="check-label"><input type="checkbox" value="💩" onchange="renderTable()"> 💩</label>
-                                <label class="check-label"><input type="checkbox" value="未設定" onchange="renderTable()"> 未設定(メモ無含む)</label>
-                            </div>
+                            <summary class="filter-group-title">タグ・メモ<span id="filter-affinity-count" class="filter-count"></span></summary>
+                            <div class="filter-checks" id="filter-affinity"></div>
                         </details>
                         <details class="filter-group filter-sub-details">
                             <summary class="filter-group-title">スコアランク<span id="filter-rank-count" class="filter-count"></span></summary>
@@ -438,39 +434,25 @@
         </div>
     </div>
 
-    <div id="memo-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-content" style="max-width: 400px;">
+    <div id="memo-modal" class="modal-overlay" style="display: none;" onclick="if (event.target === this) closeMemoModal()">
+        <div class="modal-content memo-modal-content">
             <h3 id="memo-modal-title">メモ</h3>
-            <input type="hidden" id="memo-modal-id">
-            
-            <div class="input-item" style="margin-bottom: 15px;">
-                <label>相性</label>
-                <select id="memo-input-affinity">
-                    <option value="">未設定</option>
-                    <option value="得意">得意</option>
-                    <option value="苦手">苦手</option>
-                    <option value="噛み合い待ち">噛み合い待ち</option>
-                    <option value="敵">敵</option>
-                    <option value="💩">💩</option>
-                </select>
-            </div>
-
-            <div class="input-item" style="margin-bottom: 15px;">
-                <label>SUDDEN+ (サドプラ) の値など</label>
-                <input type="text" id="memo-input-sudden" placeholder="例: -150, 300 など">
-            </div>
-
-            <div class="input-item" style="margin-bottom: 20px;">
-                <label>コメント</label>
-                <textarea id="memo-input-comment" placeholder="譜面の傾向や注意点など..."></textarea>
-            </div>
-
+            <div id="memo-editor-memo"></div>
             <div class="modal-actions" style="justify-content: space-between; gap: 20px;">
-                <button onclick="clearMemo()" style="background-color: #f44336; color: white;">クリア</button>
-                <div style="display: flex; gap: 10px;">
-                    <button onclick="closeMemoModal()" style="border: 1px solid #ccc; background: #eee;">キャンセル</button>
-                    <button onclick="saveMemoModal()" style="background-color: #4caf50; color: white; font-weight: bold;">保存</button>
-                </div>
+                <button onclick="clearMemo()" style="background: #fff; color: #d32f2f; border: 1px solid #ef9a9a;">全部消す</button>
+                <button onclick="closeMemoModal()" style="background-color: #4caf50; color: white; font-weight: bold; padding: 8px 24px;">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- メモ一覧（メダルを選ぶ画面より前に置く：一覧から開いたメモが上に出るように） -->
+    <div id="memo-list-modal" class="modal-overlay" style="display: none;" onclick="if (event.target === this) closeMemoListModal()">
+        <div class="modal-content memo-list-content">
+            <h3 style="margin: 0 0 8px;">メモ一覧 <span id="memo-list-count" class="ml-count"></span></h3>
+            <div id="memo-list-chips" class="me-chips"></div>
+            <div id="memo-list-body" class="memo-list-body"></div>
+            <div class="modal-actions" style="justify-content: flex-end; margin-top: 10px;">
+                <button onclick="closeMemoListModal()" style="border: 1px solid #ccc; background: #eee; padding: 8px 24px;">閉じる</button>
             </div>
         </div>
     </div>
@@ -536,8 +518,22 @@
             <h3 style="text-align: center; color: #555; border-bottom: 1px solid #eee; padding-bottom: 10px;">メダルを選択</h3>
             <div id="medal-grid" class="medal-grid"></div>
             <div id="ura-medal-box" class="ura-medal-box" style="display: none;"></div>
+            <div id="memo-editor-medal"></div>
             <div class="modal-actions" style="justify-content: center; margin-top: 20px;">
-                <button onclick="closeMedalModal()" style="border: 1px solid #ccc; background: #eee; padding: 8px 30px;">キャンセル</button>
+                <button onclick="closeMedalModal()" style="border: 1px solid #ccc; background: #eee; padding: 8px 30px;">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- タグの編集（メダル・メモの画面より後に置き、上に出す） -->
+    <div id="memo-tags-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content memo-tags-content">
+            <h3 style="margin: 0 0 8px;">タグを編集</h3>
+            <div style="font-size: 0.8em; color: #888; margin-bottom: 8px;">名前を変えると、メモの中のタグも変わります。消すとメモから外れます。</div>
+            <div id="memo-tags-body"></div>
+            <div class="modal-actions" style="justify-content: flex-end; gap: 10px; margin-top: 12px;">
+                <button onclick="closeMemoTagsModal()" style="border: 1px solid #ccc; background: #eee;">キャンセル</button>
+                <button onclick="saveMemoTagsModal()" style="background-color: #4caf50; color: white; font-weight: bold;">保存</button>
             </div>
         </div>
     </div>
@@ -654,20 +650,21 @@
     <button id="back-to-top" onclick="scrollToTop()" title="トップに戻る">↑</button>
 
     <!-- 読み込み順に意味があります（config が最初、app が最後） -->
-    <script src="js/config.js?v=3.15.1.0"></script>
-    <script src="js/utils.js?v=3.15.1.0"></script>
-    <script src="js/cloud.js?v=3.15.1.0"></script>
-    <script src="js/users.js?v=3.15.1.0"></script>
-    <script src="js/table.js?v=3.15.1.0"></script>
-    <script src="js/modals.js?v=3.15.1.0"></script>
-    <script src="js/history.js?v=3.15.1.0"></script>
-    <script src="js/goals.js?v=3.15.1.0"></script>
-    <script src="js/admin.js?v=3.15.1.0"></script>
-    <script src="js/image-export.js?v=3.15.1.0"></script>
-    <script src="js/eagate-import.js?v=3.15.1.0"></script>
-    <script src="js/menu.js?v=3.15.1.0"></script>
-    <script src="js/ui-new.js?v=3.15.1.0"></script>
-    <script src="js/app.js?v=3.15.1.0"></script>
+    <script src="js/config.js?v=3.16.0.0"></script>
+    <script src="js/utils.js?v=3.16.0.0"></script>
+    <script src="js/cloud.js?v=3.16.0.0"></script>
+    <script src="js/users.js?v=3.16.0.0"></script>
+    <script src="js/table.js?v=3.16.0.0"></script>
+    <script src="js/modals.js?v=3.16.0.0"></script>
+    <script src="js/memo.js?v=3.16.0.0"></script>
+    <script src="js/history.js?v=3.16.0.0"></script>
+    <script src="js/goals.js?v=3.16.0.0"></script>
+    <script src="js/admin.js?v=3.16.0.0"></script>
+    <script src="js/image-export.js?v=3.16.0.0"></script>
+    <script src="js/eagate-import.js?v=3.16.0.0"></script>
+    <script src="js/menu.js?v=3.16.0.0"></script>
+    <script src="js/ui-new.js?v=3.16.0.0"></script>
+    <script src="js/app.js?v=3.16.0.0"></script>
 
 </body>
 </html>

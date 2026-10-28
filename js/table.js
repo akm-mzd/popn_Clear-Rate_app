@@ -69,7 +69,7 @@ function countActiveFilters() {
     return FILTER_IDS.reduce((n, id) => n + getFilterValues(id).length, 0);
 }
 
-// 「さらに条件で絞り込む」と、折りたたみ（バージョン・相性）の見出しに、選んでいる数を出す
+// 「さらに条件で絞り込む」と、折りたたみ（バージョン・タグ）の見出しに、選んでいる数を出す
 function updateFilterSummaryCount() {
     const setCount = (elId, n) => {
         const el = document.getElementById(elId);
@@ -96,10 +96,18 @@ function initFilters() {
     updateDynamicFilters();
 }
 
+// タグ・メモの絞り込みの選択肢（タグはユーザーごとに変えられるので、描くたびに作り直す）
+function buildMemoFilterChecks() {
+    const items = getMemoTagNames().map(n => ({ value: n, label: n }));
+    items.push({ value: MEMO_FILTER_STAR, label: '★練習したい' }, { value: MEMO_FILTER_COMMENT, label: 'コメントあり' }, { value: MEMO_FILTER_NONE, label: 'タグなし' });
+    buildFilterChecks('filter-affinity', items);
+}
+
 function updateDynamicFilters() {
     const versions = [...new Set(songs.map(s => s.version))].filter(v => v)
         .sort((a, b) => getVersionSortValue(a) - getVersionSortValue(b));
     buildFilterChecks('filter-version', versions.map(v => ({ value: v, label: v })));
+    buildMemoFilterChecks();
 
     updateStartupSettingsUI();
 
@@ -361,7 +369,7 @@ function getDiffSortValue(song) {
     return -999;
 }
 
-// 絞り込み（メダル・バージョン・難易度・相性・スコアランク）を当てる関数。何も選んでいない項目は「すべて」
+// 絞り込み（メダル・バージョン・難易度・タグ・スコアランク）を当てる関数。何も選んでいない項目は「すべて」
 function makeSongFilter() {
     const filterMedals = getFilterValues('filter-medal');
     const filterVersions = getFilterValues('filter-version');
@@ -384,10 +392,16 @@ function makeSongFilter() {
             if (!filterDiffs.includes(dClass)) return false;
         }
 
+        // タグ・メモ：選んだもののどれかに当てはまる曲（タグ・★練習したい・コメントあり・タグなし）
         if (filterAffinities.length > 0) {
-            const memo = memoRecords[s.id] || {};
-            const aff = memo.affinity || '未設定';
-            if (!filterAffinities.includes(aff)) return false;
+            const memo = getMemo(s.id);
+            const tags = getMemoTags(memo);
+            const hit = filterAffinities.some(v =>
+                v === MEMO_FILTER_STAR ? !!memo.star
+                : v === MEMO_FILTER_COMMENT ? !!memo.comment
+                : v === MEMO_FILTER_NONE ? tags.length === 0
+                : tags.includes(v));
+            if (!hit) return false;
         }
 
         if (filterRanks.length > 0 && !filterRanks.includes(getSongScoreRank(s) || SCORE_RANK_NONE)) return false;
@@ -479,7 +493,8 @@ function renderTable() {
     let baseSongs = songs.filter(s => {
         if (specialIds) return specialIds.has(s.id);
         if (!searchQuery && currentViewLevel !== 'ALL' && s.level !== currentViewLevel) return false;
-        if (searchQuery && !(s.genre.toLowerCase().includes(searchQuery) || s.title.toLowerCase().includes(searchQuery))) return false;
+        // フリーワード検索：曲名・ジャンルと、メモ（コメント・タグ・ハイスピード・サドプラ・オプション）
+        if (searchQuery && !(s.genre.toLowerCase().includes(searchQuery) || s.title.toLowerCase().includes(searchQuery) || getMemoSearchText(getMemo(s.id)).includes(searchQuery))) return false;
         return true;
     });
 
@@ -658,20 +673,12 @@ function renderTable() {
 
         const finalWikiUrl = getWikiUrl(song); // http(s) 以外のURLは使わない
 
-        const memo = memoRecords[song.id] || {};
-        const hasMemo = memo.comment || memo.sudden || memo.affinity;
-        let tooltipLines = [];
-        if (memo.affinity) tooltipLines.push(`相性: ${memo.affinity}`);
-        if (memo.sudden) tooltipLines.push(`SUDDEN+: ${memo.sudden}`);
-        if (memo.comment) tooltipLines.push(`コメント:\n${memo.comment}`);
-        const memoTooltip = tooltipLines.length > 0 ? tooltipLines.join('\n') : 'メモを追加・編集';
-
-        let affinityBadge = '';
-        if (memo.affinity) {
-            const affinity = String(memo.affinity);
-            const badgeClass = ['得意', '苦手', '噛み合い待ち', '敵', '💩'].includes(affinity) ? `memo-badge-${affinity}` : '';
-            affinityBadge = `<span class="${badgeClass}" style="font-size: 0.8em; margin-left: 2px;">[${escapeHtml(affinity.substring(0, 2))}]</span>`;
-        }
+        const memo = getMemo(song.id);
+        const hasMemo = hasMemoContent(memo);
+        const memoTooltip = hasMemo ? describeMemo(memo) : 'メモを追加・編集';
+        // タグはタグの色で、★練習したいは★で出す
+        const affinityBadge = (memo.star ? '<span class="memo-mark-star" style="font-size: 0.8em; margin-left: 2px;">★</span>' : '') +
+            getMemoTags(memo).map(t => `<span style="font-size: 0.8em; margin-left: 2px; font-weight: bold; color: ${getMemoTagColor(t)};">[${escapeHtml(t.substring(0, 2))}]</span>`).join('');
 
         tr.innerHTML = `
             <td class="col-medal" style="text-align: center; vertical-align: middle;">${medalDisplayHtml}</td>
@@ -1384,7 +1391,7 @@ function buildDiffGridCellHtml(song, showScore, extraHtml = '') {
     const bannerInner = bannerSrc
         ? `<img src="${escapeHtml(bannerSrc)}" alt="${escapeHtml(song.title)}" loading="lazy">`
         : `<span class="dg-banner-text">${escapeHtml(song.title)}</span>`;
-    const banner = `<a class="dg-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（攻略wikiを開く）">${bannerInner}</a>`;
+    const banner = `<a class="dg-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（攻略wikiを開く）">${bannerInner}${buildMemoMarkHtml(song.id)}</a>`;
     return `
                 <div class="dg-cell">
                     <button type="button" class="dg-medal${medalClass}" onclick="openMedalModal('${jsStringAttr(song.id)}')" title="メダルを変更">${buildGridMedalInner(medalKey)}${rankHtml}${buildUraBadgeHtml(song.id, medalKey)}</button>
@@ -1586,7 +1593,7 @@ function renderMedalGrid(targetSongs) {
             cells += `
                 <div class="dg-cell">
                     <button type="button" class="dg-medal${k === '' ? ' dg-medal-empty' : ''}" onclick="openMedalModal('${jsStringAttr(song.id)}')" title="メダルを変更">${buildGridMedalInner(k)}${rankHtml}${buildUraBadgeHtml(song.id, k)}</button>
-                    <a class="dg-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（Lv${escapeHtml(song.level)}${escapeHtml(diffText)}・攻略wikiを開く）">${bannerInner}</a>
+                    <a class="dg-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（Lv${escapeHtml(song.level)}${escapeHtml(diffText)}・攻略wikiを開く）">${bannerInner}${buildMemoMarkHtml(song.id)}</a>
                 </div>`;
         });
 
@@ -1652,7 +1659,7 @@ function renderScoreGrid(targetSongs) {
                 <div class="dg-cell">
                     <button type="button" class="dg-medal${medalClass}" onclick="openMedalModal('${safeId}')" title="メダルを変更">${buildGridMedalInner(medalKey)}${buildUraBadgeHtml(song.id, medalKey)}</button>
                     <div class="dg-banner-wrap">
-                        <a class="dg-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（攻略wikiを開く）">${bannerInner}</a>
+                        <a class="dg-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（攻略wikiを開く）">${bannerInner}${buildMemoMarkHtml(song.id)}</a>
                         <button type="button" class="dg-score${score ? '' : ' dg-score-none'}" onclick="openScoreModal('${safeId}')" title="スコアを変更">${score ? score : '-'}</button>
                     </div>
                 </div>`;
@@ -1846,7 +1853,7 @@ function calcPokkura() {
 
 // ---------- ポックラを上げるおすすめ ----------
 //   曲ごとに「メダルを1段上げる」「スコアを +1000 点ずつ上げる」「未プレイの曲をクリア」の案を作り、
-//   やりやすさ（上がり幅 ÷ 大変さ）の一番よい案を1つ残す。大変さ = 種類の重み × 難しさ（Lv・難易度） × 相性
+//   やりやすさ（上がり幅 ÷ 大変さ）の一番よい案を1つ残す。大変さ = 種類の重み × 難しさ（Lv・難易度） × タグ（相性）
 const POKKURA_REC_COUNT = 20;
 const POKKURA_REC_AFFINITY = { '得意': 0.7, '噛み合い待ち': 1.3, '苦手': 1.5, '敵': 2, '💩': 2 };
 
@@ -1889,7 +1896,9 @@ function calcPokkuraRecommendations(pk) {
         const lv = parseInt(getPokkuraLevel(song), 10);
         const diff = getDiffSortValue(song);
         const memo = memoRecords[song.id] || {};
-        const hardness = Math.pow(2, (lv - 48) + (diff === -999 ? 0 : diff) * 0.5) * (POKKURA_REC_AFFINITY[memo.affinity] || 1);
+        // タグの重み（付いているタグの分を掛け合わせる。新しく作ったタグは 1）
+        const tagWeight = getMemoTags(memo).reduce((w, t) => w * (POKKURA_REC_AFFINITY[t] || 1), 1);
+        const hardness = Math.pow(2, (lv - 48) + (diff === -999 ? 0 : diff) * 0.5) * tagWeight;
         const entry = entryOf[song.id] || null;
         const options = [];
         const add = (kind, gain, effort, extra) => {
@@ -2140,7 +2149,7 @@ function renderPokkuraGrid() {
                 <div class="dg-cell">
                     <button type="button" class="dg-medal${medalClass}" onclick="openMedalModal('${safeId}')" title="${escapeHtml(medalTitle)}">${buildGridMedalInner(medalKey)}${buildUraBadgeHtml(song.id, medalKey)}</button>
                     <div class="dg-banner-wrap">
-                        <a class="dg-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（Lv${escapeHtml(song.level)}・攻略wikiを開く）">${bannerInner}</a>
+                        <a class="dg-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（Lv${escapeHtml(song.level)}・攻略wikiを開く）">${bannerInner}${buildMemoMarkHtml(song.id)}</a>
                         ${lvHtml}
                         ${easySelectHtml}
                         <button type="button" class="dg-score pk-score${isVersion ? ' pk-score-version' : ''}" onclick="openScoreModal('${safeId}')" title="${isVersion ? `今作のスコア（歴代ベスト ${escapeHtml(scoreRecords[song.id] || '-')}）。押すと歴代ベストを変更` : 'スコアを変更'}">${score}</button>
