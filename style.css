@@ -1589,21 +1589,13 @@ button.search-suggest-item:hover, button.search-suggest-item.active { background
 .search-suggest-item img { flex-shrink: 0; }
 .search-suggest-none, .search-suggest-more { padding: 8px; font-size: 12px; color: #888; text-align: center; }
 
-/* 絞り込み：曲数・よく使う条件・今の条件・スコアの範囲 */
-.check-label .fc-n, .filter-preset .fc-n { margin-left: 4px; font-size: 0.85em; font-weight: normal; color: #999; }
+/* 絞り込み：曲数・今の条件・スコアの範囲 */
+.check-label .fc-n { margin-left: 4px; font-size: 0.85em; font-weight: normal; color: #999; }
 .check-label.fc-zero { opacity: 0.45; }
 .filter-summary-shown { margin-left: 6px; font-weight: normal; color: #888; font-size: 0.9em; }
-.filter-quick-title, .filter-sub-label { font-size: 0.85em; font-weight: bold; color: #666; margin: 0 0 4px; }
+.filter-sub-label { font-size: 0.85em; font-weight: bold; color: #666; margin: 0 0 4px; }
 .filter-sub-label { margin-top: 6px; font-size: 0.8em; }
 .filter-note { font-size: 0.8em; color: #888; margin-top: 4px; }
-.filter-presets { display: flex; flex-wrap: wrap; gap: 6px; }
-button.filter-preset {
-    display: inline-flex; align-items: center; min-height: 34px; margin: 0; padding: 0 12px; border: 1px solid #ce93d8; border-radius: 17px;
-    background: #faf5fc; color: #6a1b9a; font-size: 13px; font-weight: bold; font-family: inherit; cursor: pointer;
-}
-button.filter-preset:hover { background: #f3e5f5; }
-button.filter-preset.active { background: #7b1fa2; border-color: #7b1fa2; color: #fff; }
-button.filter-preset.active .fc-n { color: rgba(255,255,255,0.8); }
 .filter-active { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; border-radius: 10px; background: var(--nu-accent-soft, #fce4ef); }
 .filter-active[hidden] { display: none; }
 button.filter-active-chip {
@@ -1617,21 +1609,10 @@ button.filter-active-clear { min-height: 30px; margin: 0 0 0 auto; padding: 0 10
 .filter-range-unit { font-size: 0.85em; color: #888; }
 body.ui-new #menu-panel .check-label .fc-n { color: var(--nu-muted); }
 body.ui-new #menu-panel .check-label:has(input:checked) .fc-n { color: var(--nu-accent-dark); }
-body.ui-new #menu-panel .filter-quick-title, body.ui-new #menu-panel .filter-sub-label { font-size: 12px; font-weight: 700; color: var(--nu-muted); }
+body.ui-new #menu-panel .filter-sub-label { font-size: 12px; font-weight: 700; color: var(--nu-muted); }
 body.ui-new #menu-panel .filter-range input { height: 40px; border: 1px solid var(--nu-line); border-radius: 12px; background: var(--nu-bg); }
-#menu-panel .filter-presets > button, #menu-panel .filter-active > button { width: auto !important; flex: 0 0 auto; }
+#menu-panel .filter-active > button { width: auto !important; flex: 0 0 auto; }
 #menu-panel .filter-active > button.filter-active-clear { margin-left: auto; }
-
-/* よく使う条件：覚えた組み合わせ（よく使う順） */
-.filter-quick-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
-.filter-quick-head .filter-quick-title { margin: 0; }
-#menu-panel button.filter-usage-clear { width: auto !important; margin: 0; padding: 0; min-height: 0; border: none; background: none; color: #999; font-size: 11px; text-decoration: underline; cursor: pointer; }
-#menu-panel button.filter-usage-clear[hidden] { display: none; }
-button.filter-preset .fp-label { max-width: 16em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-button.filter-preset.learned { border-color: #90caf9; background: #e3f2fd; color: #0d47a1; }
-button.filter-preset.learned::before { content: '↻'; margin-right: 4px; font-size: 0.9em; opacity: 0.7; }
-button.filter-preset.learned:hover { background: #bbdefb; }
-button.filter-preset.learned.active { background: #1565c0; border-color: #1565c0; color: #fff; }
 
 /* 今の表示レベル・検索の曲にない選択肢（と、出すものがない項目）は隠す */
 #menu-panel .check-label.fc-none, #menu-panel details.filter-group.fc-none { display: none !important; }
