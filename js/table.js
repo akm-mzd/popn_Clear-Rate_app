@@ -10,11 +10,12 @@
 //   同じ項目の中は「どれか」（OR）、違う項目どうしは「すべて」（AND）で絞り込む。
 //   ほかに、スコアの範囲（#filter-score-min / max）。選択肢の横には、選ぶと出る曲の数を出す。
 // ==========================================
-const FILTER_IDS = ['filter-medal', 'filter-version', 'filter-diff', 'filter-affinity', 'filter-attr', 'filter-rank', 'filter-updated'];
+// 並びは絞り込みの欄の並びと同じ（レベル・メダル・難易度・属性・バージョン・スコア・タグ・メモ・最後に更新した日）
+const FILTER_IDS = ['filter-level', 'filter-medal', 'filter-diff', 'filter-attr', 'filter-version', 'filter-rank', 'filter-affinity', 'filter-updated'];
 
 // 項目の短い名前（今の条件のチップに使う）
 const FILTER_GROUP_NAMES = {
-    'filter-medal': 'メダル', 'filter-rank': 'ランク', 'filter-diff': '難易度', 'filter-updated': '更新',
+    'filter-level': 'レベル', 'filter-medal': 'メダル', 'filter-rank': 'ランク', 'filter-diff': '難易度', 'filter-updated': '更新',
     'filter-affinity': 'タグ', 'filter-attr': '属性', 'filter-version': 'バージョン'
 };
 
@@ -284,6 +285,8 @@ function updateFilterSummaryCount(shown) {
 }
 
 // 選択肢の横に「選ぶと出る曲の数」を出す（ほかの項目の条件はそのまま、その項目だけ入れ替えて数える）
+//   今の表示レベル・検索の曲に1曲もない選択肢は出さない（選んでいるものは出す）。
+//   出す選択肢がない項目は、項目ごと隠す（レベルは1つしかないときも隠す）
 //   よく使う条件のボタンと、今の条件のチップもここで作り直す
 function updateFilterOptionCounts(baseSongs) {
     const ctx = makeFilterContext();
@@ -292,15 +295,23 @@ function updateFilterOptionCounts(baseSongs) {
         if (!box) return;
         const pool = baseSongs.filter(makeSongFilter({ skip: id, ctx }));
         const test = FILTER_GROUP_TESTS[id];
+        let visible = 0, checked = 0;
         box.querySelectorAll('label').forEach(lbl => {
             const cb = lbl.querySelector('input[type="checkbox"]');
             if (!cb) return;
             const n = pool.reduce((c, s) => c + (test(s, [cb.value], ctx) ? 1 : 0), 0);
+            const exists = baseSongs.some(s => test(s, [cb.value], ctx));
             let span = lbl.querySelector('.fc-n');
             if (!span) { span = document.createElement('span'); span.className = 'fc-n'; lbl.appendChild(span); }
             span.textContent = n;
             lbl.classList.toggle('fc-zero', n === 0 && !cb.checked);
+            lbl.classList.toggle('fc-none', !exists && !cb.checked);
+            if (exists || cb.checked) visible++;
+            if (cb.checked) checked++;
         });
+        // スコアはランクのほかに点数の範囲もあるので、項目ごとは隠さない
+        const group = box.closest('details.filter-group');
+        if (group && id !== 'filter-rank') group.classList.toggle('fc-none', checked === 0 && visible <= (id === 'filter-level' ? 1 : 0));
     });
     renderFilterPresets(baseSongs, ctx);
     renderFilterActiveChips();
@@ -416,6 +427,9 @@ function updateDynamicFilters() {
     buildFilterChecks('filter-version', versions.map(v => ({ value: v, label: v })));
     buildMemoFilterChecks();
     buildFilterChecks('filter-attr', getAllSongAttrs().map(a => ({ value: a, label: a })));
+    // レベル：小さいレベル → 大きいレベル（文字のレベルは後ろ）。レベルボタンと同じ並び
+    const lvItems = getSortedLevels().slice().reverse().sort((a, b) => isNaN(parseInt(a, 10)) - isNaN(parseInt(b, 10)));
+    buildFilterChecks('filter-level', lvItems.map(l => ({ value: String(l), label: isNaN(parseInt(l, 10)) ? String(l) : `Lv${l}` })));
 
     updateStartupSettingsUI();
 
@@ -794,6 +808,7 @@ function getSongDiffFilterClass(s) {
 }
 
 const FILTER_GROUP_TESTS = {
+    'filter-level': (s, values) => values.includes(String(s.level)),
     'filter-medal': (s, values) => {
         const medalKey = clearRecords[s.id] || '';
         return values.includes(medalKey === '' ? 'unplayed' : medalKey);

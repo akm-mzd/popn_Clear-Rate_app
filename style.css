@@ -1632,3 +1632,6 @@ button.filter-preset.learned { border-color: #90caf9; background: #e3f2fd; color
 button.filter-preset.learned::before { content: '↻'; margin-right: 4px; font-size: 0.9em; opacity: 0.7; }
 button.filter-preset.learned:hover { background: #bbdefb; }
 button.filter-preset.learned.active { background: #1565c0; border-color: #1565c0; color: #fff; }
+
+/* 今の表示レベル・検索の曲にない選択肢（と、出すものがない項目）は隠す */
+#menu-panel .check-label.fc-none, #menu-panel details.filter-group.fc-none { display: none !important; }
