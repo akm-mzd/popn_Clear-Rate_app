@@ -5,6 +5,8 @@
 //   ・曲の編集画面で手入力できる（「、」区切り）
 //   ・攻略wikiの上で動くブックマークレット（js/wiki-bookmarklet.js）で全曲の属性を集め、ここに貼って取り込める
 //   絞り込みの「属性」、フリーワード検索でも使う。
+//   似た属性は1つにまとめる：決まり（canonicalAttr）と、管理者が「属性の整理」でまとめた置き換え（attrConfigRecords._alias）。
+//   攻略wikiから取り込むときは、どちらも自動で当てる。
 // ==========================================
 
 const WIKI_ATTR_MAX_TEXT_LENGTH = 3000000;
@@ -91,7 +93,7 @@ function parseWikiAttrPayload(text) {
     const list = [];
     data.songs.forEach(s => {
         if (!s || (typeof s.t !== 'string' && typeof s.g !== 'string')) return;
-        const attrs = parseAttrText((Array.isArray(s.a) ? s.a : []).filter(a => typeof a === 'string').join('、'));
+        const attrs = organizeAttrs(parseAttrText((Array.isArray(s.a) ? s.a : []).filter(a => typeof a === 'string').join('、')));
         if (attrs.length === 0) return;
         list.push({
             title: String(s.t || '').slice(0, 300), genre: String(s.g || '').slice(0, 300),
@@ -164,5 +166,144 @@ async function applyWikiAttrImport() {
     updateDynamicFilters();
     renderTable();
     showToast('toast-eagate', `属性を反映しました（${pending.changes.length}曲）`, '#4caf50', 3000);
+    await saveToCloud(true);
+}
+
+// ---------- 属性の整理 ----------
+// 似た属性を1つにまとめる決まり。末尾の「曲」「系」などと（…）を外し、言い方の違うものを同じ名前にする
+const ATTR_SUFFIXES = ['譜面', '要素', '気味', '寄り', '多め', 'あり', '有り', '曲', '系'];
+const ATTR_SYNONYMS = {
+    '縦連打': '縦連', '同時': '同時押し', 'ガチ押': 'ガチ押し', '総合': '総合力',
+    'ゲージ辛': '辛ゲージ', '辛いゲージ': '辛ゲージ', 'ゲージが辛い': '辛ゲージ',
+    'BPM変化': 'ソフラン', 'BPM変動': 'ソフラン', '変速': 'ソフラン'
+};
+
+function canonicalAttr(name) {
+    let a = String(name || '').normalize('NFKC').replace(/\s+/g, '').replace(/[。.、,!！]+$/, '');
+    const noParen = a.replace(/[(\[][^)\]]*[)\]]/g, '');
+    if (noParen) a = noParen;
+    for (let changed = true; changed;) {
+        changed = false;
+        for (const suf of ATTR_SUFFIXES) {
+            if (a.length > suf.length && a.endsWith(suf)) { a = a.slice(0, -suf.length); changed = true; break; }
+        }
+    }
+    return Object.prototype.hasOwnProperty.call(ATTR_SYNONYMS, a) ? ATTR_SYNONYMS[a] : a;
+}
+
+// 管理者がまとめた置き換え { 前の名前: 新しい名前（'' は消す） }（ユーザーごと：attrConfigRecords._alias）
+function getAttrAliases(user = currentUser) {
+    const rec = allUsersData[user] && allUsersData[user].attrConfigRecords;
+    const al = rec && rec._alias;
+    return al && typeof al === 'object' && !Array.isArray(al) ? al : {};
+}
+
+function saveAttrAliases(aliases) {
+    if (!allUsersData[currentUser]) return;
+    allUsersData[currentUser].attrConfigRecords = { ...(allUsersData[currentUser].attrConfigRecords || {}), _alias: aliases };
+    scheduleAutoSave();
+}
+
+// 1つの属性を、置き換え → 決まり → 置き換え の順でそろえる（'' は消す）
+function organizeAttr(name) {
+    const al = getAttrAliases();
+    const has = k => Object.prototype.hasOwnProperty.call(al, k) && typeof al[k] === 'string';
+    let a = has(name) ? al[name] : name;
+    if (!a) return '';
+    a = canonicalAttr(a);
+    if (has(a)) a = al[a];
+    return a;
+}
+
+function organizeAttrs(list) {
+    const out = [];
+    list.forEach(a => { const v = organizeAttr(a); if (v && !out.includes(v)) out.push(v); });
+    return out;
+}
+
+let attrOrgDraft = null;
+
+function openAttrOrgModal() {
+    if (!checkAdminAuth()) return;
+    const count = {};
+    songs.forEach(s => getSongAttrs(s).forEach(a => { count[a] = (count[a] || 0) + 1; }));
+    attrOrgDraft = getAllSongAttrs().map(a => ({ from: a, n: a, count: count[a], del: false }));
+    renderAttrOrgModal();
+    document.getElementById('attr-org-modal').style.display = 'flex';
+}
+
+function renderAttrOrgModal() {
+    const rows = attrOrgDraft.map((r, i) => `
+        <div class="ao-row${r.del ? ' ao-del' : (r.n.trim() !== r.from ? ' ao-changed' : '')}">
+            <span class="ao-from" title="${escapeHtml(r.from)}">${escapeHtml(r.from)}</span>
+            <span class="ao-count">${r.count}曲</span>
+            <span class="ao-arrow">→</span>
+            <input type="text" class="ao-name" value="${escapeHtml(r.n)}" maxlength="40" ${r.del ? 'disabled' : ''}
+                oninput="attrOrgDraft[${i}].n = this.value" onchange="renderAttrOrgModal()" aria-label="新しい名前">
+            <button type="button" class="ao-delbtn" onclick="attrOrgDraft[${i}].del = !attrOrgDraft[${i}].del; renderAttrOrgModal()">${r.del ? '戻す' : '消す'}</button>
+        </div>`).join('');
+    const aliases = getAttrAliases();
+    const aliasRows = Object.keys(aliases).map(k => `<li>${escapeHtml(k)} → ${aliases[k] ? escapeHtml(aliases[k]) : '<span style="color:#d32f2f;">消す</span>'}
+        <button type="button" class="ao-alias-del" onclick="removeAttrAlias('${jsStringAttr(k)}')" aria-label="この置き換えをやめる">×</button></li>`).join('');
+    const changed = attrOrgDraft.filter(r => r.del || r.n.trim() !== r.from).length;
+    document.getElementById('attr-org-body').innerHTML = `
+        <button type="button" class="ao-auto" onclick="autoOrganizeAttrDraft()">似た属性を自動でまとめる</button>
+        <div class="ao-summary">${attrOrgDraft.length}種類${changed ? `（変えるもの ${changed}）` : ''}</div>
+        ${rows || '<div class="me-empty">属性のある曲がありません</div>'}
+        ${aliasRows ? `<details class="ao-aliases"><summary>保存している置き換え（${Object.keys(aliases).length}）</summary>
+            <div style="font-size:0.85em;color:#888;">攻略wikiから取り込むときにも使います。</div><ul>${aliasRows}</ul></details>` : ''}`;
+}
+
+// 決まり（と保存している置き換え）で、名前の欄を埋める
+function autoOrganizeAttrDraft() {
+    attrOrgDraft.forEach(r => { if (!r.del) r.n = organizeAttr(r.from) || r.from; });
+    renderAttrOrgModal();
+}
+
+function removeAttrAlias(key) {
+    const aliases = { ...getAttrAliases() };
+    delete aliases[key];
+    saveAttrAliases(aliases);
+    renderAttrOrgModal();
+}
+
+function closeAttrOrgModal() {
+    attrOrgDraft = null;
+    document.getElementById('attr-org-modal').style.display = 'none';
+}
+
+async function saveAttrOrgModal() {
+    if (!attrOrgDraft) return;
+    const map = {};
+    attrOrgDraft.forEach(r => {
+        const n = parseAttrText(r.n)[0] || '';
+        if (r.del) map[r.from] = '';
+        else if (n && n !== r.from) map[r.from] = n;
+    });
+    const keys = Object.keys(map);
+    if (keys.length === 0) { closeAttrOrgModal(); return; }
+    const removed = keys.filter(k => !map[k]);
+    if (!confirm(`属性を${keys.length - removed.length}個まとめ・名前を変え${removed.length ? `、${removed.length}個消し` : ''}ます。楽曲リストとして全ユーザーに反映されます。よろしいですか？`)) return;
+
+    let changedSongs = 0;
+    songs.forEach(s => {
+        const before = getSongAttrs(s);
+        const after = [];
+        before.forEach(a => { const v = Object.prototype.hasOwnProperty.call(map, a) ? map[a] : a; if (v && !after.includes(v)) after.push(v); });
+        if (JSON.stringify(before) !== JSON.stringify(after)) { setSongAttrs(s, after); changedSongs++; }
+    });
+    // 置き換えを残す（攻略wikiから取り込み直しても同じ名前になるように）。前の置き換えの行き先も付け替える
+    const aliases = { ...getAttrAliases() };
+    Object.keys(aliases).forEach(k => { if (Object.prototype.hasOwnProperty.call(map, aliases[k])) aliases[k] = map[aliases[k]]; });
+    keys.forEach(k => { aliases[k] = map[k]; });
+    Object.keys(aliases).forEach(k => { if (aliases[k] === k) delete aliases[k]; });
+    saveAttrAliases(aliases);
+
+    const selected = getFilterValues('filter-attr').map(a => (Object.prototype.hasOwnProperty.call(map, a) ? map[a] : a)).filter(Boolean);
+    closeAttrOrgModal();
+    updateDynamicFilters();
+    setFilterValues('filter-attr', [...new Set(selected)]);
+    renderTable();
+    showToast('toast-eagate', `属性を整理しました（${changedSongs}曲）`, '#4caf50', 3000);
     await saveToCloud(true);
 }
