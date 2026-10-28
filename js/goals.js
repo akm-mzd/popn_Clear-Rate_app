@@ -249,7 +249,7 @@ function showGoalSongs(id) {
     if (goal.kind === 'pokkura') { openPokkuraForGoal(); return; }
     const searchInput = document.getElementById('search-input');
     if (searchInput) searchInput.value = '';
-    FILTER_IDS.forEach(fid => setFilterValues(fid, []));
+    clearAllFilters();
     setFilterValues('filter-diff', goal.df || []);
     setFilterValues('filter-affinity', goal.af || []);
     if (goal.kind === 'medal') {

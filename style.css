@@ -1568,3 +1568,56 @@ button.ao-auto { width: 100%; margin: 0 0 6px; height: 38px; padding: 0; line-he
 .menu-admin-section .admin-drop-title { font-weight: bold; color: #333; margin-bottom: 4px; }
 body.ui-new #menu-panel .menu-admin-section textarea.admin-code { height: 44px; font-size: 11px; }
 body.ui-new #menu-panel .menu-admin-section details.admin-sub textarea { height: 64px; }
+
+/* 検索：候補 */
+.search-wrap { position: relative; flex: 1; min-width: 0; }
+.search-wrap .search-box { width: 100% !important; }
+.search-suggest {
+    position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 50; max-height: 60vh; overflow-y: auto;
+    background: #fff; border: 1px solid var(--nu-line, #ddd); border-radius: 12px; box-shadow: 0 6px 20px rgba(0,0,0,0.15); padding: 4px;
+}
+.search-suggest[hidden] { display: none; }
+button.search-suggest-item {
+    display: flex; align-items: center; gap: 8px; width: 100%; margin: 0; padding: 6px 8px; border: none; border-radius: 8px;
+    background: #fff; color: #333; text-align: left; font-family: inherit; cursor: pointer;
+}
+button.search-suggest-item:hover, button.search-suggest-item.active { background: var(--nu-accent-soft, #fce4ef); }
+.search-suggest-item .level-badge { flex-shrink: 0; }
+.search-suggest-item .ss-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.search-suggest-item .ss-title { font-weight: bold; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.search-suggest-item .ss-genre { font-size: 11px; color: #888; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.search-suggest-item img { flex-shrink: 0; }
+.search-suggest-none, .search-suggest-more { padding: 8px; font-size: 12px; color: #888; text-align: center; }
+
+/* 絞り込み：曲数・よく使う条件・今の条件・スコアの範囲 */
+.check-label .fc-n, .filter-preset .fc-n { margin-left: 4px; font-size: 0.85em; font-weight: normal; color: #999; }
+.check-label.fc-zero { opacity: 0.45; }
+.filter-summary-shown { margin-left: 6px; font-weight: normal; color: #888; font-size: 0.9em; }
+.filter-quick-title, .filter-sub-label { font-size: 0.85em; font-weight: bold; color: #666; margin: 0 0 4px; }
+.filter-sub-label { margin-top: 6px; font-size: 0.8em; }
+.filter-note { font-size: 0.8em; color: #888; margin-top: 4px; }
+.filter-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+button.filter-preset {
+    display: inline-flex; align-items: center; min-height: 34px; margin: 0; padding: 0 12px; border: 1px solid #ce93d8; border-radius: 17px;
+    background: #faf5fc; color: #6a1b9a; font-size: 13px; font-weight: bold; font-family: inherit; cursor: pointer;
+}
+button.filter-preset:hover { background: #f3e5f5; }
+button.filter-preset.active { background: #7b1fa2; border-color: #7b1fa2; color: #fff; }
+button.filter-preset.active .fc-n { color: rgba(255,255,255,0.8); }
+.filter-active { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; border-radius: 10px; background: var(--nu-accent-soft, #fce4ef); }
+.filter-active[hidden] { display: none; }
+button.filter-active-chip {
+    display: inline-flex; align-items: center; gap: 6px; min-height: 30px; margin: 0; padding: 0 10px; border: 1px solid var(--nu-accent, #c2185b); border-radius: 15px;
+    background: #fff; color: var(--nu-accent-dark, #8e1043); font-size: 12px; font-weight: bold; font-family: inherit; cursor: pointer;
+}
+button.filter-active-chip span { font-size: 14px; line-height: 1; }
+button.filter-active-clear { min-height: 30px; margin: 0 0 0 auto; padding: 0 10px; border: none; background: none; color: var(--nu-accent-dark, #8e1043); font-size: 12px; text-decoration: underline; cursor: pointer; }
+.filter-range { display: flex; align-items: center; gap: 6px; }
+.filter-range input { flex: 1 1 0; min-width: 0; width: 0; height: 36px; padding: 0 8px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
+.filter-range-unit { font-size: 0.85em; color: #888; }
+body.ui-new #menu-panel .check-label .fc-n { color: var(--nu-muted); }
+body.ui-new #menu-panel .check-label:has(input:checked) .fc-n { color: var(--nu-accent-dark); }
+body.ui-new #menu-panel .filter-quick-title, body.ui-new #menu-panel .filter-sub-label { font-size: 12px; font-weight: 700; color: var(--nu-muted); }
+body.ui-new #menu-panel .filter-range input { height: 40px; border: 1px solid var(--nu-line); border-radius: 12px; background: var(--nu-bg); }
+#menu-panel .filter-presets > button, #menu-panel .filter-active > button { width: auto !important; flex: 0 0 auto; }
+#menu-panel .filter-active > button.filter-active-clear { margin-left: auto; }
