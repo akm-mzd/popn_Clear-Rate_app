@@ -1,15 +1,17 @@
 // ==========================================
 // growth.js
 // 記録の振り返り。
-//   ・伸びのグラフ（統計シートの各ページ）：更新履歴から過去のクリア数・スコア平均を戻して、日・週・月ごとの折れ線に
+//   ・伸びのグラフ（統計シートの各ページ）：更新履歴から過去のクリア数・スコア平均を戻して、日・週・月・年ごとの折れ線に（点が多ければ横スクロール）
 //   ・ポックラの記録（pokkuraHistRecords：公式データを取り込んだ日ごとに1件）
 //   ・属性別（統計シートの各ページ）：属性ごとのクリア率・スコア平均。低い順（苦手）
 //   ・この曲の記録（メダルを選ぶ画面）：その曲の更新履歴とスコアの線
 //   ・今日のまとめ（公式データを取り込んだあと・画像シート）：今日上がったメダル・スコア・ポックラ
 // ==========================================
 
-const GROWTH_UNITS = { day: '日', week: '週', month: '月' };
-const GROWTH_MAX_POINTS = 30;   // グラフの点は直近この数まで
+const GROWTH_UNITS = { day: '日', week: '週', month: '月', year: '年' };
+// 点がこれより多いときは、グラフを横に広げて横スクロールにする（1点あたりの幅）
+const GROWTH_SCROLL_MIN_POINTS = 24;
+const GROWTH_POINT_WIDTH = { day: 8, week: 16, month: 26, year: 40 };
 const ATTR_MIN_SONGS = 3;       // これより曲の少ない属性は「苦手」の判定に使わない
 const SONG_HISTORY_SHOW = 5;    // この曲の記録：最初に出す件数
 
@@ -21,6 +23,21 @@ function getGrowthUnit() {
 function setGrowthUnit(unit) {
     storageSet('popn_growth_unit', GROWTH_UNITS[unit] ? unit : 'week');
     if (typeof renderNewUiStats === 'function') renderNewUiStats();
+}
+
+// イージー以上の線（最初は出さない。凡例を押すと出す：この端末に popn_growth_easy）
+function isGrowthEasyShown() {
+    return storageGet('popn_growth_easy') === '1';
+}
+
+function toggleGrowthEasy() {
+    storageSet('popn_growth_easy', isGrowthEasyShown() ? '0' : '1');
+    if (typeof renderNewUiStats === 'function') renderNewUiStats();
+}
+
+// 横スクロールのグラフは、開いたときに右端（今）を見せる（renderNewUiStats のあとに呼ぶ）
+function scrollGrowthChartsToEnd(root) {
+    (root || document).querySelectorAll('.gr-scroll').forEach(el => { el.scrollLeft = el.scrollWidth; });
 }
 
 const toScoreNum = v => (v === undefined || v === null || v === '' || isNaN(parseInt(v, 10))) ? null : parseInt(v, 10);
@@ -45,9 +62,10 @@ function replayHistory(songList) {
     return { start: state, events: events.reverse() };
 }
 
-// 区切りの終わり（その日・その週（日曜まで）・その月の最後の時刻の次）
+// 区切りの終わり（その日・その週（日曜まで）・その月・その年の最後の時刻の次）
 function growthBucketEnd(t, unit) {
     const d = new Date(t);
+    if (unit === 'year') return new Date(d.getFullYear() + 1, 0, 1).getTime();
     if (unit === 'month') return new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime();
     const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
     if (unit === 'week') day.setDate(day.getDate() + (7 - day.getDay()) % 7);
@@ -55,14 +73,25 @@ function growthBucketEnd(t, unit) {
     return day.getTime();
 }
 
-function growthBucketLabel(end, unit) {
+// 点の文字。日・週は、最初の点と年が変わる点だけ年も付ける（withYear）
+function growthBucketLabel(end, unit, withYear) {
     const d = new Date(end - 1);
+    if (unit === 'year') return `${d.getFullYear()}`;
     if (unit === 'month') return `${d.getFullYear() % 100}/${d.getMonth() + 1}`;
-    if (unit === 'week') {
-        const s = new Date(d); s.setDate(s.getDate() - 6);
-        return `${s.getMonth() + 1}/${s.getDate()}〜`;
-    }
-    return `${d.getMonth() + 1}/${d.getDate()}`;
+    const s = new Date(d);
+    if (unit === 'week') s.setDate(s.getDate() - 6);
+    const text = `${withYear ? `${s.getFullYear() % 100}/` : ''}${s.getMonth() + 1}/${s.getDate()}`;
+    return unit === 'week' ? `${text}〜` : text;
+}
+
+function labelGrowthPoints(points, unit) {
+    let prevYear = null;
+    points.forEach(p => {
+        const y = new Date(p.end - 1).getFullYear();
+        p.label = growthBucketLabel(p.end, unit, y !== prevYear);
+        prevYear = y;
+    });
+    return points;
 }
 
 // 区切りごとの値：{ points: [{ label, normal, easy, avg }], total, since }。履歴がなければ null
@@ -98,9 +127,9 @@ function buildGrowthSeries(songList, unit) {
             if ('s' in ev) st.s = ev.s;
             add(st, 1);
         }
-        points.push({ end, label: growthBucketLabel(end, unit), normal, easy, avg: cnt > 0 ? Math.round(sum / cnt) : null });
+        points.push({ end, normal, easy, avg: cnt > 0 ? Math.round(sum / cnt) : null });
     });
-    return { points: points.slice(-GROWTH_MAX_POINTS), total, since: events[0].t };
+    return { points: labelGrowthPoints(points, unit), total, since: events[0].t };
 }
 
 // ---------- ポックラの記録（公式データを取り込んだ日ごとに1件） ----------
@@ -135,16 +164,18 @@ function buildPokkuraGrowthSeries(unit) {
     list.forEach(e => {
         const end = growthBucketEnd(e.t, unit);
         const last = points[points.length - 1];
-        const p = { end, label: growthBucketLabel(end, unit), pc: typeof e.pc === 'number' ? e.pc : null, c: typeof e.c === 'number' ? e.c : null };
+        const p = { end, pc: typeof e.pc === 'number' ? e.pc : null, c: typeof e.c === 'number' ? e.c : null };
         if (last && last.end === end) points[points.length - 1] = p; else points.push(p);
     });
-    return points.slice(-GROWTH_MAX_POINTS);
+    return labelGrowthPoints(points, unit);
 }
 
 // ---------- 折れ線グラフ（SVG） ----------
 //   points: [{ label, ... }]、series: [{ key, name, color }]、format: 値の文字
 //   integer：曲数など整数の値（目盛りに小数を出さない。0 より下に広げない）
-function buildLineChartSvg(points, series, format = v => String(v), integer = false) {
+//   pointWidth：点が多いとき、1点あたりの幅（px）。指定すると、目盛りを左に固定し、グラフは横スクロールにする
+function buildLineChartSvg(points, series, format = v => String(v), integer = false, pointWidth = 0) {
+    if (pointWidth && points.length > GROWTH_SCROLL_MIN_POINTS) return buildScrollLineChartHtml(points, series, format, integer, pointWidth);
     const W = 320, H = 150, L = 40, R = 10, T = 10, B = 24;
     const values = [];
     points.forEach(p => series.forEach(s => { if (typeof p[s.key] === 'number') values.push(p[s.key]); }));
@@ -165,8 +196,8 @@ function buildLineChartSvg(points, series, format = v => String(v), integer = fa
         svg += `<line x1="${L}" x2="${W - R}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" class="gr-grid"/>`;
         svg += `<text x="${L - 4}" y="${(y(v) + 3).toFixed(1)}" class="gr-axis" text-anchor="end">${escapeHtml(format(Math.round(v * 100) / 100))}</text>`;
     });
-    // 横軸の文字（最初・真ん中・最後）
-    const labelIdx = [...new Set([0, Math.floor((points.length - 1) / 2), points.length - 1])];
+    // 横軸の文字（点が少なければ全部、多ければ最初・真ん中・最後）
+    const labelIdx = points.length <= 6 ? points.map((p, i) => i) : [...new Set([0, Math.floor((points.length - 1) / 2), points.length - 1])];
     labelIdx.forEach(i => {
         const anchor = points.length === 1 ? 'middle' : i === 0 ? 'start' : i === points.length - 1 ? 'end' : 'middle';
         svg += `<text x="${x(i).toFixed(1)}" y="${H - 6}" class="gr-axis" text-anchor="${anchor}">${escapeHtml(points[i].label)}</text>`;
@@ -182,8 +213,62 @@ function buildLineChartSvg(points, series, format = v => String(v), integer = fa
     return svg + '</svg>';
 }
 
+// 縦の目盛りの範囲（buildLineChartSvg と同じ決め方）
+function chartRange(points, series, integer) {
+    const values = [];
+    points.forEach(p => series.forEach(s => { if (typeof p[s.key] === 'number') values.push(p[s.key]); }));
+    if (values.length === 0) return null;
+    let lo = Math.min(...values), hi = Math.max(...values);
+    if (lo === hi) {
+        hi += 1;
+        if (!(integer && lo <= 0)) lo -= 1;
+    }
+    const pad = (hi - lo) * 0.08;
+    return { ticks: integer && hi - lo < 2 ? [hi, lo] : [hi, (hi + lo) / 2, lo], min: lo - pad, max: hi + pad };
+}
+
+// 横スクロールの折れ線：左に目盛り（動かない）、右にグラフ（横に動く）
+function buildScrollLineChartHtml(points, series, format, integer, pointWidth) {
+    const H = 150, T = 10, B = 24, AX = 40, PAD = 12;
+    const range = chartRange(points, series, integer);
+    if (!range) return '';
+    const W = PAD * 2 + (points.length - 1) * pointWidth;
+    const x = i => PAD + i * pointWidth;
+    const y = v => T + (range.max - v) / (range.max - range.min) * (H - T - B);
+    let axis = `<svg class="gr-yaxis" width="${AX}" height="${H}" viewBox="0 0 ${AX} ${H}" aria-hidden="true">`;
+    let svg = `<svg class="gr-svg-wide" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${escapeHtml(series.map(s => s.name).join('・'))}の推移">`;
+    range.ticks.forEach(v => {
+        axis += `<text x="${AX - 4}" y="${(y(v) + 3).toFixed(1)}" class="gr-axis" text-anchor="end">${escapeHtml(format(Math.round(v * 100) / 100))}</text>`;
+        svg += `<line x1="0" x2="${W}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" class="gr-grid"/>`;
+    });
+    // 横軸の文字：だいたい 70px おき（年が付く点は必ず）
+    const every = Math.max(1, Math.round(70 / pointWidth));
+    let lastLabelX = -Infinity;
+    points.forEach((p, i) => {
+        const withYear = /^\d{2,4}\//.test(p.label) || /^\d{4}$/.test(p.label);
+        if (!(i % every === 0 || (withYear && x(i) - lastLabelX > 40) || i === points.length - 1)) return;
+        if (x(i) - lastLabelX < 36) return;
+        lastLabelX = x(i);
+        svg += `<line x1="${x(i)}" x2="${x(i)}" y1="${H - B}" y2="${H - B + 3}" class="gr-grid"/>`;
+        svg += `<text x="${x(i).toFixed(1)}" y="${H - 6}" class="gr-axis" text-anchor="middle">${escapeHtml(p.label)}</text>`;
+    });
+    series.forEach(s => {
+        const pts = points.map((p, i) => typeof p[s.key] === 'number' ? `${x(i).toFixed(1)},${y(p[s.key]).toFixed(1)}` : null).filter(Boolean);
+        if (pts.length > 1) svg += `<polyline points="${pts.join(' ')}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+        points.forEach((p, i) => {
+            if (typeof p[s.key] !== 'number') return;
+            svg += `<circle cx="${x(i).toFixed(1)}" cy="${y(p[s.key]).toFixed(1)}" r="${pointWidth < 12 ? 1.5 : 2.5}" fill="${s.color}"><title>${escapeHtml(`${p.label} ${s.name}：${format(p[s.key])}`)}</title></circle>`;
+        });
+    });
+    return `<div class="gr-chart">${axis}</svg><div class="gr-scroll">${svg}</svg></div></div>`;
+}
+
+// 凡例。s.toggle のある線は押して出す・消す（s.off のときは薄く）
 function buildChartLegendHtml(series, last) {
-    return `<div class="gr-legend">${series.map(s => `<span><i style="background: ${s.color};"></i>${escapeHtml(s.name)}${last && typeof last[s.key] === 'number' ? `<b>${escapeHtml(s.format ? s.format(last[s.key]) : String(last[s.key]))}</b>` : ''}</span>`).join('')}</div>`;
+    return `<div class="gr-legend">${series.map(s => {
+        const inner = `<i style="background: ${s.color};"></i>${escapeHtml(s.name)}${last && typeof last[s.key] === 'number' && !s.off ? `<b>${escapeHtml(s.format ? s.format(last[s.key]) : String(last[s.key]))}</b>` : ''}`;
+        return s.toggle ? `<button type="button" class="gr-legend-btn${s.off ? ' off' : ''}" aria-pressed="${!s.off}" onclick="${s.toggle}" title="押すと${s.off ? '出す' : '消す'}">${inner}</button>` : `<span>${inner}</span>`;
+    }).join('')}</div>`;
 }
 
 // 統計シートの「伸び」のカード（page.key：レベル / 'ALL' / 'CUR'）
@@ -196,14 +281,16 @@ function buildGrowthCardHtml(page, pageSongs) {
         body += '<div class="gr-empty">まだ更新履歴がありません。メダル・スコアを更新すると、ここに伸びが出ます。</div>';
     } else {
         const last = g.points[g.points.length - 1];
+        const pw = GROWTH_POINT_WIDTH[unit];
+        const easyOn = isGrowthEasyShown();
         const clearSeries = [
             { key: 'normal', name: 'ノーマル以上', color: '#c2185b' },
-            { key: 'easy', name: 'イージー以上', color: '#2e9d2a' }
+            { key: 'easy', name: 'イージー以上', color: '#2e9d2a', toggle: 'toggleGrowthEasy()', off: !easyOn }
         ];
-        body += `<div class="gr-sub">クリア数（${g.total}曲中）</div>${buildChartLegendHtml(clearSeries, last)}${buildLineChartSvg(g.points, clearSeries, v => `${Math.round(v)}`, true)}`;
+        body += `<div class="gr-sub">クリア数（${g.total}曲中）</div>${buildChartLegendHtml(clearSeries, last)}${buildLineChartSvg(g.points, clearSeries.filter(s => !s.off), v => `${Math.round(v)}`, true, pw)}`;
         if (g.points.some(p => p.avg !== null)) {
             const avgSeries = [{ key: 'avg', name: 'スコア平均', color: '#1565c0', format: v => Math.round(v).toLocaleString('ja-JP') }];
-            body += `<div class="gr-sub">スコア平均</div>${buildChartLegendHtml(avgSeries, last)}${buildLineChartSvg(g.points, avgSeries, v => Math.round(v).toLocaleString('ja-JP'))}`;
+            body += `<div class="gr-sub">スコア平均</div>${buildChartLegendHtml(avgSeries, last)}${buildLineChartSvg(g.points, avgSeries, v => Math.round(v).toLocaleString('ja-JP'), false, pw)}`;
         }
         const d = new Date(g.since);
         body += `<div class="gr-note">${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} からの更新履歴をもとにしています</div>`;
@@ -215,7 +302,7 @@ function buildGrowthCardHtml(page, pageSongs) {
             { key: 'c', name: '計算値', color: '#ef6c00', format: v => v.toFixed(2) }
         ];
         body += `<div class="gr-sub">ポップンクラス</div>`;
-        body += pk ? `${buildChartLegendHtml(pkSeries, pk[pk.length - 1])}${buildLineChartSvg(pk, pkSeries, v => Number(v).toFixed(2))}`
+        body += pk ? `${buildChartLegendHtml(pkSeries, pk[pk.length - 1])}${buildLineChartSvg(pk, pkSeries, v => Number(v).toFixed(2), false, GROWTH_POINT_WIDTH[unit])}`
             : '<div class="gr-empty">公式データを取り込むたびに記録します（ver 3.22 から）。</div>';
     }
     return `<section class="ns-card gr-card"><div class="ns-card-title">伸び<span class="gr-units" role="group" aria-label="区切り">${tabs}</span></div>${body}</section>`;
@@ -247,6 +334,8 @@ function getWeakAttrs(songList) {
     return list.length > 0 ? list.filter(r => r.rate === list[0].rate).map(r => r.a) : [];
 }
 
+let attrCardOpen = false;
+
 function buildAttrCardHtml(pageSongs) {
     const list = getAttrStats(pageSongs);
     if (list.length === 0) return '';
@@ -259,8 +348,10 @@ function buildAttrCardHtml(pageSongs) {
             <td class="ns-rate-cell"><span class="ns-rate">${formatRate(r.normal, r.total)}%</span><span class="ns-bar"><span style="width: ${(r.rate * 100).toFixed(1)}%; background: #c2185b;"></span></span></td>
             <td class="ns-num">${r.avg !== null ? r.avg.toLocaleString('ja-JP') : '-'}</td></tr>`;
     }).join('');
-    return `<section class="ns-card at-card"><div class="ns-card-title">属性別<span class="ns-card-sub">ノーマルクリア率の低い順・押すと絞り込み</span></div>
-        <div class="ns-table-wrap"><table class="ns-table at-table"><thead><tr><th>属性</th><th>クリア</th><th>クリア率</th><th>スコア平均</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
+    // 最初は畳んでおく（開いたかどうかは、統計シートを描き直しても覚えておく）
+    return `<details class="ns-card at-card"${attrCardOpen ? ' open' : ''} ontoggle="attrCardOpen = this.open"><summary class="ns-card-title">属性別<span class="ns-card-sub">${weak.length ? `苦手：${escapeHtml(weak.join('・'))}` : 'ノーマルクリア率の低い順'}</span></summary>
+        <div class="ns-card-sub at-hint">ノーマルクリア率の低い順・押すと絞り込み</div>
+        <div class="ns-table-wrap"><table class="ns-table at-table"><thead><tr><th>属性</th><th>クリア</th><th>クリア率</th><th>スコア平均</th></tr></thead><tbody>${rows}</tbody></table></div></details>`;
 }
 
 function filterByAttr(attr) {

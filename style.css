@@ -1706,3 +1706,36 @@ button.sh-more { width: 100%; margin: 6px 0 0; padding: 6px; border: 1px solid #
 .hist-bad { font-size: 0.85em; color: #555; white-space: nowrap; }
 .hist-bad b { color: #1565c0; }
 .sv-bad { color: #1565c0; }
+
+/* 伸びのグラフ：横スクロール・凡例のボタン */
+.gr-chart { display: flex; align-items: stretch; }
+.gr-yaxis { flex-shrink: 0; display: block; }
+.gr-scroll { flex: 1; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+.gr-svg-wide { display: block; }
+#menu-panel button.gr-legend-btn { width: auto; min-height: 0; margin: 0; padding: 1px 6px; border: 1px solid #ddd; border-radius: 10px; background: #fff; color: #666; font-size: 11px; font-family: inherit; cursor: pointer; }
+#menu-panel button.gr-legend-btn.off { opacity: 0.5; border-style: dashed; }
+#menu-panel button.gr-legend-btn.off i { background: #bbb !important; }
+
+/* 属性別（畳んでおく） */
+details.at-card > summary { cursor: pointer; list-style: none; margin-bottom: 0; }
+details.at-card > summary::-webkit-details-marker { display: none; }
+details.at-card > summary::after { content: '›'; margin-left: auto; font-size: 18px; color: #999; transition: transform 0.15s; }
+details.at-card[open] > summary::after { transform: rotate(90deg); }
+details.at-card[open] > summary { margin-bottom: 6px; }
+.at-hint { margin-bottom: 4px; }
+
+/* 過去の更新履歴の取り込み：バナーで曲を選ぶ */
+.hi-pick-wrap { margin: 10px 0; }
+.hi-pick-title { font-weight: bold; font-size: 14px; margin-bottom: 4px; }
+.hi-pick { padding: 8px 0; border-bottom: 1px solid #eee; }
+.hi-pick-head { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: bold; margin-bottom: 6px; }
+.hi-pick-head img, .hi-cand img { width: 96px; height: 24px; object-fit: cover; border-radius: 3px; flex-shrink: 0; background: #eee; }
+.hi-cands { display: flex; flex-wrap: wrap; gap: 6px; }
+button.hi-cand { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 112px; margin: 0; padding: 5px; border: 2px solid #ddd; border-radius: 8px; background: #fff; color: #333; font-family: inherit; text-align: left; cursor: pointer; }
+button.hi-cand.active { border-color: #c2185b; background: #fce4ef; }
+.hi-cand-title { font-size: 11px; font-weight: bold; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hi-cand-sim { font-size: 10px; color: #888; }
+button.hi-cand-none { justify-content: center; align-items: center; min-height: 52px; color: #777; }
+.hi-nobanner { font-size: 10px; color: #999; }
+.hi-days-wrap { margin: 8px 0; font-size: 13px; }
+.hi-days-wrap summary { cursor: pointer; color: #555; }
