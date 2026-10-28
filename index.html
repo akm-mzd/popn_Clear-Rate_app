@@ -6,7 +6,7 @@
     <title>Pop’n Clear Rate app</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
-    <link rel="stylesheet" href="style.css?v=3.18.0.0">
+    <link rel="stylesheet" href="style.css?v=3.18.1.0">
 </head>
 <body>
     <!-- 新しいデザイン（ver 3）の上部バーとナビ。以前の見た目では隠れる（js/ui-new.js） -->
@@ -35,124 +35,6 @@
     <div id="app-main" style="padding: 20px;">
         <h1>Pop’n Clear Rate app</h1>
         <div id="current-user-label" class="current-user-label">👤 ユーザー: -</div>
-
-        <details id="admin-controls" class="controls" style="cursor: pointer;">
-            <summary style="font-weight: bold; font-size: 1.1em; color: #333; user-select: none; outline: none; padding-bottom: 5px; border-bottom: 1px dashed #ccc;">
-                ⚙️ データ追加・管理・バックアップ (タップして開く)
-            </summary>
-            
-            <div style="margin-top: 15px; cursor: default;">
-                <div class="flex-row">
-                    <label style="font-weight: bold;">追加するレベル: 
-                        <select id="import-level" style="padding: 10px;">
-                            <option value="50">Lv 50</option>
-                            <option value="49">Lv 49</option>
-                            <option value="48" selected>Lv 48</option>
-                            <option value="47">Lv 47</option>
-                            <option value="46">Lv 46</option>
-                            <option value="45">Lv 45</option>
-                            <option value="44">Lv 44</option>
-                            <option value="43">Lv 43</option>
-                            <option value="42">Lv 42</option>
-                            <option value="41">Lv 41</option>
-                            <option value="40">Lv 40</option>
-                            <option value="その他">その他</option>
-                        </select>
-                    </label>
-                    <button onclick="importFromClipboard()" style="background-color: #2196F3; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">📋 コピーしたデータを追加</button>
-                    <button onclick="downloadSongsAndClearsJson()" style="background-color: #ff9800; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">💾 バックアップ (データ＋記録)</button>
-                    <button onclick="downloadSongsJsonOnly()" style="background-color: #795548; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">💾 バックアップ (楽曲のみ)</button>
-
-                    <button onclick="document.getElementById('restore-file').click()" style="background-color: #9c27b0; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">📂 ファイルから復元</button>
-                    <input type="file" id="restore-file" accept=".json" style="display: none;" onchange="restoreFromJson(event)">
-                    </div>
-                
-                <details style="margin-top: 10px; cursor: pointer; background: #f5f5f5; padding: 10px; border-radius: 4px;">
-                    <summary style="font-size: 0.9em; color: #666; font-weight: bold;">📝 手動でペーストして追加する場合はこちら</summary>
-                    <div style="margin-top: 10px; cursor: default;">
-                        <textarea id="import-text" placeholder="Wikiでコピーしたテキストをここにペーストしてください..."></textarea>
-                        <button onclick="importDataManual()">手動ペーストで追加</button>
-                    </div>
-                </details>
-
-                <details style="margin-top: 10px; cursor: pointer; background: #e3f2fd; padding: 10px; border-radius: 4px;">
-                    <summary style="font-size: 0.9em; color: #0056b3; font-weight: bold;">➕ フォームに手入力して新規追加する場合はこちら</summary>
-                    <div style="margin-top: 10px; cursor: default; text-align: center;">
-                        <button onclick="openAddModal()" style="background-color: #0056b3; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">📝 新規楽曲を手動入力して追加</button>
-                    </div>
-                </details>
-
-                <details style="margin-top: 10px; cursor: pointer; background: #f3e5f5; padding: 10px; border-radius: 4px;" ontoggle="if (this.open) openWikiAttrHelp()">
-                    <summary style="font-size: 0.9em; color: #7b1fa2; font-weight: bold;">🏷️ 攻略wikiから属性を取り込む</summary>
-                    <div style="margin-top: 10px; cursor: default; font-size: 0.9em; line-height: 1.6;">
-                        <ol style="margin: 0 0 8px; padding-left: 1.4em;">
-                            <li>下のリンクをブックマークバーにドラッグして登録（スマホは下の欄の文字をコピーして、新しいブックマークのURLに貼る）</li>
-                            <li>攻略wiki（popn.wiki）のページを開いて、そのブックマークを押す（全曲を読むので数分かかります）</li>
-                            <li>終わったら「コピー」を押し、ここに戻って「クリップボードから取り込む」</li>
-                        </ol>
-                        <a id="wiki-attr-bookmarklet-link" href="#" onclick="onWikiBookmarkletLinkClick(event)" style="display: inline-block; padding: 6px 12px; border: 2px dashed #7b1fa2; border-radius: 6px; color: #7b1fa2; font-weight: bold; text-decoration: none;">🏷️ 属性を読み取る</a>
-                        <textarea id="wiki-attr-bookmarklet-code" readonly style="display: block; width: 100%; height: 48px; margin: 8px 0 4px; font-size: 11px; box-sizing: border-box;"></textarea>
-                        <button onclick="copyWikiBookmarkletCode()">ブックマークレットをコピー</button>
-                        <div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px;">
-                            <button onclick="importWikiAttrsFromClipboard()" style="background-color: #7b1fa2; color: white; font-weight: bold;">クリップボードから取り込む</button>
-                        </div>
-                        <textarea id="wiki-attr-text" placeholder="攻略wikiでコピーしたデータを貼り付け" style="display: block; width: 100%; height: 48px; margin-top: 8px; box-sizing: border-box;"></textarea>
-                        <button onclick="importWikiAttrsFromText()">貼り付けたデータを取り込む</button>
-                        <div style="margin-top: 12px; padding-top: 10px; border-top: 1px dashed #ce93d8;">似た属性（「発狂」と「発狂曲」など）を1つにまとめたり、名前を変えたり、消したりできます。</div>
-                        <button onclick="openAttrOrgModal()" style="margin-top: 6px; background-color: #fff; color: #7b1fa2; border: 1px solid #7b1fa2; font-weight: bold;">属性を整理する</button>
-                    </div>
-                </details>
-
-                <details style="margin-top: 10px; cursor: pointer; background: #fff3e0; padding: 10px; border-radius: 4px;">
-                    <summary style="font-size: 0.9em; color: #e65100; font-weight: bold;">🎯 難易度・指数をまとめて割り当てる場合はこちら</summary>
-                     <div style="margin-top: 10px; cursor: default; text-align: center;">
-                        <button onclick="openBulkDiffModal()" style="background-color: #e65100; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">🎯 難易度・指数を一括割り当て</button>
-                    </div>
-                </details>
-                
-                <div id="banner-drop-zone" style="margin-top: 15px; border: 2px dashed #999; border-radius: 8px; padding: 20px; text-align: center; background: #fdfdfd; transition: all 0.2s; cursor: default;">
-                    <div style="font-weight: bold; color: #333; font-size: 1.05em; margin-bottom: 5px;">🖼️ ここにバナー画像（複数可）をドロップして一括更新</div>
-                    <div style="font-size: 0.85em; color: #666; line-height: 1.4;">
-                        ※ファイル名（拡張子抜き）が「曲名」と完全一致する楽曲のバナーを更新します。<br>
-                        ※現在選択している「表示レベル」の楽曲を優先してマッチングします。<br>
-                        ※アップロードされた画像はクラウド（Google Drive）にURLとして保存されます。<br>
-                        <span style="color: #d32f2f; font-weight: bold; display: inline-block; margin-top: 5px;">🔑 画像ドロップ時に管理者パスワードが求められます</span>
-                    </div>
-                </div>
-
-                <div style="margin-top: 10px; text-align: center;">
-                    <button onclick="migrateBannersToCloud()" style="background-color: #ff9800; color: white; font-weight: bold; padding: 10px 16px; border: none; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">🖼️ 既存のバナー画像をクラウドURLへ一括移行</button>
-                    <div style="font-size: 0.8em; color: #666; margin-top: 5px;">
-                        以前アップロードした画像（Base64埋め込み）を、クラウドの画像URLに変換して軽量化します。
-                    </div>
-                </div>
-                <hr style="border: none; border-top: 1px solid #eee; margin: 15px 0;">
-                
-                <div class="flex-row" style="margin-bottom: 0;">
-                    <label style="font-weight: bold; color: #d32f2f;">レベル一括削除: 
-                        <select id="delete-level" style="border-color: #d32f2f; padding: 6px;">
-                            <option value="50">Lv 50</option>
-                            <option value="49">Lv 49</option>
-                            <option value="48" selected>Lv 48</option>
-                            <option value="47">Lv 47</option>
-                            <option value="46">Lv 46</option>
-                            <option value="45">Lv 45</option>
-                            <option value="44">Lv 44</option>
-                            <option value="43">Lv 43</option>
-                            <option value="42">Lv 42</option>
-                            <option value="41">Lv 41</option>
-                            <option value="40">Lv 40</option>
-                            <option value="その他">その他</option>
-                        </select>
-                    </label>
-                    <button onclick="deleteLevelData()" style="color: #d32f2f; border-color: #d32f2f; background-color: #fff;">削除実行</button>
-                    
-                    <div style="margin-left: auto; display: flex; flex-wrap: wrap; gap: 10px;">
-                        <button onclick="clearRecordsOnly()" style="padding: 8px 12px;">現在のユーザーの記録(クリア・スコア・メモ)リセット</button>
-                    </div>
-                </div>
-            </div>
-        </details>
 
         <button id="menu-btn" onclick="toggleMenu()" title="メニュー">☰</button>
         <div id="menu-backdrop" onclick="toggleMenu(false)"></div>
@@ -327,6 +209,127 @@
                     <summary>手で貼り付けて取り込む</summary>
                     <textarea id="eagate-import-text" placeholder="公式サイトでコピーしたデータを貼り付け"></textarea>
                     <button onclick="importEagateFromText()" class="btn-eagate">取り込む</button>
+                </details>
+            </section>
+
+            <!-- ⑦ データの追加・管理（管理者） -->
+            <section class="menu-card menu-admin-section" data-sheet="more">
+                <div class="menu-card-title"><span><span class="menu-emoji">🛠️</span> データの追加・管理</span></div>
+                <div class="admin-note">🔑 楽曲データを変える操作は、管理者パスワードが必要です。</div>
+
+                <details class="admin-group">
+                    <summary><span class="admin-group-title">➕ 曲を追加する</span><span class="admin-group-desc">攻略wikiの表から／1曲ずつ手入力で</span></summary>
+                    <div class="admin-group-body">
+                        <ol class="admin-steps">
+                            <li>攻略wikiのレベルの表で「魔法のボタン」を押してコピー</li>
+                            <li>追加するレベルを選んで「コピーしたデータを追加」</li>
+                        </ol>
+                        <div class="admin-row">
+                            <select id="import-level" aria-label="追加するレベル">
+                                <option value="50">Lv 50</option>
+                                <option value="49">Lv 49</option>
+                                <option value="48" selected>Lv 48</option>
+                                <option value="47">Lv 47</option>
+                                <option value="46">Lv 46</option>
+                                <option value="45">Lv 45</option>
+                                <option value="44">Lv 44</option>
+                                <option value="43">Lv 43</option>
+                                <option value="42">Lv 42</option>
+                                <option value="41">Lv 41</option>
+                                <option value="40">Lv 40</option>
+                                <option value="その他">その他</option>
+                            </select>
+                            <button type="button" class="admin-btn admin-btn-main" onclick="importFromClipboard()">コピーしたデータを追加</button>
+                        </div>
+                        <details class="admin-sub">
+                            <summary>うまくいかないとき：貼り付けて追加</summary>
+                            <textarea id="import-text" placeholder="攻略wikiでコピーしたデータを貼り付け"></textarea>
+                            <button type="button" class="admin-btn" onclick="importDataManual()">貼り付けたデータを追加</button>
+                        </details>
+                        <div class="admin-sub-title">1曲ずつ追加</div>
+                        <button type="button" class="admin-btn" onclick="openAddModal()">曲を手入力で追加</button>
+                    </div>
+                </details>
+
+                <details class="admin-group" ontoggle="if (this.open) openWikiAttrHelp()">
+                    <summary><span class="admin-group-title">🏷️ 曲の情報をまとめて設定する</span><span class="admin-group-desc">難易度・指数／攻略wikiの属性</span></summary>
+                    <div class="admin-group-body">
+                        <div class="admin-sub-title">難易度・指数</div>
+                        <div class="admin-desc">攻略wikiなどの難易度表を貼り付けて、まとめて割り当てます。</div>
+                        <button type="button" class="admin-btn" onclick="openBulkDiffModal()">難易度・指数を一括割り当て</button>
+
+                        <div class="admin-sub-title">攻略wikiの属性（総合力・発狂など）</div>
+                        <ol class="admin-steps">
+                            <li>下のリンクをブックマークに登録（スマホは下の欄の文字をコピーして、新しいブックマークのURLに貼る）</li>
+                            <li>攻略wiki（popn.wiki）のページで、そのブックマークを押す（全曲を読むので数分かかります）</li>
+                            <li>終わったら「コピー」を押し、ここに戻って「クリップボードから取り込む」</li>
+                        </ol>
+                        <a id="wiki-attr-bookmarklet-link" class="admin-bookmarklet" href="#" onclick="onWikiBookmarkletLinkClick(event)">🏷️ 属性を読み取る</a>
+                        <textarea id="wiki-attr-bookmarklet-code" class="admin-code" readonly aria-label="ブックマークレット"></textarea>
+                        <div class="admin-row">
+                            <button type="button" class="admin-btn" onclick="copyWikiBookmarkletCode()">ブックマークレットをコピー</button>
+                            <button type="button" class="admin-btn admin-btn-main" onclick="importWikiAttrsFromClipboard()">クリップボードから取り込む</button>
+                        </div>
+                        <details class="admin-sub">
+                            <summary>うまくいかないとき：貼り付けて取り込む</summary>
+                            <textarea id="wiki-attr-text" placeholder="攻略wikiでコピーしたデータを貼り付け"></textarea>
+                            <button type="button" class="admin-btn" onclick="importWikiAttrsFromText()">貼り付けたデータを取り込む</button>
+                        </details>
+                        <div class="admin-desc">似た属性（「発狂」と「発狂曲」など）は、1つにまとめたり、名前を変えたり、消したりできます。</div>
+                        <button type="button" class="admin-btn" onclick="openAttrOrgModal()">属性を整理する</button>
+                    </div>
+                </details>
+
+                <details class="admin-group pc-only">
+                    <summary><span class="admin-group-title">🖼️ バナー画像</span><span class="admin-group-desc">画像をドロップしてまとめて登録</span></summary>
+                    <div class="admin-group-body">
+                        <div id="banner-drop-zone" class="admin-drop-zone">
+                            <div class="admin-drop-title">ここにバナー画像（いくつでも）をドロップ</div>
+                            <div class="admin-desc">ファイル名（拡張子を除く）が曲名と同じ曲のバナーになります。今の表示レベルの曲を優先します。画像はクラウド（Google Drive）に保存されます。</div>
+                        </div>
+                        <div class="admin-desc">以前の形（画像をそのまま埋め込んだもの）のバナーは、クラウドのURLに移すと軽くなります。</div>
+                        <button type="button" class="admin-btn" onclick="migrateBannersToCloud()">古いバナー画像をクラウドに移す</button>
+                    </div>
+                </details>
+
+                <details class="admin-group">
+                    <summary><span class="admin-group-title">💾 バックアップ・復元</span><span class="admin-group-desc">ファイルに保存／ファイルから戻す</span></summary>
+                    <div class="admin-group-body">
+                        <div class="admin-desc">「データ＋記録」は楽曲リストと今のユーザーの記録、「楽曲のみ」は楽曲リストだけを保存します。</div>
+                        <div class="admin-row">
+                            <button type="button" class="admin-btn admin-btn-main" onclick="downloadSongsAndClearsJson()">バックアップ（データ＋記録）</button>
+                            <button type="button" class="admin-btn" onclick="downloadSongsJsonOnly()">バックアップ（楽曲のみ）</button>
+                        </div>
+                        <button type="button" class="admin-btn" onclick="document.getElementById('restore-file').click()">ファイルから復元</button>
+                        <input type="file" id="restore-file" accept=".json" style="display: none;" onchange="restoreFromJson(event)">
+                    </div>
+                </details>
+
+                <details class="admin-group admin-danger">
+                    <summary><span class="admin-group-title">⚠️ 削除・リセット</span><span class="admin-group-desc">元に戻せません</span></summary>
+                    <div class="admin-group-body">
+                        <div class="admin-sub-title">レベルの曲をまとめて削除</div>
+                        <div class="admin-row">
+                            <select id="delete-level" aria-label="削除するレベル">
+                                <option value="50">Lv 50</option>
+                                <option value="49">Lv 49</option>
+                                <option value="48" selected>Lv 48</option>
+                                <option value="47">Lv 47</option>
+                                <option value="46">Lv 46</option>
+                                <option value="45">Lv 45</option>
+                                <option value="44">Lv 44</option>
+                                <option value="43">Lv 43</option>
+                                <option value="42">Lv 42</option>
+                                <option value="41">Lv 41</option>
+                                <option value="40">Lv 40</option>
+                                <option value="その他">その他</option>
+                            </select>
+                            <button type="button" class="admin-btn admin-btn-danger" onclick="deleteLevelData()">削除する</button>
+                        </div>
+                        <div class="admin-sub-title">今のユーザーの記録をリセット</div>
+                        <div class="admin-desc">クリア・スコア・メモを消します（楽曲リストは残ります）。</div>
+                        <button type="button" class="admin-btn admin-btn-danger" onclick="clearRecordsOnly()">記録をリセット</button>
+                    </div>
                 </details>
             </section>
 
@@ -704,22 +707,22 @@
     <button id="back-to-top" onclick="scrollToTop()" title="トップに戻る">↑</button>
 
     <!-- 読み込み順に意味があります（config が最初、app が最後） -->
-    <script src="js/config.js?v=3.18.0.0"></script>
-    <script src="js/utils.js?v=3.18.0.0"></script>
-    <script src="js/cloud.js?v=3.18.0.0"></script>
-    <script src="js/users.js?v=3.18.0.0"></script>
-    <script src="js/table.js?v=3.18.0.0"></script>
-    <script src="js/modals.js?v=3.18.0.0"></script>
-    <script src="js/memo.js?v=3.18.0.0"></script>
-    <script src="js/history.js?v=3.18.0.0"></script>
-    <script src="js/goals.js?v=3.18.0.0"></script>
-    <script src="js/admin.js?v=3.18.0.0"></script>
-    <script src="js/image-export.js?v=3.18.0.0"></script>
-    <script src="js/eagate-import.js?v=3.18.0.0"></script>
-    <script src="js/wiki-import.js?v=3.18.0.0"></script>
-    <script src="js/menu.js?v=3.18.0.0"></script>
-    <script src="js/ui-new.js?v=3.18.0.0"></script>
-    <script src="js/app.js?v=3.18.0.0"></script>
+    <script src="js/config.js?v=3.18.1.0"></script>
+    <script src="js/utils.js?v=3.18.1.0"></script>
+    <script src="js/cloud.js?v=3.18.1.0"></script>
+    <script src="js/users.js?v=3.18.1.0"></script>
+    <script src="js/table.js?v=3.18.1.0"></script>
+    <script src="js/modals.js?v=3.18.1.0"></script>
+    <script src="js/memo.js?v=3.18.1.0"></script>
+    <script src="js/history.js?v=3.18.1.0"></script>
+    <script src="js/goals.js?v=3.18.1.0"></script>
+    <script src="js/admin.js?v=3.18.1.0"></script>
+    <script src="js/image-export.js?v=3.18.1.0"></script>
+    <script src="js/eagate-import.js?v=3.18.1.0"></script>
+    <script src="js/wiki-import.js?v=3.18.1.0"></script>
+    <script src="js/menu.js?v=3.18.1.0"></script>
+    <script src="js/ui-new.js?v=3.18.1.0"></script>
+    <script src="js/app.js?v=3.18.1.0"></script>
 
 </body>
 </html>

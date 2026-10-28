@@ -134,9 +134,6 @@ details > summary::-webkit-details-marker { display: none; }
     body { padding: 4px !important; box-sizing: border-box; }
     #capture-area { padding: 0 !important; } 
     
-    /* スマホで管理メニューを非表示にする */
-    #admin-controls { display: none !important; }
-
     /* スマホでも画像出力を使えるようにする（メニュー内で縦に並べる） */
     #image-export-area { flex-wrap: wrap; gap: 8px; justify-content: flex-start !important; }
 
@@ -984,7 +981,6 @@ body.ui-new #nu-stat-card:focus-visible { outline: 2px solid var(--nu-purple); o
 body.ui-new #diff-grid-view { background: var(--nu-surface); border: 1px solid var(--nu-line); border-radius: 16px; }
 body.ui-new #capture-area { background: transparent !important; padding: 0 !important; }
 body.ui-new .stats-container { padding-right: 0; }
-body.ui-new #admin-controls { background: var(--nu-surface); border: 1px dashed #B9AFC2; border-radius: 14px; margin: 12px 0; }
 
 /* ナビ（スマホ：下、PC：左のサイドバー） */
 body.ui-new #nu-nav {
@@ -1182,13 +1178,14 @@ body.ui-new #menu-panel .random-ready-btn { flex: 1 1 auto; width: 100%; color: 
 body.ui-new #menu-panel .random-ready-btn::before { content: '🎲'; font-style: normal; }
 body.ui-new #menu-panel .menu-filter-section { gap: 12px; }
 
-/* その他：よく使うものを上に（ユーザー → スコア → 表示の設定 → 公式データ取り込み → 見た目） */
+/* その他：よく使うものを上に（ユーザー → スコア → 表示の設定 → 公式データ取り込み → データの追加・管理 → 見た目） */
 body.ui-new #menu-panel .menu-user-section { order: 1; }
 body.ui-new #menu-panel .menu-score-section { order: 2; }
 body.ui-new #menu-panel .menu-level-row { order: 3; }
 body.ui-new #menu-panel .menu-eagate-section { order: 4; }
-body.ui-new #menu-panel .ui-switch-card { order: 5; }
-body.ui-new #menu-panel .app-version { order: 6; }
+body.ui-new #menu-panel .menu-admin-section { order: 5; }
+body.ui-new #menu-panel .ui-switch-card { order: 6; }
+body.ui-new #menu-panel .app-version { order: 7; }
 body.ui-new #menu-panel #nu-sheet-foot { order: 9; }
 body.ui-new #menu-panel .menu-user-controls { display: flex; flex-wrap: wrap; gap: 8px; }
 body.ui-new #menu-panel .menu-user-section select { flex: 1 1 140px; min-width: 0; }
@@ -1526,3 +1523,48 @@ button.ao-auto { width: 100%; margin: 0 0 6px; height: 38px; padding: 0; line-he
 .ao-aliases { margin-top: 10px; font-size: 0.9em; }
 .ao-aliases ul { margin: 4px 0 0; padding-left: 1.2em; }
 .ao-aliases button.ao-alias-del { width: auto; margin: 0 0 0 4px; padding: 0 6px; border: none; background: none; color: #d32f2f; cursor: pointer; }
+
+/* データの追加・管理（その他の中。用途ごとに折りたたむ） */
+.menu-admin-section { --ad-accent: var(--nu-accent, #c2185b); --ad-line: var(--nu-line, #e0d8e4); --ad-muted: var(--nu-muted, #777); --ad-bg: var(--nu-bg, #f7f4f8); }
+.menu-admin-section .admin-note { font-size: 12px; color: var(--ad-muted); }
+.menu-admin-section details.admin-group { border: 1px solid var(--ad-line); border-radius: 12px; background: #fff; }
+.menu-admin-section details.admin-group > summary {
+    display: flex; flex-direction: column; gap: 2px; padding: 10px 34px 10px 12px; cursor: pointer; position: relative; user-select: none;
+}
+.menu-admin-section details.admin-group > summary::after {
+    content: ''; position: absolute; right: 14px; top: 50%; width: 8px; height: 8px; margin-top: -6px;
+    border-right: 2px solid var(--ad-muted); border-bottom: 2px solid var(--ad-muted); transform: rotate(45deg); transition: transform 0.15s;
+}
+.menu-admin-section details.admin-group[open] > summary::after { transform: rotate(-135deg); margin-top: -2px; }
+.menu-admin-section details.admin-group[open] > summary { border-bottom: 1px solid var(--ad-line); }
+.menu-admin-section .admin-group-title { font-weight: bold; font-size: 15px; color: #333; }
+.menu-admin-section .admin-group-desc { font-size: 12px; color: var(--ad-muted); }
+.menu-admin-section .admin-danger .admin-group-title { color: #c62828; }
+.menu-admin-section .admin-group-body { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 12px; font-size: 14px; }
+.menu-admin-section .admin-sub-title { font-weight: bold; font-size: 13px; color: #555; margin-top: 6px; padding-top: 8px; border-top: 1px dashed var(--ad-line); }
+.menu-admin-section .admin-group-body > .admin-sub-title:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+.menu-admin-section .admin-desc { font-size: 12px; color: var(--ad-muted); line-height: 1.5; }
+.menu-admin-section .admin-steps { margin: 0; padding-left: 1.4em; font-size: 13px; line-height: 1.6; color: #444; }
+.menu-admin-section .admin-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.menu-admin-section .admin-row > select { flex: 0 1 120px; min-width: 0; height: 40px; }
+.menu-admin-section .admin-row > .admin-btn { flex: 1 1 160px; }
+.menu-admin-section button.admin-btn {
+    width: 100%; min-height: 40px; margin: 0; padding: 6px 14px; border: 1px solid var(--ad-line); border-radius: 10px; background: #fff;
+    color: #333; font-size: 14px; font-weight: bold; font-family: inherit; cursor: pointer; box-shadow: none; box-sizing: border-box;
+}
+.menu-admin-section button.admin-btn:hover { background: var(--ad-bg); }
+.menu-admin-section button.admin-btn-main { background: var(--ad-accent); border-color: var(--ad-accent); color: #fff; }
+.menu-admin-section button.admin-btn-main:hover { background: var(--nu-accent-dark, #8e1043); }
+.menu-admin-section button.admin-btn-danger { border-color: #ef9a9a; color: #c62828; }
+.menu-admin-section button.admin-btn-danger:hover { background: #ffebee; }
+.menu-admin-section details.admin-sub > summary { font-size: 12px; color: var(--ad-muted); cursor: pointer; text-decoration: underline; }
+.menu-admin-section details.admin-sub[open] { display: flex; flex-direction: column; gap: 6px; }
+.menu-admin-section details.admin-sub textarea { height: 64px; margin: 0; font-size: 12px; }
+.menu-admin-section .admin-bookmarklet {
+    align-self: flex-start; padding: 6px 12px; border: 2px dashed #7b1fa2; border-radius: 8px; color: #7b1fa2; font-weight: bold; text-decoration: none;
+}
+.menu-admin-section textarea.admin-code { height: 44px; margin: 0; font-size: 11px; }
+.menu-admin-section .admin-drop-zone { border: 2px dashed #999; border-radius: 10px; padding: 16px; text-align: center; background: #fdfdfd; transition: all 0.2s; }
+.menu-admin-section .admin-drop-title { font-weight: bold; color: #333; margin-bottom: 4px; }
+body.ui-new #menu-panel .menu-admin-section textarea.admin-code { height: 44px; font-size: 11px; }
+body.ui-new #menu-panel .menu-admin-section details.admin-sub textarea { height: 64px; }
