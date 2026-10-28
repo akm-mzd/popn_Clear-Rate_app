@@ -270,14 +270,28 @@ function openHistoryImportPreview(rawEntries) {
 
     const add = [], unmatched = [];
     let newer = 0, dup = 0, bad = 0;
-    rawEntries.forEach(r => {
-        const t = r ? parseHistoryImportTime(r.t) : null;
+    // ファイルの中に同じ曲の更新がいくつかあれば、日付の古い順に並べてつなぐ：
+    //   2件目からの「変更前」は、ファイルの中のその曲の1つ前の「変更後」にする（変わっていなければその項目は外す）
+    const timed = rawEntries.map((r, i) => ({ r, i, t: r ? parseHistoryImportTime(r.t) : null }));
+    timed.sort((a, b) => (a.t === null) - (b.t === null) || (a.t - b.t) || (a.i - b.i));
+    const prev = {}; // 曲ID → { m, s }（ファイルの中で1つ前の変更後）
+    timed.forEach(({ r, t }) => {
         if (!r || t === null || typeof r.ti !== 'string') { bad++; return; }
         const song = matchHistoryImportSong(r);
         if (!song) { unmatched.push(r); return; }
+        const p = prev[song.id] || (prev[song.id] = {});
         const e = { t, id: song.id, ti: song.title, lv: song.level, src: 'p' };
-        if (typeof r.nm === 'string' && (r.nm === '' || MEDAL_TYPES[r.nm]) && (r.om || '') !== r.nm) { e.om = MEDAL_TYPES[r.om] ? r.om : ''; e.nm = r.nm; }
-        if ('ns' in r && toNum(r.ns) !== toNum(r.os)) { e.os = toNum(r.os); e.ns = toNum(r.ns); }
+        if (typeof r.nm === 'string' && (r.nm === '' || MEDAL_TYPES[r.nm])) {
+            const om = 'm' in p ? p.m : (MEDAL_TYPES[r.om] ? r.om : '');
+            if (om !== r.nm) { e.om = om; e.nm = r.nm; }
+            p.m = r.nm;
+        }
+        if ('ns' in r) {
+            const os = 's' in p ? p.s : toNum(r.os);
+            const ns = toNum(r.ns);
+            if (os !== ns) { e.os = os; e.ns = ns; }
+            p.s = ns;
+        }
         if (!('nm' in e) && !('ns' in e)) { bad++; return; }
         if (earliest[song.id] !== undefined && t >= earliest[song.id]) { newer++; return; }
         if (have.has(sameKey(e))) { dup++; return; }
