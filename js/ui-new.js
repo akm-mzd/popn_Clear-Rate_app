@@ -86,12 +86,6 @@ function setNewUiNavActive(key) {
 }
 
 // ---------- 上部バー・絞り込みチップ・統計カード（renderTable の最後に呼ばれる） ----------
-const NEW_UI_FILTER_GROUPS = [
-    ['filter-medal', 'メダル'], ['filter-diff', '難易度'], ['filter-rank', 'ランク'],
-    ['filter-version', 'バージョン'], ['filter-affinity', 'タグ'], ['filter-attr', '属性']
-];
-const NEW_UI_VALUE_LABELS = { unplayed: '未プレイ', none: 'スコアなし' };
-
 function makeChip(text, ariaLabel, onRemove) {
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -128,11 +122,9 @@ function updateNewUiChrome(summary) {
         bar.appendChild(makeChip(`検索：${query}`, `検索「${query}」を外す`, () => clearSearch()));
         chipCount++;
     }
-    NEW_UI_FILTER_GROUPS.forEach(([id, groupName]) => {
-        const values = getFilterValues(id);
-        if (values.length === 0) return;
-        const text = `${groupName}：${values.map(v => NEW_UI_VALUE_LABELS[v] || v).join('・')}`;
-        bar.appendChild(makeChip(text, `${groupName}の絞り込みを外す`, () => { setFilterValues(id, []); renderTable(); }));
+    // 条件は1つずつ出して、× で1つずつ外せる
+    getActiveFilterItems().forEach(item => {
+        bar.appendChild(makeChip(item.text, `${item.text} を外す`, item.remove));
         chipCount++;
     });
     if (chipCount === 0) {
