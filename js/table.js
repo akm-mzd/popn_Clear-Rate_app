@@ -1322,6 +1322,7 @@ function renderNewUiStats() {
     const slider = document.getElementById('ns-slider');
     const index = Math.max(0, pages.findIndex(p => p.key === active));
     slider.scrollLeft = index * slider.clientWidth;
+    if (typeof scrollGrowthChartsToEnd === 'function') scrollGrowthChartsToEnd(slider);
     fitStatsSliderHeight();
     if (window.ResizeObserver) {
         const ro = new ResizeObserver(() => {

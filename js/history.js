@@ -262,11 +262,20 @@ function onHistoryDayToggle(el) {
 }
 
 // ---------- 過去の更新履歴の取り込み（昔の公式サイトの写真から作ったファイル） ----------
-//   ファイルの形：{ type: 'popn-history-import', v: 1, entries: [{ t: 日時(ms) か 'YYYY-MM-DD', ti: 曲名, g?: ジャンル, lv: レベル, om?/nm?: メダル, os?/ns?: スコア }] }
+//   ファイルの形：{ type: 'popn-history-import', entries: [{ t: 日時(ms) か 'YYYY-MM-DD', ti: 曲名, g?: ジャンル, lv: レベル,
+//                    om?/nm?: メダル, os?/ns?: スコア, ob?/nb?: BAD, k?: 曲の鍵 }],
+//                  bads?: [{ ti, g?, lv, n, k? }], songs?: [{ k, ti, g?, lv, q?: 曲名に自信がない, bn?: 写真のバナー(64×16 の data URI) }] }
 //   アプリの曲とは、曲名とレベルで合わせる（同じ曲名が複数あればジャンル・UPPER で絞る）。
-//   今の履歴と食い違わないよう、その曲の今ある一番古い履歴（写真以外）より後の日付のものは飛ばす。同じものがすでにあれば飛ばす
-const HISTORY_IMPORT_MAX_BYTES = 10 * 1024 * 1024;
+//   合わなかった曲は、写真のバナーを同じレベルの曲のバナーと比べて、似ている順に候補を出す（一番似ている曲を選んでおく）。
+//   その曲の今ある一番古い履歴（写真以外）より後の日付のものは、今の履歴と同じ更新（前後3日・メダルかスコアが同じ）なら
+//   今の履歴に BAD だけ書き足し、それ以外は飛ばす。同じものがすでにあれば飛ばす。今ある履歴・今のメダル・スコアは消さない
+const HISTORY_IMPORT_MAX_BYTES = 20 * 1024 * 1024;
+const HISTORY_MERGE_DAYS = 3;
+const BANNER_W = 64, BANNER_H = 16;
+const BANNER_PICK_MIN = 0.5;       // これより似ていなければ、最初は「入れない」にしておく
+const BANNER_LOAD_CONCURRENCY = 6;
 let pendingHistoryImport = null;
+const bannerVectorCache = new Map(); // 曲ID → 正規化したバナーの色（読めなければ null）
 
 async function importHistoryFromFile(event) {
     const input = event.target;
@@ -280,7 +289,7 @@ async function importHistoryFromFile(event) {
         alert('過去の更新履歴のファイルではありません。');
         return;
     }
-    openHistoryImportPreview(data.entries, Array.isArray(data.bads) ? data.bads : []);
+    openHistoryImportPreview(data.entries, Array.isArray(data.bads) ? data.bads : [], Array.isArray(data.songs) ? data.songs : []);
 }
 
 function parseHistoryImportTime(t) {
@@ -304,28 +313,57 @@ function matchHistoryImportSong(e) {
     return cands.length === 1 ? cands[0] : null;
 }
 
-//   bads：[{ ti, g?, lv, n }]（写真で分かった、クリアしたときの一番少ない BAD）。今の記録が無いか、それより多い曲だけ入れる
-function openHistoryImportPreview(rawEntries, rawBads = []) {
+function openHistoryImportPreview(rawEntries, rawBads = [], rawSongs = []) {
+    const fileSongs = {};
+    rawSongs.forEach(s => { if (s && typeof s.k === 'string' && typeof s.ti === 'string') fileSongs[s.k] = s; });
+    // 曲名とレベルで合わなかった曲のうち、写真のバナーがあるもの（バナーで探す）
+    const pickKeys = Object.keys(fileSongs).filter(k => !matchHistoryImportSong(fileSongs[k]) && /^data:image\//.test(fileSongs[k].bn || ''));
+    const state = { user: currentUser, rawEntries, rawBads, fileSongs, pickKeys, choice: {}, cands: {}, progress: pickKeys.length ? { done: 0, total: 0 } : null };
+    pendingHistoryImport = state;
+    renderHistoryImport();
+    document.getElementById('history-import-modal').style.display = 'flex';
+    if (pickKeys.length) compareHistoryImportBanners(state);
+}
+
+// 1件の曲（entries・bads の1件）を、アプリの曲に（バナーで選んだ曲も含めて）
+function resolveHistoryImportSong(state, r) {
+    const fs = r.k && state.fileSongs[r.k];
+    if (fs) {
+        const m = matchHistoryImportSong(fs);
+        if (m) return m;
+        const id = state.choice[r.k];
+        return id ? songs.find(s => s.id === id) || null : null;
+    }
+    return matchHistoryImportSong(r);
+}
+
+// 取り込む中身を計算する（バナーの選び直しのたびに呼ぶ）
+function calcHistoryImport(state) {
     const records = getHistoryRecords();
-    const existing = Object.values(records).filter(e => e && typeof e.t === 'number');
-    // 曲ごとの、今ある一番古い履歴（写真以外）の日時
-    const earliest = {};
-    existing.forEach(e => { if (e.src !== 'p' && !(earliest[e.id] <= e.t)) earliest[e.id] = e.t; });
+    const existing = Object.entries(records).filter(([, e]) => e && typeof e.t === 'number');
+    // 曲ごとの、今ある一番古い履歴（写真以外）の日時と、写真以外の履歴
+    const earliest = {}, ownById = {};
+    existing.forEach(([key, e]) => {
+        if (e.src === 'p') return;
+        if (!(earliest[e.id] <= e.t)) earliest[e.id] = e.t;
+        (ownById[e.id] || (ownById[e.id] = [])).push({ key, e });
+    });
     const sameKey = e => [e.id, e.t, e.nm ?? '', e.ns ?? '', e.nb ?? ''].join('|');
-    const have = new Set(existing.map(sameKey));
+    const have = new Set(existing.map(([, e]) => sameKey(e)));
     const toNum = v => (v === undefined || v === null || v === '' || isNaN(parseInt(v, 10))) ? null : parseInt(v, 10);
 
-    const add = [], unmatched = [];
-    let newer = 0, dup = 0, bad = 0;
+    const add = [], merges = [], unmatched = [];
+    let newer = 0, dup = 0, bad = 0, same = 0;
+    const mergedKeys = new Set();
     // ファイルの中に同じ曲の更新がいくつかあれば、日付の古い順に並べてつなぐ：
     //   2件目からの「変更前」は、ファイルの中のその曲の1つ前の「変更後」にする（変わっていなければその項目は外す）
-    const timed = rawEntries.map((r, i) => ({ r, i, t: r ? parseHistoryImportTime(r.t) : null }));
+    const timed = state.rawEntries.map((r, i) => ({ r, i, t: r ? parseHistoryImportTime(r.t) : null }));
     timed.sort((a, b) => (a.t === null) - (b.t === null) || (a.t - b.t) || (a.i - b.i));
-    const prev = {}; // 曲ID → { m, s }（ファイルの中で1つ前の変更後）
+    const prev = {}; // 曲ID → { m, s, b }（ファイルの中で1つ前の変更後）
     timed.forEach(({ r, t }) => {
         if (!r || t === null || typeof r.ti !== 'string') { bad++; return; }
-        const song = matchHistoryImportSong(r);
-        if (!song) { unmatched.push(r); return; }
+        const song = resolveHistoryImportSong(state, r);
+        if (!song) { if (!(r.k && state.pickKeys.includes(r.k))) unmatched.push(r); return; }
         const p = prev[song.id] || (prev[song.id] = {});
         const e = { t, id: song.id, ti: song.title, lv: song.level, src: 'p' };
         if (typeof r.nm === 'string' && (r.nm === '' || MEDAL_TYPES[r.nm])) {
@@ -346,7 +384,16 @@ function openHistoryImportPreview(rawEntries, rawBads = []) {
             p.b = nb;
         }
         if (!('nm' in e) && !('ns' in e) && !('nb' in e)) { bad++; return; }
-        if (earliest[song.id] !== undefined && t >= earliest[song.id]) { newer++; return; }
+        if (earliest[song.id] !== undefined && t >= earliest[song.id]) {
+            // 今の履歴と同じ更新（前後3日・メダルかスコアが同じ）なら、今の履歴に BAD だけ書き足す
+            const hit = (ownById[song.id] || []).find(({ e: x }) => Math.abs(x.t - t) <= HISTORY_MERGE_DAYS * DAY_MS
+                && (('nm' in e && 'nm' in x && x.nm === e.nm) || ('ns' in e && 'ns' in x && x.ns === e.ns)));
+            if (hit) {
+                same++;
+                if ('nb' in e && !('nb' in hit.e) && !mergedKeys.has(hit.key)) { mergedKeys.add(hit.key); merges.push({ key: hit.key, ob: e.ob, nb: e.nb }); }
+            } else newer++;
+            return;
+        }
         if (have.has(sameKey(e))) { dup++; return; }
         have.add(sameKey(e));
         add.push(e);
@@ -354,36 +401,154 @@ function openHistoryImportPreview(rawEntries, rawBads = []) {
     // BAD の数（今の記録が無いか、今より少ないものだけ）
     const badRecs = getBadRecords();
     const badSet = {};
-    rawBads.forEach(r => {
+    state.rawBads.forEach(r => {
         const n = r ? toBadNum(r.n) : null;
         if (n === null || typeof r.ti !== 'string') return;
-        const song = matchHistoryImportSong(r);
+        const song = resolveHistoryImportSong(state, r);
         if (!song) return;
         const cur = toBadNum(badRecs[song.id]);
         if ((cur === null || n < cur) && !(badSet[song.id] <= n)) badSet[song.id] = n;
     });
-    const badCount = Object.keys(badSet).length;
-    pendingHistoryImport = { user: currentUser, add, badSet };
+    return { add, merges, badSet, unmatched, newer, dup, bad, same, existingCount: existing.length };
+}
 
-    // 日付ごとの件数
+function renderHistoryImport() {
+    const state = pendingHistoryImport;
+    if (!state) return;
+    const c = calcHistoryImport(state);
+    state.calc = c;
+    const badCount = Object.keys(c.badSet).length;
     const byDay = {};
-    add.forEach(e => { const k = localDateKey(e.t); byDay[k] = (byDay[k] || 0) + 1; });
+    c.add.forEach(e => { const k = localDateKey(e.t); byDay[k] = (byDay[k] || 0) + 1; });
     const days = Object.keys(byDay).sort();
-    const over = existing.length + add.length > HISTORY_MAX;
-    const unmatchedNames = [...new Set(unmatched.map(r => `Lv${r.lv} ${r.ti}`))];
-    document.getElementById('history-import-body').innerHTML = `
+    const over = c.existingCount + c.add.length > HISTORY_MAX;
+    const unmatchedNames = [...new Set(c.unmatched.map(r => `Lv${r.lv} ${r.ti}`))];
+    const body = document.getElementById('history-import-body');
+    const scrollTop = body.scrollTop;
+    body.innerHTML = `
         <div class="eagate-summary">
-            <div>${escapeHtml(currentUser)} さんの更新履歴に <b>${add.length}</b> 件を足します</div>
-            ${newer ? `<div class="hi-note">今の履歴より新しい日付の ${newer} 件は飛ばします</div>` : ''}
-            ${dup ? `<div class="hi-note">すでに取り込んでいる ${dup} 件は飛ばします</div>` : ''}
-            ${bad ? `<div class="hi-note">読めなかった ${bad} 件は飛ばします</div>` : ''}
+            <div>${escapeHtml(currentUser)} さんの更新履歴に <b>${c.add.length}</b> 件を足します</div>
+            ${c.same ? `<div class="hi-note">今の履歴と同じ更新 ${c.same} 件は、今の履歴を残します${c.merges.length ? `（BAD を ${c.merges.length} 件に書き足します）` : ''}</div>` : ''}
+            ${c.newer ? `<div class="hi-note">今の履歴より新しい日付の ${c.newer} 件は飛ばします</div>` : ''}
+            ${c.dup ? `<div class="hi-note">すでに取り込んでいる ${c.dup} 件は飛ばします</div>` : ''}
+            ${c.bad ? `<div class="hi-note">読めなかった ${c.bad} 件は飛ばします</div>` : ''}
             ${over ? `<div class="hi-warn">履歴が ${HISTORY_MAX} 件を超えるため、古いものから消えます</div>` : ''}
             ${badCount ? `<div>BAD の数を <b>${badCount}</b> 曲に入れます（今の記録が無いか、今より少ない曲）</div>` : ''}
         </div>
-        ${days.length ? `<div class="hi-days">${days.map(k => `<div><span>${escapeHtml(k.replace(/-/g, '/'))}</span><b>${byDay[k]}件</b></div>`).join('')}</div>` : ''}
+        ${buildHistoryImportPickHtml(state)}
+        ${days.length ? `<details class="hi-days-wrap"><summary>日付ごとの件数（${days.length}日）</summary><div class="hi-days">${days.map(k => `<div><span>${escapeHtml(k.replace(/-/g, '/'))}</span><b>${byDay[k]}件</b></div>`).join('')}</div></details>` : ''}
         ${unmatchedNames.length ? `<details class="eagate-unmatched"><summary>アプリの曲と合わなかった曲（${unmatchedNames.length}曲）</summary><ul>${unmatchedNames.slice(0, 300).map(n => `<li>${escapeHtml(n)}</li>`).join('')}</ul></details>` : ''}`;
-    document.getElementById('history-import-apply').disabled = add.length === 0 && badCount === 0;
-    document.getElementById('history-import-modal').style.display = 'flex';
+    body.scrollTop = scrollTop;
+    document.getElementById('history-import-apply').disabled = (c.add.length === 0 && badCount === 0 && c.merges.length === 0) || !!(state.progress && state.progress.done < state.progress.total);
+}
+
+// 曲名で合わなかった曲：写真のバナーと、似ている順の候補（押して選ぶ）
+function buildHistoryImportPickHtml(state) {
+    if (state.pickKeys.length === 0) return '';
+    const pr = state.progress;
+    if (pr && (pr.total === 0 || pr.done < pr.total)) {
+        return `<div class="hi-pick-wrap"><div class="hi-pick-title">曲名で合わなかった曲（${state.pickKeys.length}曲）</div>
+            <div class="hi-note">バナーを比べています…（${pr.done} / ${pr.total || '?'}）</div></div>`;
+    }
+    const banner = (src, alt) => src ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" loading="lazy">` : '<span class="hi-nobanner">バナーなし</span>';
+    const rows = state.pickKeys.map(k => {
+        const fs = state.fileSongs[k];
+        const chosen = state.choice[k] || '';
+        const cands = (state.cands[k] || []).map(c => {
+            const song = songs.find(s => s.id === c.id);
+            if (!song) return '';
+            return `<button type="button" class="hi-cand${chosen === song.id ? ' active' : ''}" onclick="pickHistoryImportSong('${jsStringAttr(k)}', '${jsStringAttr(song.id)}')">
+                ${banner(safeUrl(song.bannerUrl, true), song.title)}<span class="hi-cand-title">${escapeHtml(song.title)}</span><span class="hi-cand-sim">${Math.round(Math.max(0, c.sim) * 100)}%</span></button>`;
+        }).join('');
+        return `<div class="hi-pick">
+            <div class="hi-pick-head">${banner(fs.bn, '写真のバナー')}<span><span class="level-badge">${escapeHtml(fs.lv)}</span> ${escapeHtml(fs.ti)}</span></div>
+            <div class="hi-cands">${cands || '<span class="hi-note">同じレベルにバナーのある曲がありません</span>'}
+                <button type="button" class="hi-cand hi-cand-none${chosen === '' ? ' active' : ''}" onclick="pickHistoryImportSong('${jsStringAttr(k)}', '')">入れない</button></div>
+        </div>`;
+    }).join('');
+    const picked = state.pickKeys.filter(k => state.choice[k]).length;
+    return `<div class="hi-pick-wrap"><div class="hi-pick-title">曲名で合わなかった曲（${state.pickKeys.length}曲・${picked}曲を選択中）</div>
+        <div class="hi-note">写真のバナー（左）に似ている順に、同じレベルの曲を出しています。押して選び直せます。</div>${rows}</div>`;
+}
+
+function pickHistoryImportSong(k, id) {
+    const state = pendingHistoryImport;
+    if (!state) return;
+    state.choice[k] = id;
+    renderHistoryImport();
+}
+
+// バナーの色を、64×16 に縮めて明るさをそろえた数の並びにする（読めなければ null）
+function loadBannerVector(src) {
+    return new Promise(resolve => {
+        const img = new Image();
+        if (/^https?:/i.test(src)) img.crossOrigin = 'anonymous';
+        const timer = setTimeout(() => { img.src = ''; resolve(null); }, 15000);
+        img.onload = () => {
+            clearTimeout(timer);
+            try {
+                const cv = document.createElement('canvas');
+                cv.width = BANNER_W; cv.height = BANNER_H;
+                const ctx = cv.getContext('2d');
+                ctx.drawImage(img, 0, 0, BANNER_W, BANNER_H);
+                const d = ctx.getImageData(0, 0, BANNER_W, BANNER_H).data;
+                const v = new Float32Array(BANNER_W * BANNER_H * 3);
+                let sum = 0;
+                for (let i = 0, j = 0; i < d.length; i += 4) { v[j++] = d[i]; v[j++] = d[i + 1]; v[j++] = d[i + 2]; }
+                v.forEach(x => { sum += x; });
+                const mean = sum / v.length;
+                let sq = 0;
+                for (let i = 0; i < v.length; i++) { v[i] -= mean; sq += v[i] * v[i]; }
+                const norm = Math.sqrt(sq) || 1;
+                for (let i = 0; i < v.length; i++) v[i] /= norm;
+                resolve(v);
+            } catch (e) { resolve(null); }
+        };
+        img.onerror = () => { clearTimeout(timer); resolve(null); };
+        img.src = src;
+    });
+}
+
+function bannerSimilarity(a, b) {
+    let s = 0;
+    for (let i = 0; i < a.length; i++) s += a[i] * b[i];
+    return s;
+}
+
+async function compareHistoryImportBanners(state) {
+    const levels = new Set(state.pickKeys.map(k => String(state.fileSongs[k].lv)));
+    const targets = songs.filter(s => levels.has(String(s.level)) && isImageSrc(s.bannerUrl) && !bannerVectorCache.has(s.id));
+    state.progress = { done: 0, total: targets.length + state.pickKeys.length };
+    renderHistoryImport();
+    let next = 0;
+    const tick = () => { state.progress.done++; if (state.progress.done % 10 === 0 && pendingHistoryImport === state) renderHistoryImport(); };
+    const worker = async () => {
+        while (next < targets.length && pendingHistoryImport === state) {
+            const s = targets[next++];
+            const src = s.bannerUrl.startsWith('data:') ? s.bannerUrl : toImageProxyUrl(s.bannerUrl);
+            bannerVectorCache.set(s.id, await loadBannerVector(src));
+            tick();
+        }
+    };
+    await Promise.all(Array.from({ length: BANNER_LOAD_CONCURRENCY }, worker));
+    for (const k of state.pickKeys) {
+        if (pendingHistoryImport !== state) return;
+        const fs = state.fileSongs[k];
+        const v = await loadBannerVector(fs.bn);
+        const list = [];
+        if (v) {
+            songs.forEach(s => {
+                if (String(s.level) !== String(fs.lv)) return;
+                const w = bannerVectorCache.get(s.id);
+                if (w) list.push({ id: s.id, sim: bannerSimilarity(v, w) });
+            });
+        }
+        list.sort((a, b) => b.sim - a.sim);
+        state.cands[k] = list.slice(0, 3);
+        state.choice[k] = list.length && list[0].sim >= BANNER_PICK_MIN ? list[0].id : '';
+        tick();
+    }
+    if (pendingHistoryImport === state) renderHistoryImport();
 }
 
 function closeHistoryImport() {
@@ -392,13 +557,16 @@ function closeHistoryImport() {
 }
 
 function applyHistoryImport() {
-    const pending = pendingHistoryImport;
-    if (!pending) return;
-    if (pending.user !== currentUser) { alert('ユーザーが切り替わったので、取り込みをやめました。'); closeHistoryImport(); return; }
+    const state = pendingHistoryImport;
+    if (!state || !state.calc) return;
+    if (state.user !== currentUser) { alert('ユーザーが切り替わったので、取り込みをやめました。'); closeHistoryImport(); return; }
+    const c = calcHistoryImport(state);
     const records = getHistoryRecords();
-    pending.add.forEach(e => { records[e.t.toString(36) + '_p' + Math.random().toString(36).slice(2, 7)] = e; });
+    c.add.forEach(e => { records[e.t.toString(36) + '_p' + Math.random().toString(36).slice(2, 7)] = e; });
+    // 今の履歴と同じ更新：今の履歴は残し、BAD だけ書き足す
+    c.merges.forEach(m => { const x = records[m.key]; if (x && !('nb' in x)) { x.ob = m.ob; x.nb = m.nb; } });
     const badRecs = getBadRecords();
-    Object.keys(pending.badSet).forEach(id => { badRecs[id] = pending.badSet[id]; });
+    Object.keys(c.badSet).forEach(id => { badRecs[id] = c.badSet[id]; });
     const keys = Object.keys(records);
     if (keys.length > HISTORY_MAX) {
         keys.sort((a, b) => (records[a].t || 0) - (records[b].t || 0)).slice(0, keys.length - HISTORY_MAX).forEach(k => delete records[k]);
@@ -406,6 +574,6 @@ function applyHistoryImport() {
     closeHistoryImport();
     scheduleAutoSave();
     renderTable();
-    const nBad = Object.keys(pending.badSet).length;
-    showToast('toast-eagate', `過去の更新履歴を取り込みました（${pending.add.length}件${nBad ? `・BAD ${nBad}曲` : ''}）`, '#4caf50', 3000);
+    const nBad = Object.keys(c.badSet).length;
+    showToast('toast-eagate', `過去の更新履歴を取り込みました（${c.add.length}件${c.merges.length ? `・BAD 書き足し ${c.merges.length}件` : ''}${nBad ? `・BAD ${nBad}曲` : ''}）`, '#4caf50', 3000);
 }
