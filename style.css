@@ -1505,3 +1505,7 @@ button.ml-row:hover { background: #faf5fc; }
 .ml-comment { font-size: 12px; color: #666; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .menu-memo-row { display: flex; }
 .menu-memo-row button.memo-list-open { width: 100%; margin: 0; padding: 8px 12px; border: 1px solid #ab47bc; border-radius: 6px; background: #fff; color: #7b1fa2; font-weight: bold; cursor: pointer; }
+
+/* 曲の属性（攻略wiki）：小さな灰色のラベル */
+.song-attrs { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
+.song-attrs span { font-size: 10px; font-weight: normal; line-height: 1.5; padding: 0 6px; border-radius: 8px; background: #eceff1; color: #546e7a; white-space: nowrap; }
