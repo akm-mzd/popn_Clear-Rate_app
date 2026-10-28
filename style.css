@@ -1509,3 +1509,20 @@ button.ml-row:hover { background: #faf5fc; }
 /* 曲の属性（攻略wiki）：小さな灰色のラベル */
 .song-attrs { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
 .song-attrs span { font-size: 10px; font-weight: normal; line-height: 1.5; padding: 0 6px; border-radius: 8px; background: #eceff1; color: #546e7a; white-space: nowrap; }
+
+/* 属性の整理 */
+.attr-org-content { max-width: 560px; width: 95vw; max-height: 90vh; display: flex; flex-direction: column; box-sizing: border-box; }
+button.ao-auto { width: 100%; margin: 0 0 6px; height: 38px; padding: 0; line-height: 38px; font-size: 14px; border: 1px solid #7b1fa2; border-radius: 8px; background: #7b1fa2; color: #fff; font-weight: bold; cursor: pointer; }
+.ao-summary { font-size: 0.8em; color: #888; margin-bottom: 6px; }
+.ao-row { display: flex; align-items: center; gap: 6px; padding: 4px 6px; margin-bottom: 4px; border-radius: 6px; }
+.ao-row.ao-changed { background: #f3e5f5; }
+.ao-row.ao-del { background: #ffebee; }
+.ao-row.ao-del .ao-from { text-decoration: line-through; color: #999; }
+.ao-from { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: bold; }
+.ao-count { flex-shrink: 0; font-size: 0.75em; color: #888; width: 3.6em; text-align: right; }
+.ao-arrow { flex-shrink: 0; color: #aaa; }
+.ao-row .ao-name { flex: 1 1 0; min-width: 0; height: 32px; padding: 0 6px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; box-sizing: border-box; }
+.ao-row button.ao-delbtn { flex-shrink: 0; width: auto; margin: 0; padding: 0 8px; height: 32px; border: 1px solid #ef9a9a; border-radius: 6px; background: #fff; color: #d32f2f; font-size: 12px; cursor: pointer; }
+.ao-aliases { margin-top: 10px; font-size: 0.9em; }
+.ao-aliases ul { margin: 4px 0 0; padding-left: 1.2em; }
+.ao-aliases button.ao-alias-del { width: auto; margin: 0 0 0 4px; padding: 0 6px; border: none; background: none; color: #d32f2f; cursor: pointer; }
