@@ -116,11 +116,54 @@ function clearAllFilters() {
     setScoreRange(null, null);
 }
 
+// ---------- レベル（絞り込みの欄と、上のレベルボタンをそろえる） ----------
+//   絞り込みを開くと、今表示しているレベルにチェックが付いている。チェックを変えると表示も変わる：
+//   1つ → そのレベル、2つ以上 → 「すべて」にして選んだレベルで絞る、なし → 「すべて」。
+//   検索中・「更新」「最近」のときは、上のレベルはそのままで、選んだレベルで絞るだけ。
+//   今表示しているレベル1つだけのチェックは「絞り込み」には数えない（チップ・よく使う条件にも出さない）
+function isRealViewLevel(level) {
+    return level !== 'ALL' && !isSpecialViewLevel(level);
+}
+
+function isSearching() {
+    const input = document.getElementById('search-input');
+    return !!(input && input.value.trim());
+}
+
+function getActiveFilterValues(id) {
+    const values = getFilterValues(id);
+    if (id === 'filter-level' && values.length === 1 && values[0] === currentViewLevel) return [];
+    return values;
+}
+
+// 表示しているレベルとチェックを合わせる（renderTable の最初に呼ぶ）
+function syncLevelSelection() {
+    if (isSearching() || isSpecialViewLevel(currentViewLevel)) return;
+    const values = getFilterValues('filter-level');
+    if (values.length === 0) {
+        if (isRealViewLevel(currentViewLevel)) setFilterValues('filter-level', [currentViewLevel]);
+        return;
+    }
+    const next = values.length === 1 ? values[0] : 'ALL';
+    if (next !== currentViewLevel) {
+        currentViewLevel = next;
+        updateDynamicFilters(); // 上のレベルボタンの選択を付け替える
+    }
+}
+
+function onLevelFilterChange() {
+    if (!isSearching() && !isSpecialViewLevel(currentViewLevel) && getFilterValues('filter-level').length === 0) {
+        currentViewLevel = 'ALL';
+        updateDynamicFilters();
+    }
+    renderTable();
+}
+
 // 条件の組み合わせ { s: { 項目: [値] }, r: スコアの範囲 or null }（値は並べ替えておく。空の項目は入れない）
 function getCurrentFilterCombo() {
     const set = {};
     FILTER_IDS.forEach(id => {
-        const values = getFilterValues(id);
+        const values = getActiveFilterValues(id);
         if (values.length > 0) set[id] = values.slice().sort();
     });
     return { s: set, r: getScoreRange() };
@@ -268,7 +311,7 @@ function buildFilterChecks(id, items) {
 }
 
 function countActiveFilters() {
-    return FILTER_IDS.reduce((n, id) => n + getFilterValues(id).length, 0) + (getScoreRange() ? 1 : 0);
+    return FILTER_IDS.reduce((n, id) => n + getActiveFilterValues(id).length, 0) + (getScoreRange() ? 1 : 0);
 }
 
 // 「さらに条件で絞り込む」と、各項目の見出しに、選んでいる数を出す（shown：今出ている曲数）
@@ -278,7 +321,7 @@ function updateFilterSummaryCount(shown) {
         if (el) el.textContent = n > 0 ? `（${n}）` : '';
     };
     setCount('filter-summary-count', countActiveFilters());
-    FILTER_IDS.filter(id => id !== 'filter-rank').forEach(id => setCount(`${id}-count`, getFilterValues(id).length));
+    FILTER_IDS.filter(id => id !== 'filter-rank').forEach(id => setCount(`${id}-count`, getActiveFilterValues(id).length));
     setCount('filter-score-count', getFilterValues('filter-rank').length + (getScoreRange() ? 1 : 0));
     const shownEl = document.getElementById('filter-summary-shown');
     if (shownEl) shownEl.textContent = typeof shown === 'number' ? ` ${shown}曲` : '';
@@ -286,21 +329,23 @@ function updateFilterSummaryCount(shown) {
 
 // 選択肢の横に「選ぶと出る曲の数」を出す（ほかの項目の条件はそのまま、その項目だけ入れ替えて数える）
 //   今の表示レベル・検索の曲に1曲もない選択肢は出さない（選んでいるものは出す）。
-//   出す選択肢がない項目は、項目ごと隠す（レベルは1つしかないときも隠す）
+//   出す選択肢がない項目は、項目ごと隠す
+//   レベルだけは、表示しているレベルに関係なく数える（levelBaseSongs：検索・「更新」「最近」だけを当てた曲）
 //   よく使う条件のボタンと、今の条件のチップもここで作り直す
-function updateFilterOptionCounts(baseSongs) {
+function updateFilterOptionCounts(baseSongs, levelBaseSongs) {
     const ctx = makeFilterContext();
     FILTER_IDS.forEach(id => {
         const box = document.getElementById(id);
         if (!box) return;
-        const pool = baseSongs.filter(makeSongFilter({ skip: id, ctx }));
+        const base = id === 'filter-level' && levelBaseSongs ? levelBaseSongs : baseSongs;
+        const pool = base.filter(makeSongFilter({ skip: id, ctx }));
         const test = FILTER_GROUP_TESTS[id];
         let visible = 0, checked = 0;
         box.querySelectorAll('label').forEach(lbl => {
             const cb = lbl.querySelector('input[type="checkbox"]');
             if (!cb) return;
             const n = pool.reduce((c, s) => c + (test(s, [cb.value], ctx) ? 1 : 0), 0);
-            const exists = baseSongs.some(s => test(s, [cb.value], ctx));
+            const exists = base.some(s => test(s, [cb.value], ctx));
             let span = lbl.querySelector('.fc-n');
             if (!span) { span = document.createElement('span'); span.className = 'fc-n'; lbl.appendChild(span); }
             span.textContent = n;
@@ -311,7 +356,7 @@ function updateFilterOptionCounts(baseSongs) {
         });
         // スコアはランクのほかに点数の範囲もあるので、項目ごとは隠さない
         const group = box.closest('details.filter-group');
-        if (group && id !== 'filter-rank') group.classList.toggle('fc-none', checked === 0 && visible <= (id === 'filter-level' ? 1 : 0));
+        if (group && id !== 'filter-rank') group.classList.toggle('fc-none', checked === 0 && visible === 0);
     });
     renderFilterPresets(baseSongs, ctx);
     renderFilterActiveChips();
@@ -430,6 +475,7 @@ function updateDynamicFilters() {
     // レベル：小さいレベル → 大きいレベル（文字のレベルは後ろ）。レベルボタンと同じ並び
     const lvItems = getSortedLevels().slice().reverse().sort((a, b) => isNaN(parseInt(a, 10)) - isNaN(parseInt(b, 10)));
     buildFilterChecks('filter-level', lvItems.map(l => ({ value: String(l), label: isNaN(parseInt(l, 10)) ? String(l) : `Lv${l}` })));
+    document.querySelectorAll('#filter-level input[type="checkbox"]').forEach(cb => { cb.onchange = onLevelFilterChange; });
 
     updateStartupSettingsUI();
 
@@ -587,6 +633,8 @@ function handleSearch() {
 }
 function clearSearch() {
     document.getElementById('search-input').value = '';
+    // 検索中に選んだレベルは外して、表示しているレベルに戻す
+    setFilterValues('filter-level', isRealViewLevel(currentViewLevel) ? [currentViewLevel] : []);
     hideSearchSuggest();
     renderTable();
 }
@@ -673,6 +721,8 @@ function changeViewLevel(level, keepMenu = false) {
     if (viewMode === 'pokkura' || isSpecialViewLevel(level)) viewMode = 'grid';
     document.getElementById('search-input').value = '';
     currentViewLevel = level;
+    // 絞り込みのレベルも、選んだレベルだけにする（「すべて」「更新」「最近」なら外す）
+    setFilterValues('filter-level', isRealViewLevel(level) ? [level] : []);
     updateDynamicFilters();
     renderTable();
 }
@@ -849,7 +899,7 @@ function makeFilterContext() {
 function makeSongFilter(opts = {}) {
     const ctx = opts.ctx || makeFilterContext();
     const groups = FILTER_IDS.filter(id => id !== opts.skip).map(id => {
-        const values = opts.override && opts.override[id] ? opts.override[id] : getFilterValues(id);
+        const values = opts.override && opts.override[id] ? opts.override[id] : getActiveFilterValues(id);
         return values.length > 0 ? [FILTER_GROUP_TESTS[id], values] : null;
     }).filter(Boolean);
     const range = opts.range !== undefined ? opts.range : getScoreRange();
@@ -913,6 +963,7 @@ function computeStats(statsSongs, showUnreleased) {
 function renderTable() {
     const searchInput = document.getElementById('search-input');
     const searchQuery = searchInput ? searchInput.value.trim().toLowerCase() : "";
+    syncLevelSelection();
 
     // 絞り込み条件（空配列 = すべて）
     const isFiltered = countActiveFilters() > 0;
@@ -950,7 +1001,9 @@ function renderTable() {
     // 2. 実際にテーブルに表示する楽曲（すべての絞り込みを適用）
     let displaySongs = baseSongs.filter(songFilter);
     updateFilterSummaryCount(displaySongs.length);
-    updateFilterOptionCounts(baseSongs);
+    // レベルの選択肢の曲数は、表示しているレベルに関係なく数える
+    const levelBaseSongs = specialIds ? baseSongs : searchQuery ? baseSongs : songs;
+    updateFilterOptionCounts(baseSongs, levelBaseSongs);
     if (currentSort === 'clear') {
         displaySongs.sort((a, b) => {
             let valA = MEDAL_TYPES[clearRecords[a.id] || ''].rank;
