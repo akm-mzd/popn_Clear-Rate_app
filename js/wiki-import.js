@@ -96,15 +96,16 @@ function parseWikiAttrPayload(text) {
         list.push({
             title: String(s.t || '').slice(0, 300), genre: String(s.g || '').slice(0, 300),
             level: Number.isInteger(s.lv) ? s.lv : null, notes: Number.isInteger(s.n) ? s.n : null,
-            path: typeof s.p === 'string' ? s.p.slice(0, 300) : '', attrs
+            path: typeof s.p === 'string' ? s.p.slice(0, 300) : '', type: typeof s.d === 'string' ? s.d.toUpperCase() : '', attrs
         });
     });
     return { list, at: typeof data.at === 'string' ? data.at : '' };
 }
 
-// wiki の曲をアプリの曲に合わせる：曲名（なければジャンル）→ レベル → ノーツ数 → ジャンルの順に絞り、1曲に決まったものだけ
+// wiki の曲をアプリの曲に合わせる：曲名（なければジャンル）→ UPPER かどうか → レベル → ノーツ数 → ジャンルの順に絞り、1曲に決まったものだけ
+//   曲名の Ⓤ・UPPER・(UPPER)・upper は同じものとして扱う（normalizeSongText）
 function matchWikiAttrSongs(list) {
-    const norm = typeof normalizeSongText === 'function' ? normalizeSongText : (s => String(s || '').toLowerCase());
+    const norm = normalizeSongText;
     const used = new Set();
     const pairs = [];
     const unmatched = [];
@@ -113,6 +114,8 @@ function matchWikiAttrSongs(list) {
         let cands = t ? songs.filter(s => norm(s.title) === t) : [];
         if (cands.length === 0 && g) cands = songs.filter(s => norm(s.genre) === g);
         const narrow = test => { const c = cands.filter(test); if (c.length > 0) cands = c; };
+        const upper = isUpperText(w.title) || isUpperText(w.genre) || isUpperText(w.path) || w.type === 'UPPER';
+        if (cands.length > 1) narrow(s => songSaysUpper(s) === upper);
         if (cands.length > 1 && w.level !== null) narrow(s => parseInt(s.level, 10) === w.level || parseInt(s.pokkuraLevel, 10) === w.level);
         if (cands.length > 1 && w.notes !== null) narrow(s => parseInt(s.notes, 10) === w.notes);
         if (cands.length > 1 && g) narrow(s => norm(s.genre) === g);

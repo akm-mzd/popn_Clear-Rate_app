@@ -547,7 +547,7 @@ const BULK_RE_CHART_SUFFIX = /\((?:ex|h|n|e)\)$/; // ジャンル名の末尾の
 
 let bulkDiffResults = [];
 
-// 表記ゆれを吸収する（全角/半角・大文字/小文字・ハイフンや波ダッシュの違い・ⓊとUPPER）
+// 表記ゆれを吸収する（全角/半角・大文字/小文字・ハイフンや波ダッシュの違い・Ⓤ・UPPER・(UPPER)・upper）
 function bulkNormText(s) {
     return String(s || '')
         .replace(/[\u24CA\u24E4]/g, '(UPPER)')   // Ⓤ → (UPPER)
@@ -557,7 +557,7 @@ function bulkNormText(s) {
         .replace(/[\u201C\u201D]/g, '"')
         .normalize('NFKC')
         .toLowerCase()
-        .replace(/[(\[]\s*upper\s*[)\]]/g, '(upper)'); // （UPPER）や [UPPER] も同じ扱いに
+        .replace(/[(\[]\s*upper\s*[)\]]|(?<![\p{L}\p{N}])upper(?![\p{L}\p{N}])/gu, '(upper)'); // （UPPER）や [UPPER]、括弧なしの UPPER も同じ扱いに
 }
 function bulkKey(s) { return bulkNormText(s).replace(/\s+/g, ''); }
 function bulkIdxOk(idx) { return Math.abs(parseFloat(idx.replace('±', ''))) <= 10; }
