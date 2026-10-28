@@ -3,11 +3,11 @@
 // メダル・スコアの更新履歴。
 // 自分で変えたとき（メダル・スコアの入力）と、公式データ取り込みで変わったときに記録する。
 // 履歴はユーザーごとに historyRecords（{ キー: 1件 }）としてクラウドに保存する。
-//   1件 = { t: 日時(ms), id: 曲ID, ti: 曲名, lv: レベル, src: 'm'(手動) / 'e'(公式),
+//   1件 = { t: 日時(ms), id: 曲ID, ti: 曲名, lv: レベル, src: 'm'(手動) / 'e'(公式) / 'p'(写真から取り込んだ過去の分),
 //          om / nm: メダルの変更前・後（メダルが変わったときだけ）, os / ns: スコアの変更前・後（スコアが変わったときだけ。なしは null） }
 // ==========================================
 
-const HISTORY_MAX = 5000;      // これより多くなったら古いものから消す
+const HISTORY_MAX = 20000;     // これより多くなったら古いものから消す（写真から取り込んだ過去の分も入るので多めに）
 const HISTORY_PAGE_SIZE = 200; // 画面に一度に出す件数
 
 let historyShowCount = HISTORY_PAGE_SIZE;
@@ -155,6 +155,7 @@ function deleteHistoryEntry(key) {
 }
 
 const HISTORY_WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
+const HISTORY_SRC = { m: ['manual', '手動'], e: ['eagate', '公式'], p: ['photo', '写真'] };
 
 function renderHistoryModal() {
     const records = getHistoryRecords();
@@ -193,7 +194,7 @@ function renderHistoryModal() {
             <div class="hist-item">
                 <div class="hist-head">
                     <span class="hist-time">${time}</span>
-                    <span class="hist-src ${e.src === 'e' ? 'eagate' : 'manual'}">${e.src === 'e' ? '公式' : '手動'}</span>
+                    <span class="hist-src ${HISTORY_SRC[e.src] ? HISTORY_SRC[e.src][0] : 'manual'}">${HISTORY_SRC[e.src] ? HISTORY_SRC[e.src][1] : '手動'}</span>
                     <span class="level-badge">${escapeHtml(e.lv)}</span>
                     <span class="hist-title">${escapeHtml(e.ti)}</span>
                     <button type="button" class="hist-delete" onclick="deleteHistoryEntry('${jsStringAttr(key)}')" title="この履歴を削除（管理者のみ）" aria-label="この履歴を削除（管理者のみ）">✕</button>
@@ -212,4 +213,116 @@ function renderHistoryModal() {
 function onHistoryDayToggle(el) {
     if (!historyOpenDays) historyOpenDays = new Set();
     if (el.open) historyOpenDays.add(el.dataset.day); else historyOpenDays.delete(el.dataset.day);
+}
+
+// ---------- 過去の更新履歴の取り込み（昔の公式サイトの写真から作ったファイル） ----------
+//   ファイルの形：{ type: 'popn-history-import', v: 1, entries: [{ t: 日時(ms) か 'YYYY-MM-DD', ti: 曲名, g?: ジャンル, lv: レベル, om?/nm?: メダル, os?/ns?: スコア }] }
+//   アプリの曲とは、曲名とレベルで合わせる（同じ曲名が複数あればジャンル・UPPER で絞る）。
+//   今の履歴と食い違わないよう、その曲の今ある一番古い履歴（写真以外）より後の日付のものは飛ばす。同じものがすでにあれば飛ばす
+const HISTORY_IMPORT_MAX_BYTES = 10 * 1024 * 1024;
+let pendingHistoryImport = null;
+
+async function importHistoryFromFile(event) {
+    const input = event.target;
+    const file = input.files[0];
+    input.value = '';
+    if (!file) return;
+    if (file.size > HISTORY_IMPORT_MAX_BYTES) { alert('ファイルが大きすぎます。'); return; }
+    let data;
+    try { data = JSON.parse(await file.text()); } catch (e) { data = null; }
+    if (!data || data.type !== 'popn-history-import' || !Array.isArray(data.entries)) {
+        alert('過去の更新履歴のファイルではありません。');
+        return;
+    }
+    openHistoryImportPreview(data.entries);
+}
+
+function parseHistoryImportTime(t) {
+    if (typeof t === 'number' && isFinite(t)) return t;
+    const m = typeof t === 'string' && t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    return m ? new Date(+m[1], +m[2] - 1, +m[3], 12, 0, 0).getTime() : null;
+}
+
+function matchHistoryImportSong(e) {
+    const title = normalizeSongText(e.ti);
+    let cands = title ? songs.filter(s => normalizeSongText(s.title) === title && String(s.level) === String(e.lv)) : [];
+    if (cands.length > 1 && e.g) {
+        const g = cands.filter(s => normalizeSongText(s.genre) === normalizeSongText(e.g));
+        if (g.length > 0) cands = g;
+    }
+    if (cands.length > 1) {
+        const upper = isUpperText(e.ti) || isUpperText(e.g);
+        const u = cands.filter(s => songSaysUpper(s) === upper);
+        if (u.length > 0) cands = u;
+    }
+    return cands.length === 1 ? cands[0] : null;
+}
+
+function openHistoryImportPreview(rawEntries) {
+    const records = getHistoryRecords();
+    const existing = Object.values(records).filter(e => e && typeof e.t === 'number');
+    // 曲ごとの、今ある一番古い履歴（写真以外）の日時
+    const earliest = {};
+    existing.forEach(e => { if (e.src !== 'p' && !(earliest[e.id] <= e.t)) earliest[e.id] = e.t; });
+    const sameKey = e => [e.id, e.t, e.nm ?? '', e.ns ?? ''].join('|');
+    const have = new Set(existing.map(sameKey));
+    const toNum = v => (v === undefined || v === null || v === '' || isNaN(parseInt(v, 10))) ? null : parseInt(v, 10);
+
+    const add = [], unmatched = [];
+    let newer = 0, dup = 0, bad = 0;
+    rawEntries.forEach(r => {
+        const t = r ? parseHistoryImportTime(r.t) : null;
+        if (!r || t === null || typeof r.ti !== 'string') { bad++; return; }
+        const song = matchHistoryImportSong(r);
+        if (!song) { unmatched.push(r); return; }
+        const e = { t, id: song.id, ti: song.title, lv: song.level, src: 'p' };
+        if (typeof r.nm === 'string' && (r.nm === '' || MEDAL_TYPES[r.nm]) && (r.om || '') !== r.nm) { e.om = MEDAL_TYPES[r.om] ? r.om : ''; e.nm = r.nm; }
+        if ('ns' in r && toNum(r.ns) !== toNum(r.os)) { e.os = toNum(r.os); e.ns = toNum(r.ns); }
+        if (!('nm' in e) && !('ns' in e)) { bad++; return; }
+        if (earliest[song.id] !== undefined && t >= earliest[song.id]) { newer++; return; }
+        if (have.has(sameKey(e))) { dup++; return; }
+        have.add(sameKey(e));
+        add.push(e);
+    });
+    pendingHistoryImport = { user: currentUser, add };
+
+    // 日付ごとの件数
+    const byDay = {};
+    add.forEach(e => { const k = localDateKey(e.t); byDay[k] = (byDay[k] || 0) + 1; });
+    const days = Object.keys(byDay).sort();
+    const over = existing.length + add.length > HISTORY_MAX;
+    const unmatchedNames = [...new Set(unmatched.map(r => `Lv${r.lv} ${r.ti}`))];
+    document.getElementById('history-import-body').innerHTML = `
+        <div class="eagate-summary">
+            <div>${escapeHtml(currentUser)} さんの更新履歴に <b>${add.length}</b> 件を足します</div>
+            ${newer ? `<div class="hi-note">今の履歴より新しい日付の ${newer} 件は飛ばします</div>` : ''}
+            ${dup ? `<div class="hi-note">すでに取り込んでいる ${dup} 件は飛ばします</div>` : ''}
+            ${bad ? `<div class="hi-note">読めなかった ${bad} 件は飛ばします</div>` : ''}
+            ${over ? `<div class="hi-warn">履歴が ${HISTORY_MAX} 件を超えるため、古いものから消えます</div>` : ''}
+        </div>
+        ${days.length ? `<div class="hi-days">${days.map(k => `<div><span>${escapeHtml(k.replace(/-/g, '/'))}</span><b>${byDay[k]}件</b></div>`).join('')}</div>` : ''}
+        ${unmatchedNames.length ? `<details class="eagate-unmatched"><summary>アプリの曲と合わなかった曲（${unmatchedNames.length}曲）</summary><ul>${unmatchedNames.slice(0, 300).map(n => `<li>${escapeHtml(n)}</li>`).join('')}</ul></details>` : ''}`;
+    document.getElementById('history-import-apply').disabled = add.length === 0;
+    document.getElementById('history-import-modal').style.display = 'flex';
+}
+
+function closeHistoryImport() {
+    pendingHistoryImport = null;
+    document.getElementById('history-import-modal').style.display = 'none';
+}
+
+function applyHistoryImport() {
+    const pending = pendingHistoryImport;
+    if (!pending) return;
+    if (pending.user !== currentUser) { alert('ユーザーが切り替わったので、取り込みをやめました。'); closeHistoryImport(); return; }
+    const records = getHistoryRecords();
+    pending.add.forEach(e => { records[e.t.toString(36) + '_p' + Math.random().toString(36).slice(2, 7)] = e; });
+    const keys = Object.keys(records);
+    if (keys.length > HISTORY_MAX) {
+        keys.sort((a, b) => (records[a].t || 0) - (records[b].t || 0)).slice(0, keys.length - HISTORY_MAX).forEach(k => delete records[k]);
+    }
+    closeHistoryImport();
+    scheduleAutoSave();
+    renderTable();
+    showToast('toast-eagate', `過去の更新履歴を取り込みました（${pending.add.length}件）`, '#4caf50', 3000);
 }

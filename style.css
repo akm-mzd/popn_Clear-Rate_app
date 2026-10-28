@@ -1688,3 +1688,11 @@ button.sh-more { width: 100%; margin: 6px 0 0; padding: 6px; border: 1px solid #
 .at-weak { display: inline-block; }
 #ns-root .at-table { table-layout: auto; }
 #ns-root .at-table tbody th { white-space: normal; line-height: 1.5; }
+
+/* 過去の更新履歴の取り込み */
+.hist-src.photo { background: #8d6e63; }
+.history-import-content { max-width: 480px; width: 95vw; max-height: 90vh; display: flex; flex-direction: column; box-sizing: border-box; }
+.hi-note { font-size: 0.85em; color: #777; }
+.hi-warn { font-size: 0.85em; color: #c62828; font-weight: bold; }
+.hi-days { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 4px 12px; margin: 8px 0; font-size: 13px; }
+.hi-days div { display: flex; justify-content: space-between; border-bottom: 1px solid #f0f0f0; padding: 2px 0; }
