@@ -1696,3 +1696,13 @@ button.sh-more { width: 100%; margin: 6px 0 0; padding: 6px; border: 1px solid #
 .hi-warn { font-size: 0.85em; color: #c62828; font-weight: bold; }
 .hi-days { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 4px 12px; margin: 8px 0; font-size: 13px; }
 .hi-days div { display: flex; justify-content: space-between; border-bottom: 1px solid #f0f0f0; padding: 2px 0; }
+
+/* BAD の数（メダルを選ぶ画面・履歴） */
+.bad-box { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 8px 10px; border: 1px solid #eee; border-radius: 10px; background: #fafafa; }
+.bad-box:empty { display: none; }
+.bad-label { flex: 1; display: flex; flex-direction: column; font-weight: bold; font-size: 14px; color: #333; }
+.bad-label span { font-weight: normal; font-size: 11px; color: #888; }
+.bad-input { width: 7.5em; height: 36px; padding: 0 8px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; box-sizing: border-box; text-align: right; }
+.hist-bad { font-size: 0.85em; color: #555; white-space: nowrap; }
+.hist-bad b { color: #1565c0; }
+.sv-bad { color: #1565c0; }

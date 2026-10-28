@@ -296,6 +296,7 @@ function renderSongHistoryBox(id, showAll) {
         const parts = [];
         if ('nm' in e) parts.push(`<span class="hist-change">${historyMedalHtml(e.om)}<span class="hist-arrow">→</span>${historyMedalHtml(e.nm)}</span>`);
         if ('ns' in e) parts.push(historyScoreHtml(e.os, e.ns));
+        if ('nb' in e) parts.push(historyBadHtml(e.ob, e.nb));
         return `<div class="sh-row"><span class="sh-date">${d.getFullYear() % 100}/${d.getMonth() + 1}/${d.getDate()}</span><span class="sh-body">${parts.join('')}</span></div>`;
     }).join('');
     const more = list.length > SONG_HISTORY_SHOW && !songHistoryShowAll
@@ -313,6 +314,7 @@ function getTodayChanges() {
         const c = bySong.get(e.id) || { id: e.id, ti: e.ti, lv: e.lv };
         if ('nm' in e) { if (!('om' in c)) c.om = e.om || ''; c.nm = e.nm || ''; }
         if ('ns' in e) { if (!('os' in c)) c.os = toScoreNum(e.os); c.ns = toScoreNum(e.ns); }
+        if ('nb' in e) { if (!('ob' in c)) c.ob = toBadNum(e.ob); c.nb = toBadNum(e.nb); }
         bySong.set(e.id, c);
     });
     const rankOf = k => (MEDAL_TYPES[k] || MEDAL_TYPES['']).rank;
@@ -320,10 +322,11 @@ function getTodayChanges() {
     const medalUp = changes.filter(c => 'nm' in c && rankOf(c.nm) > rankOf(c.om)).sort((a, b) => rankOf(b.nm) - rankOf(a.nm));
     const scoreUp = changes.filter(c => 'ns' in c && c.ns !== null && (c.os === null || c.ns > c.os))
         .map(c => ({ ...c, diff: c.os === null ? null : c.ns - c.os })).sort((a, b) => (b.ns - a.ns));
+    const badDown = changes.filter(c => 'nb' in c && c.nb !== null && (c.ob === null || c.nb < c.ob)).sort((a, b) => a.nb - b.nb);
     const isNormal = k => !!(MEDAL_TYPES[k] || {}).isNormalClear;
     const isFc = k => rankOf(k) >= MEDAL_TYPES['銀丸'].rank;
     return {
-        medalUp, scoreUp, count: changes.length,
+        medalUp, scoreUp, badDown, count: changes.length,
         newNormal: medalUp.filter(c => !isNormal(c.om) && isNormal(c.nm)).length,
         newFc: medalUp.filter(c => !isFc(c.om) && isFc(c.nm)).length
     };
@@ -356,7 +359,7 @@ function closeDailySummary() {
 
 // 今日のまとめの数（0 のものは外す）：[[数, 名前]]
 function getDailySummaryTiles(sum) {
-    return [[sum.medalUp.length, 'メダルが上がった'], [sum.scoreUp.length, 'スコアが上がった'], [sum.newNormal, '初クリア'], [sum.newFc, '初フルコン']].filter(([n]) => n > 0);
+    return [[sum.medalUp.length, 'メダルが上がった'], [sum.scoreUp.length, 'スコアが上がった'], [sum.badDown.length, 'BADが減った'], [sum.newNormal, '初クリア'], [sum.newFc, '初フルコン']].filter(([n]) => n > 0);
 }
 
 function buildDailySummaryHtml(sum, pk) {
@@ -374,6 +377,9 @@ function buildDailySummaryHtml(sum, pk) {
     }
     if (sum.scoreUp.length > 0) {
         html += `<div class="ds-sub">スコア</div>` + sum.scoreUp.map(c => `<div class="ds-row"><span class="level-badge">${escapeHtml(c.lv)}</span><span class="ds-title">${escapeHtml(c.ti)}</span><span class="ds-score">${c.ns.toLocaleString('ja-JP')}${c.diff !== null ? `<small>+${c.diff.toLocaleString('ja-JP')}</small>` : '<small>初</small>'}</span></div>`).join('');
+    }
+    if (sum.badDown.length > 0) {
+        html += `<div class="ds-sub">BAD</div>` + sum.badDown.map(c => `<div class="ds-row"><span class="level-badge">${escapeHtml(c.lv)}</span><span class="ds-title">${escapeHtml(c.ti)}</span><span class="ds-score">${c.ob !== null ? `${c.ob} → ` : ''}${c.nb}</span></div>`).join('');
     }
     return html;
 }
