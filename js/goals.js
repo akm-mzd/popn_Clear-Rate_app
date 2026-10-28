@@ -2,7 +2,7 @@
 // goals.js
 // 目標（例：Lv49 の弱を全部ノーマルクリア、Lv47 で銅菱以上を100曲）と、その進み具合。
 // 目標はユーザーごとに goalRecords（{ 目標ID: 目標 }）としてクラウドに保存する。
-//   目標 = { name, lv: [レベル], df: [難易度], af: [相性], kind: 'medal'|'score'|'rank'|'pokkura',
+//   目標 = { name, lv: [レベル], df: [難易度], af: [タグ（メモ）], kind: 'medal'|'score'|'rank'|'pokkura',
 //           medal: 条件キー, score: 点数, rank: ランク, n: 曲数（null = 全曲）, t: 作った日時, done: 初めて達成した日時,
 //           pc: ポップンクラスの目標値, st: 作ったときのポップンクラス（進み具合の起点） }
 //   並び順は、達成まで近い順（進み具合の割合が大きい順。達成した目標は下）。
@@ -21,7 +21,10 @@ const GOAL_MEDAL_OPTIONS = [
     }))
 ];
 const GOAL_DIFF_VALUES = ['危険', '別格', '詐称', '強', '中(+)', '中(-)', '弱', '逆詐称', '入門', '未分類'];
-const GOAL_AFFINITY_VALUES = ['得意', '苦手', '噛み合い待ち', '敵', '💩', '未設定'];
+// タグ（メモ）の選択肢。「未設定」はタグなし
+function getGoalTagValues() {
+    return getMemoTagNames().concat(MEMO_FILTER_NONE);
+}
 // 目標の控え（この端末）。GAS が古くてクラウドに保存されなかったときに戻せるようにする
 const GOAL_BACKUP_PREFIX = 'popn_goal_backup_';
 
@@ -47,9 +50,10 @@ function getGoalTargetSongs(goal) {
     return songs.filter(song => {
         if (goal.lv && goal.lv.length > 0 && !goal.lv.includes(String(song.level))) return false;
         if (goal.df && goal.df.length > 0 && !goal.df.includes(goalSongDiffKey(song))) return false;
+        // タグ：選んだタグのどれかが付いている曲（「未設定」はタグなし）
         if (goal.af && goal.af.length > 0) {
-            const aff = (memoRecords[song.id] || {}).affinity || '未設定';
-            if (!goal.af.includes(aff)) return false;
+            const tags = getMemoTags(getMemo(song.id));
+            if (!goal.af.some(t => t === MEMO_FILTER_NONE ? tags.length === 0 : tags.includes(t))) return false;
         }
         if (!showUnreleased && clearRecords[song.id] === '未解禁') return false;
         return true;
@@ -109,7 +113,7 @@ function describeGoal(goal) {
     const parts = [];
     parts.push(goal.lv && goal.lv.length > 0 ? goal.lv.map(l => isNaN(parseInt(l, 10)) ? l : `Lv${l}`).join('・') : '全レベル');
     if (goal.df && goal.df.length > 0) parts.push(goal.df.join('・'));
-    if (goal.af && goal.af.length > 0) parts.push(`相性：${goal.af.join('・')}`);
+    if (goal.af && goal.af.length > 0) parts.push(`タグ：${goal.af.join('・')}`);
     parts.push(describeGoalCondition(goal));
     parts.push(goal.n ? `${goal.n}曲` : '全曲');
     return parts.join(' ');
@@ -295,8 +299,8 @@ function openGoalForm(id) {
             <div class="goal-opts">${goalChipsHtml('goal-lv', levels, g.lv || [])}</div></div>
         <div class="goal-field goal-song-only"><div class="goal-label">難易度 <span>（選ばなければすべて）</span></div>
             <div class="goal-opts">${goalChipsHtml('goal-df', GOAL_DIFF_VALUES, g.df || [])}</div></div>
-        <div class="goal-field goal-song-only"><div class="goal-label">相性 <span>（選ばなければすべて）</span></div>
-            <div class="goal-opts">${goalChipsHtml('goal-af', GOAL_AFFINITY_VALUES, g.af || [])}</div></div>
+        <div class="goal-field goal-song-only"><div class="goal-label">タグ <span>（選ばなければすべて）</span></div>
+            <div class="goal-opts">${goalChipsHtml('goal-af', getGoalTagValues(), g.af || [])}</div></div>
         <div class="goal-field"><div class="goal-label">達成の条件</div>
             <div class="goal-row">
                 <select id="goal-kind" onchange="updateGoalFormPreview()">
@@ -443,7 +447,7 @@ function goalSongRowHtml(goal, song, done) {
     return `
         <div class="gd-row${done ? ' is-done' : ''}">
             <button type="button" class="gd-medal${medalKey === '' ? ' is-empty' : ''}" onclick="openMedalModal('${safeId}')" title="${escapeHtml(medalLabel || '未プレイ')}（押すとメダルを変更）">${buildGridMedalInner(medalKey) || '<span class="gd-medal-none">−</span>'}</button>
-            <a class="gd-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（攻略wikiを開く）">${bannerInner}</a>
+            <a class="gd-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（攻略wikiを開く）">${bannerInner}${buildMemoMarkHtml(song.id)}</a>
             <div class="gd-info">
                 <div class="gd-title">${escapeHtml(song.title)}</div>
                 <div class="gd-sub"><span class="level-badge">${escapeHtml(song.level)}</span> ${escapeHtml(song.diffRaw || '未分類')} ・ ${escapeHtml(medalLabel || '未プレイ')}</div>

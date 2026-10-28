@@ -29,6 +29,7 @@ function initMedalGrid() {
 function openMedalModal(id) {
     currentMedalEditId = id;
     renderUraMedalBox();
+    renderMemoEditor('memo-editor-medal', id);
     document.getElementById('medal-modal').style.display = 'flex';
 }
 
@@ -65,6 +66,7 @@ function setUraOldFromModal(id, old) {
 }
 
 function closeMedalModal() {
+    flushMemoText();
     currentMedalEditId = null;
     document.getElementById('medal-modal').style.display = 'none';
 }
@@ -124,59 +126,7 @@ async function saveScoreModal() {
     renderTable();
 }
 
-// --- メモ機能関連 ---
-function openMemoModal(id) {
-    const song = songs.find(s => s.id === id);
-    if (!song) return;
-    
-    const memo = memoRecords[id] || {};
-    
-    document.getElementById('memo-modal-id').value = id;
-    document.getElementById('memo-modal-title').innerText = `メモ: ${song.title}`;
-    document.getElementById('memo-input-affinity').value = memo.affinity || '';
-    document.getElementById('memo-input-sudden').value = memo.sudden || '';
-    document.getElementById('memo-input-comment').value = memo.comment || '';
-    
-    document.getElementById('memo-modal').style.display = 'flex';
-}
-
-function closeMemoModal() {
-    document.getElementById('memo-modal').style.display = 'none';
-}
-
-function clearMemo() {
-    if(confirm('この楽曲のメモをすべてクリアしますか？')) {
-        const id = document.getElementById('memo-modal-id').value;
-        delete memoRecords[id];
-        
-        if (!allUsersData[currentUser]) allUsersData[currentUser] = { clearRecords: {}, scoreRecords: {}, memoRecords: {} };
-        allUsersData[currentUser].memoRecords = memoRecords;
-
-        closeMemoModal();
-        scheduleAutoSave();   // ←追加
-        renderTable();
-    }
-}
-
-function saveMemoModal() {
-    const id = document.getElementById('memo-modal-id').value;
-    const affinity = document.getElementById('memo-input-affinity').value;
-    const sudden = document.getElementById('memo-input-sudden').value.trim();
-    const comment = document.getElementById('memo-input-comment').value.trim();
-
-    if (affinity === '' && sudden === '' && comment === '') {
-        delete memoRecords[id];
-    } else {
-        memoRecords[id] = { affinity, sudden, comment };
-    }
-
-    if (!allUsersData[currentUser]) allUsersData[currentUser] = { clearRecords: {}, scoreRecords: {}, memoRecords: {} };
-    allUsersData[currentUser].memoRecords = memoRecords;
-
-    closeMemoModal();
-    scheduleAutoSave();   // ←追加
-    renderTable();
-}
+// --- メモ：js/memo.js ---
 
 // --- ランダム選曲機能関連 ---
 function openRandomModal() {

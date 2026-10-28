@@ -125,11 +125,6 @@ details > summary::-webkit-details-marker { display: none; }
 .check-label input { margin: 0; }
 
 /* メモアイコン用装飾 */
-.memo-badge-得意 { color: #2196F3; font-weight: bold; }
-.memo-badge-苦手 { color: #FF9800; font-weight: bold; }
-.memo-badge-噛み合い待ち { color: #9C27B0; font-weight: bold; }
-.memo-badge-敵 { color: #F44336; font-weight: bold; }
-.memo-badge-💩 { color: #795548; font-weight: bold; }
 
 /* =========================================
     📱 スマホ向け最適化（レスポンシブデザイン）
@@ -1153,6 +1148,7 @@ body.ui-new #menu-panel .btn-eagate-sub,
 body.ui-new #menu-panel .ui-switch-btn,
 body.ui-new #menu-panel .menu-search-clear,
 body.ui-new #menu-panel .random-ready-btn,
+body.ui-new #menu-panel .memo-list-open,
 body.ui-new #menu-panel .export-col-details > summary,
 body.ui-new #menu-panel .eagate-manual > summary {
     display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 42px; padding: 0 16px; margin: 0;
@@ -1450,3 +1446,62 @@ body.ui-new #nu-stats-slot #extended-stats-display { display: none !important; }
 .gd-pk-points { margin: 6px 2px 4px; padding: 8px 10px; border-radius: 8px; background: #f6f2f8; font-size: 13px; line-height: 1.6; color: #444; }
 .gd-pk-points b { color: #6a3fb0; font-size: 15px; }
 .gd-pk-note { font-size: 11px; color: #888; }
+
+/* =========================================
+    📝 メモ（memo.js）：入力欄・バナーの印・タグの編集・メモ一覧
+    ========================================= */
+#medal-modal .modal-content, .memo-modal-content { max-height: 92vh; overflow-y: auto; box-sizing: border-box; }
+.memo-modal-content { max-width: 440px; width: 94vw; }
+.memo-editor { margin-top: 14px; padding-top: 12px; border-top: 1px solid #eee; text-align: left; display: flex; flex-direction: column; gap: 8px; }
+#memo-editor-memo .memo-editor { margin-top: 0; padding-top: 0; border-top: none; }
+.me-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.me-title { font-weight: bold; color: #555; }
+.memo-editor button.me-star, .memo-editor button.me-chip, .memo-list-content button.me-chip {
+    width: auto; margin: 0; padding: 0 12px; height: 32px; border-radius: 16px; border: 1px solid #ddd; background: #fff;
+    color: #555; font-size: 13px; font-weight: bold; font-family: inherit; cursor: pointer; line-height: 1;
+}
+.memo-editor button.me-star.on { background: #fff8e1; border-color: #ffb300; color: #e65100; }
+.me-label { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: bold; color: #777; }
+.memo-editor button.me-link { width: auto; margin: 0 0 0 auto; padding: 0; border: none; background: none; color: #6a3fb0; font-size: 12px; font-weight: bold; cursor: pointer; text-decoration: underline; }
+.me-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+button.me-chip.on { background: #fce4ef; border-color: #c2185b; color: #8e1043; }
+button.me-chip.me-tag { border-color: var(--tag-color); color: var(--tag-color); }
+button.me-chip.me-tag.on { background: var(--tag-color); border-color: var(--tag-color); color: #fff; }
+.me-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.me-field { display: flex; flex-direction: column; gap: 3px; font-size: 12px; font-weight: bold; color: #777; }
+.me-field input, .me-field textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; font-family: inherit; color: #333; background: #fff; }
+.me-field textarea { resize: vertical; min-height: 64px; }
+.me-empty { font-size: 12px; color: #999; }
+
+/* バナーの右上の印 */
+.dg-banner, .gd-banner { position: relative; }
+.memo-mark {
+    position: absolute; top: 1px; right: 1px; display: inline-flex; align-items: center; gap: 2px; padding: 1px 3px;
+    border-radius: 7px; background: rgba(255,255,255,0.92); font-size: 11px; line-height: 1; pointer-events: auto; box-shadow: 0 0 2px rgba(0,0,0,0.3);
+}
+.memo-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.memo-mark-star { color: #ff8f00; font-weight: bold; }
+.memo-mark-note { font-size: 10px; }
+
+/* タグの編集 */
+.memo-tags-content { max-width: 420px; width: 94vw; max-height: 90vh; overflow-y: auto; box-sizing: border-box; }
+.mt-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.mt-row input[type="color"] { width: 40px; height: 34px; padding: 0; border: 1px solid #ddd; border-radius: 6px; background: #fff; flex-shrink: 0; }
+.mt-row .mt-name { flex: 1; min-width: 0; height: 34px; padding: 0 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; box-sizing: border-box; }
+.mt-row button.mt-del { width: auto; margin: 0; padding: 0 10px; height: 34px; border: 1px solid #ef9a9a; border-radius: 6px; background: #fff; color: #d32f2f; font-size: 13px; cursor: pointer; }
+button.mt-add { width: 100%; margin: 6px 0 0; height: 36px; border: 1px dashed #ab47bc; border-radius: 8px; background: #faf5fc; color: #7b1fa2; font-weight: bold; cursor: pointer; }
+
+/* メモ一覧 */
+.memo-list-content { max-width: 640px; width: 95vw; max-height: 92vh; display: flex; flex-direction: column; box-sizing: border-box; }
+.ml-count { font-size: 0.75em; color: #888; font-weight: normal; }
+.memo-list-body { flex: 1; min-height: 0; overflow-y: auto; margin-top: 8px; border-top: 1px solid #eee; }
+button.ml-row { display: flex; align-items: flex-start; gap: 8px; width: 100%; margin: 0; padding: 8px 4px; border: none; border-bottom: 1px solid #f0eaf2; background: #fff; text-align: left; cursor: pointer; font-family: inherit; color: #333; }
+button.ml-row:hover { background: #faf5fc; }
+.ml-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.ml-title { font-weight: bold; font-size: 14px; }
+.ml-tags { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.ml-tag { color: #fff; font-size: 11px; font-weight: bold; padding: 1px 6px; border-radius: 8px; }
+.ml-extra { font-size: 11px; color: #666; }
+.ml-comment { font-size: 12px; color: #666; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu-memo-row { display: flex; }
+.menu-memo-row button.memo-list-open { width: 100%; margin: 0; padding: 8px 12px; border: 1px solid #ab47bc; border-radius: 6px; background: #fff; color: #7b1fa2; font-weight: bold; cursor: pointer; }

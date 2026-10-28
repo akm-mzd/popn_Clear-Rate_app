@@ -93,7 +93,7 @@ function setNewUiNavActive(key) {
 // ---------- 上部バー・絞り込みチップ・統計カード（renderTable の最後に呼ばれる） ----------
 const NEW_UI_FILTER_GROUPS = [
     ['filter-medal', 'メダル'], ['filter-diff', '難易度'], ['filter-rank', 'ランク'],
-    ['filter-version', 'バージョン'], ['filter-affinity', '相性']
+    ['filter-version', 'バージョン'], ['filter-affinity', 'タグ']
 ];
 const NEW_UI_VALUE_LABELS = { unplayed: '未プレイ', none: 'スコアなし' };
 
