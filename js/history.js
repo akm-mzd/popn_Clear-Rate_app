@@ -317,8 +317,25 @@ function openHistoryImportPreview(rawEntries, rawBads = [], rawSongs = []) {
     const fileSongs = {};
     rawSongs.forEach(s => { if (s && typeof s.k === 'string' && typeof s.ti === 'string') fileSongs[s.k] = s; });
     // 曲名とレベルで合わなかった曲のうち、写真のバナーがあるもの（バナーで探す）
-    const pickKeys = Object.keys(fileSongs).filter(k => !matchHistoryImportSong(fileSongs[k]) && /^data:image\//.test(fileSongs[k].bn || ''));
-    const state = { user: currentUser, rawEntries, rawBads, fileSongs, pickKeys, choice: {}, cands: {}, progress: pickKeys.length ? { done: 0, total: 0 } : null };
+    //   前に取り込んだ写真の履歴（同じレベル・同じ日時）がある曲は、そのとき選んだ曲に決めて、選ぶ欄には出さない
+    const photoSongAt = {};
+    Object.values(getHistoryRecords()).forEach(e => {
+        if (e && e.src === 'p' && typeof e.t === 'number') photoSongAt[e.t + '|' + e.lv] = e.id;
+    });
+    const choice = {};
+    const unmatchedKeys = Object.keys(fileSongs).filter(k => !matchHistoryImportSong(fileSongs[k]) && /^data:image\//.test(fileSongs[k].bn || ''));
+    const pickKeys = unmatchedKeys.filter(k => {
+        const ids = new Set();
+        rawEntries.forEach(r => {
+            if (!r || r.k !== k) return;
+            const t = parseHistoryImportTime(r.t);
+            const id = photoSongAt[t + '|' + fileSongs[k].lv];
+            if (id && songs.some(x => x.id === id)) ids.add(id);
+        });
+        if (ids.size === 1) { choice[k] = [...ids][0]; return false; }
+        return true;
+    });
+    const state = { user: currentUser, rawEntries, rawBads, fileSongs, pickKeys, choice, cands: {}, progress: pickKeys.length ? { done: 0, total: 0 } : null };
     pendingHistoryImport = state;
     renderHistoryImport();
     document.getElementById('history-import-modal').style.display = 'flex';
