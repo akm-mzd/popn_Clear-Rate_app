@@ -5,7 +5,7 @@
 // ==========================================
 
 function downloadSongsAndClearsJson() {
-    const exportData = { songs: songs, clearRecords: clearRecords, scoreRecords: scoreRecords, memoRecords: memoRecords, historyRecords: getHistoryRecords(), pokkuraRecords: (allUsersData[currentUser] && allUsersData[currentUser].pokkuraRecords) || {}, goalRecords: getGoalRecords(), pokkuraFlagRecords: getPokkuraFlagRecords(), recentRecords: (allUsersData[currentUser] && allUsersData[currentUser].recentRecords) || {}, memoConfigRecords: (allUsersData[currentUser] && allUsersData[currentUser].memoConfigRecords) || {}, attrConfigRecords: (allUsersData[currentUser] && allUsersData[currentUser].attrConfigRecords) || {}, pokkuraHistRecords: (allUsersData[currentUser] && allUsersData[currentUser].pokkuraHistRecords) || {} };
+    const exportData = { songs: songs, clearRecords: clearRecords, scoreRecords: scoreRecords, memoRecords: memoRecords, historyRecords: getHistoryRecords(), pokkuraRecords: (allUsersData[currentUser] && allUsersData[currentUser].pokkuraRecords) || {}, goalRecords: getGoalRecords(), pokkuraFlagRecords: getPokkuraFlagRecords(), recentRecords: (allUsersData[currentUser] && allUsersData[currentUser].recentRecords) || {}, memoConfigRecords: (allUsersData[currentUser] && allUsersData[currentUser].memoConfigRecords) || {}, attrConfigRecords: (allUsersData[currentUser] && allUsersData[currentUser].attrConfigRecords) || {}, pokkuraHistRecords: (allUsersData[currentUser] && allUsersData[currentUser].pokkuraHistRecords) || {}, badRecords: (allUsersData[currentUser] && allUsersData[currentUser].badRecords) || {} };
     const dataStr = JSON.stringify(exportData, null, 2);
     triggerDownload(dataStr, `popn_data_${currentUser}.json`, 'クリア・スコア・メモを含めて');
 }
@@ -494,6 +494,7 @@ async function restoreFromJson(event) {
             if (isObj(data.memoConfigRecords)) user.memoConfigRecords = data.memoConfigRecords;
             if (isObj(data.attrConfigRecords)) user.attrConfigRecords = data.attrConfigRecords;
             if (isObj(data.pokkuraHistRecords)) user.pokkuraHistRecords = data.pokkuraHistRecords;
+            if (isObj(data.badRecords)) user.badRecords = data.badRecords;
 
             clearRecords = user.clearRecords;
             scoreRecords = user.scoreRecords;

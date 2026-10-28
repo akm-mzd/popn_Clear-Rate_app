@@ -867,6 +867,10 @@ function buildDailySummaryRoot(sum, pk) {
         html += `<div style="font-size: 13px; font-weight: bold; color: #666; margin: 10px 0 4px;">スコア</div>`;
         html += sum.scoreUp.map(c => row(c.lv, c.ti, `<div style="font-size: 15px; font-weight: bold;">${c.ns.toLocaleString('ja-JP')}<span style="font-size: 12px; color: #2e7d32; margin-left: 4px;">${c.diff !== null ? '+' + c.diff.toLocaleString('ja-JP') : '初'}</span></div>`)).join('');
     }
+    if (sum.badDown.length > 0) {
+        html += `<div style="font-size: 13px; font-weight: bold; color: #666; margin: 10px 0 4px;">BAD</div>`;
+        html += sum.badDown.map(c => row(c.lv, c.ti, `<div style="font-size: 15px; font-weight: bold;">${c.ob !== null ? `${c.ob} → ` : ''}${c.nb}</div>`)).join('');
+    }
     root.innerHTML = html;
     return root;
 }

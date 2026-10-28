@@ -10,14 +10,23 @@
 //   同じ項目の中は「どれか」（OR）、違う項目どうしは「すべて」（AND）で絞り込む。
 //   ほかに、スコアの範囲（#filter-score-min / max）。選択肢の横には、選ぶと出る曲の数を出す。
 // ==========================================
-// 並びは絞り込みの欄の並びと同じ（レベル・メダル・難易度・属性・バージョン・スコア・タグ・メモ・最後に更新した日）
-const FILTER_IDS = ['filter-level', 'filter-medal', 'filter-diff', 'filter-attr', 'filter-version', 'filter-rank', 'filter-affinity', 'filter-updated'];
+// 並びは絞り込みの欄の並びと同じ（レベル・メダル・難易度・属性・バージョン・スコア・BAD・タグ・メモ・最後に更新した日）
+const FILTER_IDS = ['filter-level', 'filter-medal', 'filter-diff', 'filter-attr', 'filter-version', 'filter-rank', 'filter-bad', 'filter-affinity', 'filter-updated'];
 
 // 項目の短い名前（今の条件のチップに使う）
 const FILTER_GROUP_NAMES = {
-    'filter-level': 'レベル', 'filter-medal': 'メダル', 'filter-rank': 'ランク', 'filter-diff': '難易度', 'filter-updated': '更新',
+    'filter-bad': 'BAD', 'filter-level': 'レベル', 'filter-medal': 'メダル', 'filter-rank': 'ランク', 'filter-diff': '難易度', 'filter-updated': '更新',
     'filter-affinity': 'タグ', 'filter-attr': '属性', 'filter-version': 'バージョン'
 };
+
+// BAD の数（クリアしたときの一番少ない BAD。フルコンボ以上は 0：getSongBad）
+const BAD_FILTER_ITEMS = [
+    { value: 'b0', label: '0（フルコン）', test: n => n === 0 },
+    { value: 'b1', label: '1〜9（一桁）', test: n => n !== null && n >= 1 && n <= 9 },
+    { value: 'b10', label: '10〜20', test: n => n !== null && n >= 10 && n <= 20 },
+    { value: 'b21', label: '21以上', test: n => n !== null && n >= 21 },
+    { value: 'none', label: '記録なし', test: n => n === null }
+];
 
 // 最後に更新した日（更新履歴の一番新しい日から何日たったか）
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -274,6 +283,7 @@ function initFilters() {
     buildFilterChecks('filter-rank', rankItems);
 
     buildFilterChecks('filter-updated', UPDATED_FILTER_ITEMS.map(({ value, label }) => ({ value, label })));
+    buildFilterChecks('filter-bad', BAD_FILTER_ITEMS.map(({ value, label }) => ({ value, label })));
     // 難易度は index.html に書いてあるので、表示名だけ付ける
     document.querySelectorAll('#filter-diff input[type="checkbox"]').forEach(cb => { cb.dataset.label = cb.value; });
 
@@ -697,6 +707,10 @@ const FILTER_GROUP_TESTS = {
             : tags.includes(v));
     },
     'filter-rank': (s, values) => values.includes(getSongScoreRank(s) || SCORE_RANK_NONE),
+    'filter-bad': (s, values) => {
+        const n = getSongBad(s.id);
+        return values.some(v => { const item = BAD_FILTER_ITEMS.find(x => x.value === v); return !!item && item.test(n); });
+    },
     // 属性（攻略wiki）：選んだもののどれかを持つ曲
     'filter-attr': (s, values) => getSongAttrs(s).some(a => values.includes(a)),
     'filter-updated': (s, values, ctx) => {
@@ -1787,6 +1801,7 @@ function renderUpdatedGrid(targetSongs) {
         const it = items.get(e.id);
         if ('nm' in e) { if (!('nm' in it)) it.nm = e.nm; it.om = e.om; }
         if ('ns' in e) { if (!('ns' in it)) it.ns = e.ns; it.os = e.os; }
+        if ('nb' in e) { if (!('nb' in it)) it.nb = e.nb; it.ob = e.ob; }
     });
 
     if (days.length === 0) {
@@ -1818,6 +1833,7 @@ function renderUpdatedGrid(targetSongs) {
                     parts.push(`<span class="sv-score ${diff >= 0 ? 'up' : 'down'}">${diff >= 0 ? '+' : '−'}${Math.abs(diff).toLocaleString('ja-JP')}</span>`);
                 }
             }
+            if ('nb' in it && it.ob !== it.nb) parts.push(`<span class="sv-score sv-bad">BAD ${it.ob === null || it.ob === undefined ? '' : `${it.ob}→`}${it.nb === null ? '削除' : it.nb}</span>`);
             if (parts.length === 0) parts.push('<span class="sv-score">もとに戻した</span>');
             cells += buildDiffGridCellHtml(it.song, showScore, `<div class="sv-info">${parts.join('')}</div>${buildSvSongInfoHtml(it.song)}`);
         });

@@ -4,7 +4,8 @@
 // 自分で変えたとき（メダル・スコアの入力）と、公式データ取り込みで変わったときに記録する。
 // 履歴はユーザーごとに historyRecords（{ キー: 1件 }）としてクラウドに保存する。
 //   1件 = { t: 日時(ms), id: 曲ID, ti: 曲名, lv: レベル, src: 'm'(手動) / 'e'(公式) / 'p'(写真から取り込んだ過去の分),
-//          om / nm: メダルの変更前・後（メダルが変わったときだけ）, os / ns: スコアの変更前・後（スコアが変わったときだけ。なしは null） }
+//          om / nm: メダルの変更前・後（メダルが変わったときだけ）, os / ns: スコアの変更前・後（スコアが変わったときだけ。なしは null）,
+//          ob / nb: BAD の数の変更前・後（クリアしたときの一番少ない BAD。変わったときだけ。なしは null） }
 // ==========================================
 
 const HISTORY_MAX = 20000;     // これより多くなったら古いものから消す（写真から取り込んだ過去の分も入るので多めに）
@@ -12,6 +13,39 @@ const HISTORY_PAGE_SIZE = 200; // 画面に一度に出す件数
 
 let historyShowCount = HISTORY_PAGE_SIZE;
 let historyOpenDays = null; // 開いている日付（null = まだ決めていない → 一番新しい日だけ開く）
+
+// ---------- BAD の数（クリアしたときの一番少ない BAD）：ユーザーごとに badRecords { 曲ID: 数 } ----------
+function getBadRecords(user = currentUser) {
+    if (!allUsersData[user]) allUsersData[user] = emptyUser();
+    if (!allUsersData[user].badRecords) allUsersData[user].badRecords = {};
+    return allUsersData[user].badRecords;
+}
+
+const toBadNum = v => (v === undefined || v === null || v === '' || isNaN(parseInt(v, 10)) || parseInt(v, 10) < 0) ? null : parseInt(v, 10);
+
+// 曲の BAD の数：記録があればその数、なければフルコンボ以上（銀丸以上）なら 0、どちらでもなければ null
+function getSongBad(id) {
+    const n = toBadNum(getBadRecords()[id]);
+    if (n !== null) return n;
+    const m = MEDAL_TYPES[clearRecords[id] || ''];
+    return m && m.rank >= MEDAL_TYPES['銀丸'].rank ? 0 : null;
+}
+
+// BAD の数を変える（null で消す）。変わったら履歴にも残す
+function setSongBad(id, value, src) {
+    const recs = getBadRecords();
+    const old = toBadNum(recs[id]);
+    const n = toBadNum(value);
+    if (old === n) return false;
+    addHistoryEntry(songs.find(s => s.id === id), { bad: [old, n] }, src);
+    if (n === null) delete recs[id]; else recs[id] = n;
+    return true;
+}
+
+function historyBadHtml(ob, nb) {
+    const v = x => (x === null || x === undefined ? '-' : x);
+    return `<span class="hist-bad">BAD ${v(ob)} → <b>${nb === null || nb === undefined ? '削除' : nb}</b></span>`;
+}
 
 function getHistoryRecords(user = currentUser) {
     if (!allUsersData[user]) allUsersData[user] = emptyUser();
@@ -36,7 +70,11 @@ function addHistoryEntry(song, change, src) {
         const os = toNum(change.score[0]), ns = toNum(change.score[1]);
         if (os !== ns) { entry.os = os; entry.ns = ns; }
     }
-    if (!('nm' in entry) && !('ns' in entry)) return;
+    if (change.bad) {
+        const ob = toBadNum(change.bad[0]), nb = toBadNum(change.bad[1]);
+        if (ob !== nb) { entry.ob = ob; entry.nb = nb; }
+    }
+    if (!('nm' in entry) && !('ns' in entry) && !('nb' in entry)) return;
 
     const records = getHistoryRecords();
     const key = entry.t.toString(36) + '_' + Math.random().toString(36).slice(2, 7);
@@ -94,7 +132,7 @@ function historyScoreHtml(os, ns) {
 function planHistoryUndo(records, key) {
     const e = records[key];
     const plan = { revert: {}, relink: [] };
-    [['nm', 'om', 'medal'], ['ns', 'os', 'score']].forEach(([newKey, oldKey, field]) => {
+    [['nm', 'om', 'medal'], ['ns', 'os', 'score'], ['nb', 'ob', 'bad']].forEach(([newKey, oldKey, field]) => {
         if (!(newKey in e)) return;
         // 同じ曲・同じ項目の、この履歴より後の変更で一番早いもの
         let next = null;
@@ -121,8 +159,9 @@ function deleteHistoryEntry(key) {
     const scoreName = v => v === null || v === undefined ? 'なし' : String(v);
     if (song && plan.revert.medal) lines.push(`メダル：${medalName(plan.revert.medal.from)} → ${medalName(plan.revert.medal.to)} に戻します`);
     if (song && plan.revert.score) lines.push(`スコア：${scoreName(plan.revert.score.from)} → ${scoreName(plan.revert.score.to)} に戻します`);
+    if (song && plan.revert.bad) lines.push(`BAD：${scoreName(plan.revert.bad.from)} → ${scoreName(plan.revert.bad.to)} に戻します`);
     if (plan.relink.length > 0) lines.push('（この曲はあとでも更新しているので、その分は今のままです）');
-    if (lines.length === 0) lines.push('（曲のメダル・スコアは変わりません）');
+    if (lines.length === 0) lines.push('（曲のメダル・スコア・BAD は変わりません）');
     if (!confirm(`この履歴を削除しますか？\n${e.ti}\n${lines.join('\n')}`)) return;
 
     // 変更前に戻す（今の値が履歴の「変更後」と違うときは、別の方法で変わっているので触らない）
@@ -138,12 +177,18 @@ function deleteHistoryEntry(key) {
             else scoreRecords[e.id] = plan.revert.score.to;
         }
     }
+    if (song && plan.revert.bad) {
+        const recs = getBadRecords();
+        if (toBadNum(recs[e.id]) === plan.revert.bad.from) {
+            if (plan.revert.bad.to === null) delete recs[e.id]; else recs[e.id] = plan.revert.bad.to;
+        }
+    }
     // 後の履歴の「変更前」をつなぎ直す。変更前と変更後が同じになったら、その項目（全部なら履歴ごと）を消す
     plan.relink.forEach(({ key: k, oldKey, newKey, value }) => {
         const x = records[k];
         x[oldKey] = value;
         if (x[oldKey] === x[newKey]) { delete x[oldKey]; delete x[newKey]; }
-        if (!('nm' in x) && !('ns' in x)) delete records[k];
+        if (!('nm' in x) && !('ns' in x) && !('nb' in x)) delete records[k];
     });
     delete records[key];
     scheduleAutoSave();
@@ -190,6 +235,7 @@ function renderHistoryModal() {
             const parts = [];
             if ('nm' in e) parts.push(`<span class="hist-change">${historyMedalHtml(e.om)}<span class="hist-arrow">→</span>${historyMedalHtml(e.nm)}</span>`);
             if ('ns' in e) parts.push(historyScoreHtml(e.os, e.ns));
+            if ('nb' in e) parts.push(historyBadHtml(e.ob, e.nb));
             html += `
             <div class="hist-item">
                 <div class="hist-head">
@@ -234,7 +280,7 @@ async function importHistoryFromFile(event) {
         alert('過去の更新履歴のファイルではありません。');
         return;
     }
-    openHistoryImportPreview(data.entries);
+    openHistoryImportPreview(data.entries, Array.isArray(data.bads) ? data.bads : []);
 }
 
 function parseHistoryImportTime(t) {
@@ -258,13 +304,14 @@ function matchHistoryImportSong(e) {
     return cands.length === 1 ? cands[0] : null;
 }
 
-function openHistoryImportPreview(rawEntries) {
+//   bads：[{ ti, g?, lv, n }]（写真で分かった、クリアしたときの一番少ない BAD）。今の記録が無いか、それより多い曲だけ入れる
+function openHistoryImportPreview(rawEntries, rawBads = []) {
     const records = getHistoryRecords();
     const existing = Object.values(records).filter(e => e && typeof e.t === 'number');
     // 曲ごとの、今ある一番古い履歴（写真以外）の日時
     const earliest = {};
     existing.forEach(e => { if (e.src !== 'p' && !(earliest[e.id] <= e.t)) earliest[e.id] = e.t; });
-    const sameKey = e => [e.id, e.t, e.nm ?? '', e.ns ?? ''].join('|');
+    const sameKey = e => [e.id, e.t, e.nm ?? '', e.ns ?? '', e.nb ?? ''].join('|');
     const have = new Set(existing.map(sameKey));
     const toNum = v => (v === undefined || v === null || v === '' || isNaN(parseInt(v, 10))) ? null : parseInt(v, 10);
 
@@ -292,13 +339,31 @@ function openHistoryImportPreview(rawEntries) {
             if (os !== ns) { e.os = os; e.ns = ns; }
             p.s = ns;
         }
-        if (!('nm' in e) && !('ns' in e)) { bad++; return; }
+        if ('nb' in r) {
+            const ob = 'b' in p ? p.b : toBadNum(r.ob);
+            const nb = toBadNum(r.nb);
+            if (ob !== nb) { e.ob = ob; e.nb = nb; }
+            p.b = nb;
+        }
+        if (!('nm' in e) && !('ns' in e) && !('nb' in e)) { bad++; return; }
         if (earliest[song.id] !== undefined && t >= earliest[song.id]) { newer++; return; }
         if (have.has(sameKey(e))) { dup++; return; }
         have.add(sameKey(e));
         add.push(e);
     });
-    pendingHistoryImport = { user: currentUser, add };
+    // BAD の数（今の記録が無いか、今より少ないものだけ）
+    const badRecs = getBadRecords();
+    const badSet = {};
+    rawBads.forEach(r => {
+        const n = r ? toBadNum(r.n) : null;
+        if (n === null || typeof r.ti !== 'string') return;
+        const song = matchHistoryImportSong(r);
+        if (!song) return;
+        const cur = toBadNum(badRecs[song.id]);
+        if ((cur === null || n < cur) && !(badSet[song.id] <= n)) badSet[song.id] = n;
+    });
+    const badCount = Object.keys(badSet).length;
+    pendingHistoryImport = { user: currentUser, add, badSet };
 
     // 日付ごとの件数
     const byDay = {};
@@ -313,10 +378,11 @@ function openHistoryImportPreview(rawEntries) {
             ${dup ? `<div class="hi-note">すでに取り込んでいる ${dup} 件は飛ばします</div>` : ''}
             ${bad ? `<div class="hi-note">読めなかった ${bad} 件は飛ばします</div>` : ''}
             ${over ? `<div class="hi-warn">履歴が ${HISTORY_MAX} 件を超えるため、古いものから消えます</div>` : ''}
+            ${badCount ? `<div>BAD の数を <b>${badCount}</b> 曲に入れます（今の記録が無いか、今より少ない曲）</div>` : ''}
         </div>
         ${days.length ? `<div class="hi-days">${days.map(k => `<div><span>${escapeHtml(k.replace(/-/g, '/'))}</span><b>${byDay[k]}件</b></div>`).join('')}</div>` : ''}
         ${unmatchedNames.length ? `<details class="eagate-unmatched"><summary>アプリの曲と合わなかった曲（${unmatchedNames.length}曲）</summary><ul>${unmatchedNames.slice(0, 300).map(n => `<li>${escapeHtml(n)}</li>`).join('')}</ul></details>` : ''}`;
-    document.getElementById('history-import-apply').disabled = add.length === 0;
+    document.getElementById('history-import-apply').disabled = add.length === 0 && badCount === 0;
     document.getElementById('history-import-modal').style.display = 'flex';
 }
 
@@ -331,6 +397,8 @@ function applyHistoryImport() {
     if (pending.user !== currentUser) { alert('ユーザーが切り替わったので、取り込みをやめました。'); closeHistoryImport(); return; }
     const records = getHistoryRecords();
     pending.add.forEach(e => { records[e.t.toString(36) + '_p' + Math.random().toString(36).slice(2, 7)] = e; });
+    const badRecs = getBadRecords();
+    Object.keys(pending.badSet).forEach(id => { badRecs[id] = pending.badSet[id]; });
     const keys = Object.keys(records);
     if (keys.length > HISTORY_MAX) {
         keys.sort((a, b) => (records[a].t || 0) - (records[b].t || 0)).slice(0, keys.length - HISTORY_MAX).forEach(k => delete records[k]);
@@ -338,5 +406,6 @@ function applyHistoryImport() {
     closeHistoryImport();
     scheduleAutoSave();
     renderTable();
-    showToast('toast-eagate', `過去の更新履歴を取り込みました（${pending.add.length}件）`, '#4caf50', 3000);
+    const nBad = Object.keys(pending.badSet).length;
+    showToast('toast-eagate', `過去の更新履歴を取り込みました（${pending.add.length}件${nBad ? `・BAD ${nBad}曲` : ''}）`, '#4caf50', 3000);
 }

@@ -29,6 +29,7 @@ function initMedalGrid() {
 function openMedalModal(id) {
     currentMedalEditId = id;
     renderUraMedalBox();
+    renderBadBox();
     renderMemoEditor('memo-editor-medal', id);
     renderSongHistoryBox(id, false);
     document.getElementById('medal-modal').style.display = 'flex';
@@ -52,6 +53,28 @@ function renderUraMedalBox() {
         <div class="ura-btns">${btn('', 'なし')}${URA_MEDALS.map(m => btn(m, m)).join('')}</div>
         <label class="ura-old${info.ura ? '' : ' is-disabled'}"><input type="checkbox"${info.old ? ' checked' : ''}${info.ura ? '' : ' disabled'} onchange="setUraOldFromModal('${safeId}', this.checked)"> 旧筐体EC（ポックラは裏メダルで計算）</label>`;
     box.style.display = '';
+}
+
+// BAD の数（クリアしたときの一番少ない BAD）。フルコンボ以上で記録が無ければ 0 と出す
+function renderBadBox() {
+    const box = document.getElementById('bad-box');
+    if (!box) return;
+    const id = currentMedalEditId;
+    if (!id) { box.innerHTML = ''; return; }
+    const rec = toBadNum(getBadRecords()[id]);
+    const shown = getSongBad(id);
+    box.innerHTML = `
+        <label class="bad-label" for="bad-input">BAD<span>クリアしたときの一番少ない数</span></label>
+        <input type="number" id="bad-input" class="bad-input" inputmode="numeric" min="0" max="9999" placeholder="${shown === 0 && rec === null ? '0（フルコン）' : '未記録'}" value="${rec === null ? '' : rec}"
+            onchange="setBadFromModal('${jsStringAttr(id)}', this.value)" onkeydown="if (event.key === 'Enter') this.blur()">`;
+}
+
+function setBadFromModal(id, value) {
+    if (!setSongBad(id, value.trim() === '' ? null : value, 'm')) return;
+    scheduleAutoSave();
+    renderTable();
+    renderBadBox();
+    renderSongHistoryBox(id);
 }
 
 function setUraMedalFromModal(id, ura) {
