@@ -1788,3 +1788,13 @@ details.memo-fold #memo-editor-medal { padding: 0 10px 10px; }
 details.memo-fold .me-title { display: none; }
 .edit-superex { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 13px; color: #6a1b9a; font-weight: bold; }
 .edit-superex input { width: auto; margin: 0; }
+.pk-old-head { font-size: 13px; color: #444; margin: 2px 0 2px; }
+.pk-old-head b { font-size: 15px; color: #d82f66; }
+.pk-old-note { font-size: 11px; color: #888; margin-bottom: 6px; }
+.pk-old-sep { font-size: 11px; color: #999; text-align: center; margin: 8px 0 4px; border-top: 1px dashed #ccc; padding-top: 4px; }
+.pk-rec-row.pk-old-out { opacity: 0.55; }
+.pk-tabs button { white-space: nowrap; min-width: 0; }
+@media (max-width: 600px) {
+    .pk-tabs button { font-size: 12px; gap: 3px; padding: 0 2px; }
+    .pk-tabs .pk-tab-count { min-width: 0; padding: 0 4px; }
+}
