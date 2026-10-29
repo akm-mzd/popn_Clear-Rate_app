@@ -184,6 +184,8 @@ async function saveScoreModal() {
     closeScoreModal();
     scheduleAutoSave();   // ←追加
     renderTable();
+    // 曲の画面から変えたときは、最高スコア・この曲の記録も描き直す
+    if (typeof refreshSongHistoryViews === 'function') refreshSongHistoryViews(id);
 }
 
 // --- メモ：js/memo.js ---

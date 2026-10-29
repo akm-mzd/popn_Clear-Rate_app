@@ -1802,3 +1802,6 @@ body.view-pokkura #extended-stats-display { display: none !important; }
 #diff-grid-view .sv-month-btn { width: 36px; height: 32px; margin: 0; padding: 0; border: 1px solid #ddd; border-radius: 8px; background: #fff; color: #6a3fb0; font-size: 20px; font-weight: bold; line-height: 1; cursor: pointer; font-family: inherit; }
 #diff-grid-view .sv-month-btn:disabled { color: #ccc; cursor: default; }
 #diff-grid-view .sv-month-select { width: auto; flex: 0 1 auto; min-width: 0; max-width: 60vw; margin: 0; padding: 5px 8px; border: 1px solid #ddd; border-radius: 8px; background: #fff; color: #333; font-size: 14px; font-weight: bold; font-family: inherit; text-align: center; cursor: pointer; }
+button.bs-edit { width: auto; margin: 0 0 0 auto; padding: 3px 12px; border: 1px solid #1565c0; border-radius: 12px; background: #fff; color: #1565c0; font-size: 12px; font-weight: bold; font-family: inherit; cursor: pointer; align-self: center; }
+.eagate-history-opt { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; font-size: 14px; font-weight: bold; color: #333; }
+.eagate-history-opt input { width: auto; margin: 0; }
