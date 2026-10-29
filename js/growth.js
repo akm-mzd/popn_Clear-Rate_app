@@ -441,6 +441,7 @@ function renderSongHistoryBox(id, showAll) {
         if ('ns' in e) parts.push(historyScoreHtml(e.os, e.ns));
         if ('nb' in e) parts.push(historyBadHtml(e.ob, e.nb));
         return `<div class="sh-row"><span class="sh-date">${d.getFullYear() % 100}/${d.getMonth() + 1}/${d.getDate()}</span><span class="sh-body">${parts.join('')}</span>
+            <button type="button" class="hist-delete sh-delete sh-edit" onclick="openHistoryEdit('${jsStringAttr(e.key)}')" title="この記録を編集（管理者のみ）" aria-label="この記録を編集（管理者のみ）">✏️</button>
             <button type="button" class="hist-delete sh-delete" onclick="deleteHistoryEntry('${jsStringAttr(e.key)}')" title="この記録を削除（管理者のみ）" aria-label="この記録を削除（管理者のみ）">✕</button></div>`;
     }).join('');
     const more = list.length > SONG_HISTORY_SHOW && !songHistoryShowAll

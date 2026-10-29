@@ -1771,3 +1771,6 @@ button.sh-apply { width: auto; margin: 0 0 0 auto; padding: 3px 10px; border: 1p
 button.sh-apply + button.sh-add { margin-left: 6px; }
 .sh-row .sh-body { flex: 1; min-width: 0; }
 button.sh-delete { width: 24px; height: 24px; font-size: 11px; }
+.hist-edit { font-size: 12px; }
+.he-song { font-size: 14px; font-weight: bold; margin-bottom: 6px; }
+.he-time { margin-left: 8px; font-size: 12px; font-weight: normal; color: #888; }
