@@ -728,50 +728,52 @@ function renderHistoryGapModal() {
                     <span class="hg-gap">${historyMedalHtml(g.from)}<span class="hist-arrow">→</span>${historyMedalHtml(g.to)}<span class="hg-where">${escapeHtml(where)}${gaps.length > 1 ? `・ほか${gaps.length - 1}か所` : ''}</span></span>
                 </span>
             </button>
-            ${open ? buildHistoryGapFormHtml(song, g) : ''}
+            ${open ? buildManualHistoryFormHtml(song, {
+                date: g.before !== null ? localDateKey(g.before) : g.after !== null ? localDateKey(g.after) : '', from: g.from, to: g.to }, 'hg') : ''}
         </div>`;
     }).join('');
     body.scrollTop = scrollTop;
 }
 
-function buildHistoryGapFormHtml(song, g) {
+// 過去の記録を手で入れる欄（過去の記録が足りない曲：prefix 'hg'／メダルを選ぶ画面の「この曲の記録」：'sh'）
+function buildManualHistoryFormHtml(song, def, prefix) {
     const today = localDateKey(Date.now());
-    const def = g.before !== null ? localDateKey(g.before) : g.after !== null ? localDateKey(g.after) : '';
     const options = sel => Object.keys(MEDAL_TYPES).filter(k => k !== '未解禁')
         .map(k => `<option value="${escapeHtml(k)}"${k === sel ? ' selected' : ''}>${escapeHtml(MEDAL_TYPES[k].label)}</option>`).join('');
     return `<div class="hg-form">
-        <label>日付<input type="date" id="hg-date" value="${def}" max="${today}"></label>
-        <label>変更前のメダル<select id="hg-om">${options(g.from)}</select></label>
-        <label>変更後のメダル<select id="hg-nm">${options(g.to)}</select></label>
-        <label>スコア<input type="number" id="hg-score" min="0" max="100000" inputmode="numeric" placeholder="空欄でもよい"></label>
-        <label>BAD<input type="number" id="hg-bad" min="0" inputmode="numeric" placeholder="空欄でもよい"></label>
-        <label class="hg-apply"><input type="checkbox" id="hg-apply">今のメダル・スコア・BAD もこの記録に変える（この曲の一番新しい記録になるときだけ）</label>
-        <button type="button" class="admin-btn admin-btn-main" onclick="addHistoryGapEntry('${jsStringAttr(song.id)}')">この記録を足す</button>
+        <label>日付<input type="date" id="${prefix}-date" value="${escapeHtml(def.date)}" max="${today}"></label>
+        <label>変更前のメダル<select id="${prefix}-om">${options(def.from)}</select></label>
+        <label>変更後のメダル<select id="${prefix}-nm">${options(def.to)}</select></label>
+        <label>スコア<input type="number" id="${prefix}-score" min="0" max="100000" inputmode="numeric" placeholder="空欄でもよい"></label>
+        <label>BAD<input type="number" id="${prefix}-bad" min="0" inputmode="numeric" placeholder="空欄でもよい"></label>
+        <label class="hg-apply"><input type="checkbox" id="${prefix}-apply">今のメダル・スコア・BAD もこの記録に変える（この曲の一番新しい記録になるときだけ）</label>
+        <button type="button" class="admin-btn admin-btn-main" onclick="addManualHistoryEntry('${jsStringAttr(song.id)}', '${prefix}')">この記録を足す</button>
     </div>`;
 }
 
 // 手で入れた過去の記録を、更新履歴に1件足す（今ある履歴は変えない。今のメダル・スコア・BAD は「今の記録も変える」を選んだときだけ変える）
-function addHistoryGapEntry(id) {
+function addManualHistoryEntry(id, prefix) {
     const song = songs.find(s => s.id === id);
     if (!song) return;
-    const dateText = document.getElementById('hg-date').value;
+    const dateText = document.getElementById(prefix + '-date').value;
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateText);
     if (!m) { alert('日付を入れてください。'); return; }
     const day = new Date(+m[1], +m[2] - 1, +m[3]);
     if (day.getTime() > Date.now()) { alert('今日より後の日付は入れられません。'); return; }
-    const om = document.getElementById('hg-om').value;
-    const nm = document.getElementById('hg-nm').value;
+    const om = document.getElementById(prefix + '-om').value;
+    const nm = document.getElementById(prefix + '-nm').value;
     const toNum = v => (v === '' || isNaN(parseInt(v, 10)) || parseInt(v, 10) < 0) ? null : parseInt(v, 10);
-    const ns = toNum(document.getElementById('hg-score').value);
-    const nb = toNum(document.getElementById('hg-bad').value);
+    const ns = toNum(document.getElementById(prefix + '-score').value);
+    const nb = toNum(document.getElementById(prefix + '-bad').value);
     if (ns !== null && ns > 100000) { alert('スコアは 100000 までです。'); return; }
     if (om === nm && ns === null && nb === null) { alert('メダルが変わっていないか、スコア・BAD が空です。'); return; }
 
-    // 時刻はその日の12時。同じ日に前後の履歴があれば、その間に入るようにずらす
     const records = getHistoryRecords();
     const mine = Object.values(records).filter(e => e && e.id === id && typeof e.t === 'number');
     const dayStart = day.getTime(), dayEnd = dayStart + DAY_MS;
-    let t = dayStart + 12 * 3600000;
+    // 時刻はその日の12時（今日なら今の時刻）
+    let t = localDateKey(dayStart) === localDateKey(Date.now()) ? Date.now() : dayStart + 12 * 3600000;
+    // 抜けている所に入れるときは、同じ日の前後の履歴の間に入るようにずらす
     const gap = (findHistoryGaps().find(x => x.song.id === id) || { gaps: [] }).gaps
         .find(g => (g.after === null || g.after < dayEnd) && (g.before === null || g.before >= dayStart));
     if (gap) {
@@ -780,7 +782,7 @@ function addHistoryGapEntry(id) {
     }
     while (mine.some(e => e.t === t)) t++;
 
-    const apply = document.getElementById('hg-apply').checked;
+    const apply = document.getElementById(prefix + '-apply').checked;
     if (apply && mine.some(e => e.t > t)) { alert('この曲にはこの日より後の履歴があるので、今のメダル・スコア・BAD は変えられません。\nチェックを外すか、日付を直してください。'); return; }
 
     const entry = { t, id: song.id, ti: song.title, lv: song.level, src: 'm' };
@@ -797,6 +799,11 @@ function addHistoryGapEntry(id) {
         renderTable();
     }
     scheduleAutoSave();
-    renderHistoryGapModal();
+    if (prefix === 'hg') renderHistoryGapModal();
+    else {
+        songHistoryFormOpen = false;
+        renderSongHistoryBox(id);
+        if (apply && currentMedalEditId === id) { renderUraMedalBox(); renderBadBox(); }
+    }
     showToast('toast-eagate', `「${song.title}」の過去の記録を足しました${apply ? '（今の記録も変えました）' : ''}`, '#4caf50', 2000);
 }

@@ -1764,3 +1764,6 @@ button.hg-head > img { width: 96px; height: 24px; object-fit: cover; border-radi
 .hg-form .admin-btn { grid-column: 1 / -1; margin: 4px 0 0; padding: 8px; border: none; border-radius: 8px; background: #c2185b; color: #fff; font-weight: bold; font-family: inherit; cursor: pointer; }
 .hg-form label.hg-apply { grid-column: 1 / -1; flex-direction: row; align-items: center; gap: 6px; color: #333; }
 .hg-form label.hg-apply input { width: auto; flex-shrink: 0; margin: 0; }
+.sh-title { display: flex; align-items: center; }
+button.sh-add { width: auto; margin: 0 0 0 auto; padding: 3px 10px; border: 1px solid #c2185b; border-radius: 12px; background: #fff; color: #c2185b; font-size: 12px; font-weight: bold; font-family: inherit; cursor: pointer; }
+.song-history-box .hg-form { margin: 4px 0 8px; padding: 8px; border-radius: 8px; background: #fdf3f7; }

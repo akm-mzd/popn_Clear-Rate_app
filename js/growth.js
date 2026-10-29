@@ -362,6 +362,7 @@ function filterByAttr(attr) {
 
 // ---------- この曲の記録（メダルを選ぶ画面） ----------
 let songHistoryShowAll = false;
+let songHistoryFormOpen = false; // 「記録を足す」の欄を開いているか
 
 function getSongHistory(id) {
     return Object.values(getHistoryRecords()).filter(e => e && e.id === id && typeof e.t === 'number').sort((a, b) => b.t - a.t);
@@ -370,10 +371,15 @@ function getSongHistory(id) {
 function renderSongHistoryBox(id, showAll) {
     const box = document.getElementById('song-history-box');
     if (!box) return;
-    if (typeof showAll === 'boolean') songHistoryShowAll = showAll;
+    if (typeof showAll === 'boolean') { songHistoryShowAll = showAll; if (!showAll) songHistoryFormOpen = false; }
     const list = getSongHistory(id);
+    const song = songs.find(s => s.id === id);
+    const cur = clearRecords[id] || '';
+    const addBtn = `<button type="button" class="sh-add" onclick="toggleSongHistoryForm('${jsStringAttr(id)}')">${songHistoryFormOpen ? '閉じる' : '＋ 記録を足す'}</button>`;
+    const form = songHistoryFormOpen && song
+        ? buildManualHistoryFormHtml(song, { date: localDateKey(Date.now()), from: cur === '未解禁' ? '' : cur, to: cur === '未解禁' ? '' : cur }, 'sh') : '';
     if (list.length === 0) {
-        box.innerHTML = '<div class="sh-title">この曲の記録</div><div class="sh-empty">まだ記録がありません</div>';
+        box.innerHTML = `<div class="sh-title">この曲の記録${addBtn}</div>${form}<div class="sh-empty">まだ記録がありません</div>`;
         return;
     }
     // スコアの線（古い順。2回以上スコアがあるとき）
@@ -392,7 +398,12 @@ function renderSongHistoryBox(id, showAll) {
     }).join('');
     const more = list.length > SONG_HISTORY_SHOW && !songHistoryShowAll
         ? `<button type="button" class="sh-more" onclick="renderSongHistoryBox('${jsStringAttr(id)}', true)">もっと見る（全${list.length}件）</button>` : '';
-    box.innerHTML = `<div class="sh-title">この曲の記録<span>${list.length}件</span></div>${chart ? `<div class="sh-chart">${chart}</div>` : ''}${rows}${more}`;
+    box.innerHTML = `<div class="sh-title">この曲の記録<span>${list.length}件</span>${addBtn}</div>${form}${chart ? `<div class="sh-chart">${chart}</div>` : ''}${rows}${more}`;
+}
+
+function toggleSongHistoryForm(id) {
+    songHistoryFormOpen = !songHistoryFormOpen;
+    renderSongHistoryBox(id);
 }
 
 // ---------- 今日のまとめ ----------
