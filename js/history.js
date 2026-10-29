@@ -244,6 +244,7 @@ function renderHistoryModal() {
                     <span class="hist-src ${HISTORY_SRC[e.src] ? HISTORY_SRC[e.src][0] : 'manual'}">${HISTORY_SRC[e.src] ? HISTORY_SRC[e.src][1] : '手動'}</span>
                     <span class="level-badge">${escapeHtml(e.lv)}</span>
                     <span class="hist-title">${escapeHtml(e.ti)}</span>
+                    <button type="button" class="hist-delete hist-edit" onclick="openHistoryEdit('${jsStringAttr(key)}')" title="この履歴を編集（管理者のみ）" aria-label="この履歴を編集（管理者のみ）">✏️</button>
                     <button type="button" class="hist-delete" onclick="deleteHistoryEntry('${jsStringAttr(key)}')" title="この履歴を削除（管理者のみ）" aria-label="この履歴を削除（管理者のみ）">✕</button>
                 </div>
                 <div class="hist-body">${parts.join('')}</div>
@@ -807,4 +808,78 @@ function addManualHistoryEntry(id, prefix) {
         if (apply && currentMedalEditId === id) { renderUraMedalBox(); renderBadBox(); }
     }
     showToast('toast-eagate', `「${song.title}」の過去の記録を足しました${apply ? '（今の記録も変えました）' : ''}`, '#4caf50', 2000);
+}
+
+// ---------- 記録（更新履歴の1件）の編集（管理者だけ。今のメダル・スコア・BAD は変えない） ----------
+let historyEditKey = null;
+const HISTORY_EDIT_NONE = '__none';
+
+function openHistoryEdit(key) {
+    const e = getHistoryRecords()[key];
+    if (!e) return;
+    if (!checkAdminAuth()) return;
+    historyEditKey = key;
+    const hasMedal = 'nm' in e;
+    const options = sel => `<option value="${HISTORY_EDIT_NONE}"${hasMedal ? '' : ' selected'}>（メダルの変更なし）</option>`
+        + Object.keys(MEDAL_TYPES).map(k => `<option value="${escapeHtml(k)}"${hasMedal && k === (sel || '') ? ' selected' : ''}>${escapeHtml(MEDAL_TYPES[k].label)}</option>`).join('');
+    const num = v => v === undefined || v === null ? '' : escapeHtml(v);
+    const d = new Date(e.t);
+    document.getElementById('history-edit-body').innerHTML = `
+        <div class="he-song"><span class="level-badge">${escapeHtml(e.lv)}</span> ${escapeHtml(e.ti)}<span class="he-time">${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}</span></div>
+        <div class="hg-form">
+            <label style="grid-column: 1 / -1;">日付<input type="date" id="he-date" value="${localDateKey(e.t)}" max="${localDateKey(Date.now())}"></label>
+            <label>変更前のメダル<select id="he-om">${options(e.om)}</select></label>
+            <label>変更後のメダル<select id="he-nm">${options(e.nm)}</select></label>
+            <label>変更前のスコア<input type="number" id="he-os" min="0" max="100000" inputmode="numeric" value="${num(e.os)}" placeholder="なし"></label>
+            <label>変更後のスコア<input type="number" id="he-ns" min="0" max="100000" inputmode="numeric" value="${num(e.ns)}" placeholder="なし"></label>
+            <label>変更前の BAD<input type="number" id="he-ob" min="0" inputmode="numeric" value="${num(e.ob)}" placeholder="なし"></label>
+            <label>変更後の BAD<input type="number" id="he-nb" min="0" inputmode="numeric" value="${num(e.nb)}" placeholder="なし"></label>
+        </div>
+        <div class="hi-note">今のメダル・スコア・BAD は変わりません（合わせたいときは「この曲の記録」の「記録を反映」）。</div>`;
+    document.getElementById('history-edit-modal').style.display = 'flex';
+}
+
+function closeHistoryEdit() {
+    historyEditKey = null;
+    document.getElementById('history-edit-modal').style.display = 'none';
+}
+
+function saveHistoryEdit() {
+    const records = getHistoryRecords();
+    const e = records[historyEditKey];
+    if (!e) { closeHistoryEdit(); return; }
+    const val = id => document.getElementById(id).value;
+    const toNum = v => (v === '' || isNaN(parseInt(v, 10))) ? null : parseInt(v, 10);
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(val('he-date'));
+    if (!m) { alert('日付を入れてください。'); return; }
+    const old = new Date(e.t);
+    let t = new Date(+m[1], +m[2] - 1, +m[3], old.getHours(), old.getMinutes(), old.getSeconds(), old.getMilliseconds()).getTime();
+    if (t > Date.now()) {
+        if (localDateKey(t) !== localDateKey(Date.now())) { alert('今日より後の日付は入れられません。'); return; }
+        t = Date.now();
+    }
+    const om = val('he-om'), nm = val('he-nm');
+    const os = toNum(val('he-os')), ns = toNum(val('he-ns')), ob = toNum(val('he-ob')), nb = toNum(val('he-nb'));
+    if ([os, ns].some(v => v !== null && (v < 0 || v > 100000))) { alert('スコアは 0〜100000 で入れてください。'); return; }
+    if ([ob, nb].some(v => v !== null && v < 0)) { alert('BAD は 0 以上で入れてください。'); return; }
+    if ((om === HISTORY_EDIT_NONE) !== (nm === HISTORY_EDIT_NONE)) { alert('メダルは、変更前と変更後の両方を選ぶか、両方「変更なし」にしてください。'); return; }
+
+    const next = { ...e, t };
+    ['om', 'nm', 'os', 'ns', 'ob', 'nb'].forEach(k => delete next[k]);
+    if (om !== HISTORY_EDIT_NONE && om !== nm) { next.om = om; next.nm = nm; }
+    if ((os !== null || ns !== null) && os !== ns) { next.os = os; next.ns = ns; }
+    if ((ob !== null || nb !== null) && ob !== nb) { next.ob = ob; next.nb = nb; }
+    if (!('nm' in next) && !('ns' in next) && !('nb' in next)) { alert('変更が何もありません。消すときは ✕ を使ってください。'); return; }
+    records[historyEditKey] = next;
+    closeHistoryEdit();
+    scheduleAutoSave();
+    renderTable();
+    if (document.getElementById('history-modal').style.display !== 'none') {
+        const body = document.getElementById('history-modal-body');
+        const scrollTop = body.scrollTop;
+        renderHistoryModal();
+        body.scrollTop = scrollTop;
+    }
+    refreshSongHistoryViews(next.id);
+    showToast('toast-eagate', '記録を直しました', '#4caf50', 2000);
 }
