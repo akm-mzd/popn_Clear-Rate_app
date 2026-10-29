@@ -651,13 +651,16 @@ let historyGapOpenId = null;
 // 曲ごとに、抜けている所（from → to、前後の履歴の日時）を古い順に返す
 function findHistoryGaps() {
     const byId = {};
+    const official = new Set(); // 公式データ取り込みで変わった曲は出さない
     Object.values(getHistoryRecords()).forEach(e => {
-        if (e && typeof e.t === 'number' && 'nm' in e) (byId[e.id] = byId[e.id] || []).push(e);
+        if (!e || typeof e.t !== 'number') return;
+        if (e.src === 'e') official.add(e.id);
+        if ('nm' in e) (byId[e.id] = byId[e.id] || []).push(e);
     });
     const result = [];
     songs.forEach(song => {
         const cur = clearRecords[song.id] || '';
-        if (cur === '' || cur === '未解禁') return;
+        if (cur === '' || cur === '未解禁' || official.has(song.id)) return;
         const list = (byId[song.id] || []).sort((a, b) => a.t - b.t);
         const gaps = [];
         let prev = '', prevT = null;
@@ -706,7 +709,7 @@ function renderHistoryGapModal() {
     const body = document.getElementById('history-gap-body');
     const scrollTop = body.scrollTop;
     const lvBtn = (v, label, n) => `<button type="button" class="hg-lv${historyGapLevel === v ? ' active' : ''}" onclick="setHistoryGapLevel('${jsStringAttr(v)}')">${escapeHtml(label)}<small>${n}</small></button>`;
-    const head = `<div class="hi-note">メダルが付いているのに、更新履歴が未プレイから今のメダルまでつながらない曲です。押すと、抜けている記録を手で足せます（今のメダル・スコアは変わりません）。</div>
+    const head = `<div class="hi-note">メダルが付いているのに、更新履歴が未プレイから今のメダルまでつながらない曲です。公式データ取り込みで変わった曲は出しません。押すと、抜けている記録を手で足せます（今のメダル・スコアは変わりません）。</div>
         <div class="hg-lvs">${lvBtn('all', 'すべて', all.length)}${levels.map(lv => lvBtn(lv, 'Lv' + lv, all.filter(x => String(x.song.level) === lv).length)).join('')}</div>`;
     if (list.length === 0) {
         body.innerHTML = head + '<div class="hist-empty">足りない曲はありません。</div>';
