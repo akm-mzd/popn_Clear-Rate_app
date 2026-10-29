@@ -376,10 +376,12 @@ function getSongHistoryLatestDiff(id) {
     const list = getSongHistory(id);
     const diff = {};
     const rankOf = k => (MEDAL_TYPES[k] || MEDAL_TYPES['']).rank;
-    const m = list.filter(e => 'nm' in e && (e.nm || '') !== '未解禁')
-        .reduce((best, e) => !best || rankOf(e.nm || '') > rankOf(best.nm || '') ? e : best, null);
-    const scores = list.map(e => toScoreNum(e.ns)).filter(v => v !== null);
-    const bads = list.map(e => toBadNum(e.nb)).filter(v => v !== null);
+    // 変更後だけでなく、変更前の値も候補にする（変更前の方が良い記録のこともあるので）
+    const medals = list.filter(e => 'nm' in e).flatMap(e => [e.nm || '', e.om || '']).filter(k => k !== '未解禁');
+    const bestMedal = medals.reduce((best, k) => best === null || rankOf(k) > rankOf(best) ? k : best, null);
+    const m = bestMedal === null ? null : { nm: bestMedal };
+    const scores = list.filter(e => 'ns' in e).flatMap(e => [toScoreNum(e.ns), toScoreNum(e.os)]).filter(v => v !== null);
+    const bads = list.filter(e => 'nb' in e).flatMap(e => [toBadNum(e.nb), toBadNum(e.ob)]).filter(v => v !== null);
     // 今の記録より良いときだけ変える（今の記録の方が良ければ、そのまま。下げることはしない）
     const curMedal = clearRecords[id] || '', curScore = toScoreNum(scoreRecords[id]), curBad = toBadNum(getBadRecords()[id]);
     if (m && curMedal !== '未解禁' && rankOf(m.nm || '') > rankOf(curMedal)) diff.medal = [curMedal, m.nm || ''];
@@ -420,8 +422,11 @@ function renderBestScoreBox(id) {
     if (!box) return;
     let best = null;
     getSongHistory(id).forEach(e => {
-        const s = toScoreNum(e.ns);
-        if (s !== null && (!best || s > best.s || (s === best.s && e.t < best.t))) best = { s, t: e.t };
+        if (!('ns' in e)) return;
+        // 変更前の方が高いこともあるので両方見る
+        [toScoreNum(e.ns), toScoreNum(e.os)].forEach(s => {
+            if (s !== null && (!best || s > best.s || (s === best.s && e.t < best.t))) best = { s, t: e.t };
+        });
     });
     if (!best) {
         box.innerHTML = '<span class="bs-label">最高スコア</span><span class="bs-none">記録なし</span>';
