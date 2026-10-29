@@ -709,7 +709,7 @@ function renderHistoryGapModal() {
     const body = document.getElementById('history-gap-body');
     const scrollTop = body.scrollTop;
     const lvBtn = (v, label, n) => `<button type="button" class="hg-lv${historyGapLevel === v ? ' active' : ''}" onclick="setHistoryGapLevel('${jsStringAttr(v)}')">${escapeHtml(label)}<small>${n}</small></button>`;
-    const head = `<div class="hi-note">メダルが付いているのに、更新履歴が未プレイから今のメダルまでつながらない曲です。公式データ取り込みで変わった曲は出しません。押すと、抜けている記録を手で足せます（今のメダル・スコアは変わりません）。</div>
+    const head = `<div class="hi-note">メダルが付いているのに、更新履歴が未プレイから今のメダルまでつながらない曲です。公式データ取り込みで変わった曲は出しません。押すと、抜けている記録を手で足せます（今のメダル・スコアは、選んだときだけ変わります）。</div>
         <div class="hg-lvs">${lvBtn('all', 'すべて', all.length)}${levels.map(lv => lvBtn(lv, 'Lv' + lv, all.filter(x => String(x.song.level) === lv).length)).join('')}</div>`;
     if (list.length === 0) {
         body.innerHTML = head + '<div class="hist-empty">足りない曲はありません。</div>';
@@ -745,11 +745,12 @@ function buildHistoryGapFormHtml(song, g) {
         <label>変更後のメダル<select id="hg-nm">${options(g.to)}</select></label>
         <label>スコア<input type="number" id="hg-score" min="0" max="100000" inputmode="numeric" placeholder="空欄でもよい"></label>
         <label>BAD<input type="number" id="hg-bad" min="0" inputmode="numeric" placeholder="空欄でもよい"></label>
+        <label class="hg-apply"><input type="checkbox" id="hg-apply">今のメダル・スコア・BAD もこの記録に変える（この曲の一番新しい記録になるときだけ）</label>
         <button type="button" class="admin-btn admin-btn-main" onclick="addHistoryGapEntry('${jsStringAttr(song.id)}')">この記録を足す</button>
     </div>`;
 }
 
-// 手で入れた過去の記録を、更新履歴に1件足す（今のメダル・スコアと、今ある履歴は変えない）
+// 手で入れた過去の記録を、更新履歴に1件足す（今ある履歴は変えない。今のメダル・スコア・BAD は「今の記録も変える」を選んだときだけ変える）
 function addHistoryGapEntry(id) {
     const song = songs.find(s => s.id === id);
     if (!song) return;
@@ -779,6 +780,9 @@ function addHistoryGapEntry(id) {
     }
     while (mine.some(e => e.t === t)) t++;
 
+    const apply = document.getElementById('hg-apply').checked;
+    if (apply && mine.some(e => e.t > t)) { alert('この曲にはこの日より後の履歴があるので、今のメダル・スコア・BAD は変えられません。\nチェックを外すか、日付を直してください。'); return; }
+
     const entry = { t, id: song.id, ti: song.title, lv: song.level, src: 'm' };
     if (om !== nm) { entry.om = om; entry.nm = nm; }
     // 変更前のスコア・BAD は、その日時より前の一番新しい履歴から
@@ -786,7 +790,13 @@ function addHistoryGapEntry(id) {
     if (ns !== null) { const p = before.find(e => 'ns' in e); entry.os = p ? toScoreNum(p.ns) : null; entry.ns = ns; }
     if (nb !== null) { const p = before.find(e => 'nb' in e); entry.ob = p ? toBadNum(p.nb) : null; entry.nb = nb; }
     records[t.toString(36) + '_' + Math.random().toString(36).slice(2, 7)] = entry;
+    if (apply) {
+        if ('nm' in entry) { if (nm === '') delete clearRecords[id]; else clearRecords[id] = nm; }
+        if (ns !== null) scoreRecords[id] = ns;
+        if (nb !== null) getBadRecords()[id] = nb;
+        renderTable();
+    }
     scheduleAutoSave();
     renderHistoryGapModal();
-    showToast('toast-eagate', `「${song.title}」の過去の記録を足しました`, '#4caf50', 2000);
+    showToast('toast-eagate', `「${song.title}」の過去の記録を足しました${apply ? '（今の記録も変えました）' : ''}`, '#4caf50', 2000);
 }
