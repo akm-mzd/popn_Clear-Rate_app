@@ -164,7 +164,7 @@ function buildStatCardBreakdownHtml(summary) {
         return `<button type="button" class="nu-stat-chip${active ? ' is-active' : ''}" aria-pressed="${active}" title="${escapeHtml(title)}：${count}曲（押すと${active ? '絞り込みを外す' : 'これで絞り込む'}）" onclick="event.stopPropagation(); toggleStatCardFilter('${kind}', '${jsStringAttr(value)}')">${iconHtml}<span>${count}</span></button>`;
     };
     const chips = [];
-    if ((viewMode === 'grid' || viewMode === 'medal') && summary.medalCounts) {
+    if ((viewMode === 'grid' || viewMode === 'medal' || viewMode === 'bad') && summary.medalCounts) {
         Object.keys(MEDAL_TYPES)
             .filter(k => summary.medalCounts[k] > 0 && (k !== '未解禁' || summary.showUnreleased))
             .sort((a, b) => MEDAL_TYPES[b].rank - MEDAL_TYPES[a].rank)
