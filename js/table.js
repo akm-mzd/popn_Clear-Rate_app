@@ -385,8 +385,6 @@ function setUpdatedMonth(index) {
     renderTable();
 }
 
-const monthRangeOf = mi => [new Date(Math.floor(mi / 12), mi % 12, 1).getTime(), new Date(Math.floor(mi / 12), mi % 12 + 1, 1).getTime()];
-
 // 月の見出しのプルダウン：更新履歴のある月（新しい順、今月はいつも）と、その月に更新した曲の数
 function buildUpdatedMonthOptions(selected) {
     const songsByMonth = new Map();
@@ -402,25 +400,6 @@ function buildUpdatedMonthOptions(selected) {
         `<option value="${mi}"${mi === selected ? ' selected' : ''}>${Math.floor(mi / 12)}年${mi % 12 + 1}月（${songsByMonth.get(mi).size}曲）</option>`).join('');
 }
 
-// その月のまとめ（表示している曲だけ）：更新した曲・初クリア・初フルコン・メダル・スコア・BAD・ポックラ
-function buildUpdatedMonthSummaryHtml(mi, shownIds) {
-    const [from, to] = monthRangeOf(mi);
-    const sum = getPeriodChanges(from, to, shownIds);
-    if (sum.count === 0) return '';
-    const fmt = n => n.toLocaleString('ja-JP');
-    const tiles = [
-        [sum.count, '更新した曲'], [sum.newNormal, '初クリア'], [sum.newFc, '初フルコン'],
-        [sum.medalUp.length, 'メダル更新'], [sum.scoreUp.length, 'スコア更新'], [sum.badDown.length, 'BAD更新']
-    ].map(([n, label]) => `<div class="${n > 0 ? '' : 'sv-sum-zero'}"><b>${fmt(n)}</b><span>${label}</span></div>`).join('');
-    const extra = [];
-    if (sum.scoreGain > 0) extra.push(`スコア合計 <b>+${fmt(sum.scoreGain)}</b>`);
-    const pk = getPeriodPokkuraChange(from, to);
-    if (pk && pk.cur !== null) {
-        const diff = pk.prev !== null ? pk.cur - pk.prev : null;
-        extra.push(`ポックラ <b>${pk.cur.toFixed(2)}</b>${diff !== null ? `<span class="${diff >= 0 ? 'up' : 'down'}">（${diff >= 0 ? '+' : '−'}${Math.abs(diff).toFixed(2)}）</span>` : ''}${pk.official ? '' : '<small>計算値</small>'}`);
-    }
-    return `<div class="sv-sum"><div class="sv-sum-tiles">${tiles}</div>${extra.length ? `<div class="sv-sum-extra">${extra.join('<span class="sv-sum-sep">・</span>')}</div>` : ''}</div>`;
-}
 
 // 見ている月の更新履歴（新しい順）
 function getUpdatedHistoryList() {
@@ -1855,8 +1834,7 @@ function renderUpdatedGrid(targetSongs) {
             <button type="button" class="sv-month-btn" onclick="moveUpdatedMonth(-1)" aria-label="前の月"${mi <= getOldestUpdatedMonthIndex() ? ' disabled' : ''}>‹</button>
             <select class="sv-month-select" onchange="setUpdatedMonth(this.value)" aria-label="月を選ぶ">${buildUpdatedMonthOptions(mi)}</select>
             <button type="button" class="sv-month-btn" onclick="moveUpdatedMonth(1)" aria-label="次の月"${mi >= monthIndexOf(Date.now()) ? ' disabled' : ''}>›</button>
-        </div>
-        ${buildUpdatedMonthSummaryHtml(mi, new Set(targetSongs.map(s => s.id)))}`;
+        </div>`;
 
     // 日付ごと・曲ごとにまとめる（その日の最初の変更前 → 最後の変更後）
     const shown = new Map(targetSongs.map(s => [s.id, s]));
