@@ -1791,8 +1791,7 @@ details.memo-fold .me-title { display: none; }
 .pk-old-head { font-size: 13px; color: #444; margin: 2px 0 2px; }
 .pk-old-head b { font-size: 15px; color: #d82f66; }
 .pk-old-note { font-size: 11px; color: #888; margin-bottom: 6px; }
-.pk-old-sep { font-size: 11px; color: #999; text-align: center; margin: 8px 0 4px; border-top: 1px dashed #ccc; padding-top: 4px; }
-.pk-rec-row.pk-old-out { opacity: 0.55; }
+.pk-old-rest .dg-cells { opacity: 0.6; }
 .pk-tabs button { white-space: nowrap; min-width: 0; }
 @media (max-width: 600px) {
     .pk-tabs button { font-size: 12px; gap: 3px; padding: 0 2px; }
