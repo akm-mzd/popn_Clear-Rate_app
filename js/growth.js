@@ -483,7 +483,14 @@ function toggleSongHistoryForm(id) {
 //   今日（0時から）の更新履歴を曲ごとにまとめる（その日の最初の「変更前」と最後の「変更後」）
 function getTodayChanges() {
     const since = new Date(); since.setHours(0, 0, 0, 0);
-    const list = Object.values(getHistoryRecords()).filter(e => e && typeof e.t === 'number' && e.t >= since.getTime()).sort((a, b) => a.t - b.t);
+    return getPeriodChanges(since.getTime(), Infinity);
+}
+
+// 期間（from 以上 to 未満）の更新履歴を曲ごとにまとめる（期間の最初の変更前と最後の変更後）。ids を渡すとその曲だけ
+function getPeriodChanges(from, to, ids) {
+    const list = Object.values(getHistoryRecords())
+        .filter(e => e && typeof e.t === 'number' && e.t >= from && e.t < to && (!ids || ids.has(e.id)))
+        .sort((a, b) => a.t - b.t);
     const bySong = new Map();
     list.forEach(e => {
         const c = bySong.get(e.id) || { id: e.id, ti: e.ti, lv: e.lv };
@@ -502,6 +509,7 @@ function getTodayChanges() {
     const isFc = k => rankOf(k) >= MEDAL_TYPES['銀丸'].rank;
     return {
         medalUp, scoreUp, badDown, count: changes.length,
+        scoreGain: scoreUp.reduce((acc, c) => acc + (c.diff || 0), 0),
         newNormal: medalUp.filter(c => !isNormal(c.om) && isNormal(c.nm)).length,
         newFc: medalUp.filter(c => !isFc(c.om) && isFc(c.nm)).length
     };
@@ -514,6 +522,16 @@ function getTodayPokkuraChange() {
     const cur = list.find(e => e.day === today);
     if (!cur) return null;
     const prev = list.filter(e => e.day < today).pop() || null;
+    const val = e => (e && typeof e.pc === 'number' ? e.pc : e && typeof e.c === 'number' ? e.c : null);
+    return { cur: val(cur), prev: val(prev), official: typeof cur.pc === 'number' };
+}
+
+// 期間の最後のポックラと、期間より前の最後のポックラ
+function getPeriodPokkuraChange(from, to) {
+    const list = getPokkuraHistList();
+    const cur = list.filter(e => e.t >= from && e.t < to).pop();
+    if (!cur) return null;
+    const prev = list.filter(e => e.t < from).pop() || null;
     const val = e => (e && typeof e.pc === 'number' ? e.pc : e && typeof e.c === 'number' ? e.c : null);
     return { cur: val(cur), prev: val(prev), official: typeof cur.pc === 'number' };
 }
