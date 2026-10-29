@@ -370,18 +370,23 @@ function getSongHistory(id) {
         .map(k => ({ ...records[k], key: k })).sort((a, b) => b.t - a.t);
 }
 
-// 履歴の一番新しいメダル・スコア・BAD のうち、今の記録と違うもの（{ medal: [今, 履歴], score: …, bad: … }）
+// 履歴から選んだ記録のうち、今の記録と違うもの（{ medal: [今, 履歴], score: …, bad: … }）
+//   メダル・スコアは履歴の中で一番良いもの、BAD は履歴の中で一番少ないもの
 function getSongHistoryLatestDiff(id) {
     const list = getSongHistory(id);
     const diff = {};
-    const m = list.find(e => 'nm' in e), sc = list.find(e => 'ns' in e), b = list.find(e => 'nb' in e);
+    const rankOf = k => (MEDAL_TYPES[k] || MEDAL_TYPES['']).rank;
+    const m = list.filter(e => 'nm' in e && (e.nm || '') !== '未解禁')
+        .reduce((best, e) => !best || rankOf(e.nm || '') > rankOf(best.nm || '') ? e : best, null);
+    const scores = list.map(e => toScoreNum(e.ns)).filter(v => v !== null);
+    const bads = list.map(e => toBadNum(e.nb)).filter(v => v !== null);
     if (m && (m.nm || '') !== (clearRecords[id] || '')) diff.medal = [clearRecords[id] || '', m.nm || ''];
-    if (sc && toScoreNum(sc.ns) !== toScoreNum(scoreRecords[id])) diff.score = [toScoreNum(scoreRecords[id]), toScoreNum(sc.ns)];
-    if (b && toBadNum(b.nb) !== toBadNum(getBadRecords()[id])) diff.bad = [toBadNum(getBadRecords()[id]), toBadNum(b.nb)];
+    if (scores.length && Math.max(...scores) !== toScoreNum(scoreRecords[id])) diff.score = [toScoreNum(scoreRecords[id]), Math.max(...scores)];
+    if (bads.length && Math.min(...bads) !== toBadNum(getBadRecords()[id])) diff.bad = [toBadNum(getBadRecords()[id]), Math.min(...bads)];
     return diff;
 }
 
-// 「記録を反映」：その曲の一番新しい履歴のメダル・スコア・BAD を今の記録にする（履歴は足さない）
+// 「記録を反映」：履歴の一番良いメダル・一番高いスコア・一番少ない BAD を今の記録にする（履歴は足さない）
 function applySongHistoryLatest(id) {
     const diff = getSongHistoryLatestDiff(id);
     const name = v => v === null || v === '' ? 'なし' : String(v);
@@ -390,7 +395,7 @@ function applySongHistoryLatest(id) {
     if (diff.score) lines.push(`スコア：${name(diff.score[0])} → ${name(diff.score[1])}`);
     if (diff.bad) lines.push(`BAD：${name(diff.bad[0])} → ${name(diff.bad[1])}`);
     if (lines.length === 0) return;
-    if (!confirm(`この曲の一番新しい記録を、今の記録にしますか？\n${lines.join('\n')}`)) return;
+    if (!confirm(`履歴の記録を、今の記録にしますか？（メダル・スコアは一番良いもの、BAD は一番少ないもの）\n${lines.join('\n')}`)) return;
     if (diff.medal) { if (diff.medal[1] === '') delete clearRecords[id]; else clearRecords[id] = diff.medal[1]; }
     if (diff.score) { if (diff.score[1] === null) delete scoreRecords[id]; else scoreRecords[id] = diff.score[1]; }
     if (diff.bad) { const recs = getBadRecords(); if (diff.bad[1] === null) delete recs[id]; else recs[id] = diff.bad[1]; }
