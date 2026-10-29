@@ -1798,7 +1798,23 @@ body.view-pokkura #nu-filterbar,
 body.view-pokkura #nu-stat-card,
 body.view-pokkura #stats-display,
 body.view-pokkura #extended-stats-display { display: none !important; }
-.sv-month-bar { justify-content: center; gap: 12px; }
+.sv-month-bar { justify-content: center; gap: 12px; flex-wrap: nowrap; }
 #diff-grid-view .sv-month-btn { width: 36px; height: 32px; margin: 0; padding: 0; border: 1px solid #ddd; border-radius: 8px; background: #fff; color: #6a3fb0; font-size: 20px; font-weight: bold; line-height: 1; cursor: pointer; font-family: inherit; }
 #diff-grid-view .sv-month-btn:disabled { color: #ccc; cursor: default; }
-.sv-month-label { min-width: 9em; text-align: center; font-weight: bold; }
+#diff-grid-view .sv-month-select { width: auto; flex: 0 1 auto; min-width: 0; max-width: 60vw; margin: 0; padding: 5px 8px; border: 1px solid #ddd; border-radius: 8px; background: #fff; color: #333; font-size: 14px; font-weight: bold; font-family: inherit; text-align: center; cursor: pointer; }
+.sv-sum { margin: 2px 0 10px; padding: 10px; border: 1px solid #eee; border-radius: 12px; background: #fff; }
+.sv-sum-tiles { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.sv-sum-tiles div { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 2px; border-radius: 10px; background: #f3edfb; }
+.sv-sum-tiles b { font-size: 20px; color: #6a3fb0; line-height: 1; }
+.sv-sum-tiles span { font-size: 11px; color: #666; white-space: nowrap; }
+.sv-sum-tiles .sv-sum-zero { background: #f5f5f5; }
+.sv-sum-tiles .sv-sum-zero b { color: #bbb; }
+.sv-sum-extra { margin-top: 8px; font-size: 13px; color: #555; text-align: center; }
+.sv-sum-extra b { color: #6a3fb0; }
+.sv-sum-extra .up { color: #2e7d32; }
+.sv-sum-extra .down { color: #c62828; }
+.sv-sum-extra small { margin-left: 4px; color: #999; }
+.sv-sum-sep { margin: 0 6px; color: #ccc; }
+@media (max-width: 600px) {
+    .sv-sum-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
