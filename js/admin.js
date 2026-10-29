@@ -5,7 +5,7 @@
 // ==========================================
 
 function downloadSongsAndClearsJson() {
-    const exportData = { songs: songs, clearRecords: clearRecords, scoreRecords: scoreRecords, memoRecords: memoRecords, historyRecords: getHistoryRecords(), pokkuraRecords: (allUsersData[currentUser] && allUsersData[currentUser].pokkuraRecords) || {}, goalRecords: getGoalRecords(), pokkuraFlagRecords: getPokkuraFlagRecords(), recentRecords: (allUsersData[currentUser] && allUsersData[currentUser].recentRecords) || {}, memoConfigRecords: (allUsersData[currentUser] && allUsersData[currentUser].memoConfigRecords) || {}, attrConfigRecords: (allUsersData[currentUser] && allUsersData[currentUser].attrConfigRecords) || {}, pokkuraHistRecords: (allUsersData[currentUser] && allUsersData[currentUser].pokkuraHistRecords) || {}, badRecords: (allUsersData[currentUser] && allUsersData[currentUser].badRecords) || {} };
+    const exportData = { songs: songs, clearRecords: clearRecords, scoreRecords: scoreRecords, memoRecords: memoRecords, historyRecords: getHistoryRecords(), pokkuraRecords: (allUsersData[currentUser] && allUsersData[currentUser].pokkuraRecords) || {}, goalRecords: getGoalRecords(), pokkuraFlagRecords: getPokkuraFlagRecords(), recentRecords: (allUsersData[currentUser] && allUsersData[currentUser].recentRecords) || {}, memoConfigRecords: (allUsersData[currentUser] && allUsersData[currentUser].memoConfigRecords) || {}, attrConfigRecords: (allUsersData[currentUser] && allUsersData[currentUser].attrConfigRecords) || {}, pokkuraHistRecords: (allUsersData[currentUser] && allUsersData[currentUser].pokkuraHistRecords) || {}, badRecords: (allUsersData[currentUser] && allUsersData[currentUser].badRecords) || {}, badReachRecords: (allUsersData[currentUser] && allUsersData[currentUser].badReachRecords) || {} };
     const dataStr = JSON.stringify(exportData, null, 2);
     triggerDownload(dataStr, `popn_data_${currentUser}.json`, 'クリア・スコア・メモを含めて');
 }
@@ -106,7 +106,8 @@ async function processImportText(text, targetLevel) {
                 hasChanged = true;
             }
             
-            if (song.diffRaw !== diffRaw || song.diffClass !== diffClass || song.diffIndex !== diffIndex) {
+            // 超EX にした曲は、取り込みで難易度を書き換えない
+            if (!isSuperExSong(song) && (song.diffRaw !== diffRaw || song.diffClass !== diffClass || song.diffIndex !== diffIndex)) {
                 song.diffRaw = diffRaw;
                 song.diffClass = diffClass;
                 song.diffIndex = diffIndex;
@@ -495,6 +496,7 @@ async function restoreFromJson(event) {
             if (isObj(data.attrConfigRecords)) user.attrConfigRecords = data.attrConfigRecords;
             if (isObj(data.pokkuraHistRecords)) user.pokkuraHistRecords = data.pokkuraHistRecords;
             if (isObj(data.badRecords)) user.badRecords = data.badRecords;
+            if (isObj(data.badReachRecords)) user.badReachRecords = data.badReachRecords;
 
             clearRecords = user.clearRecords;
             scoreRecords = user.scoreRecords;
@@ -836,7 +838,7 @@ async function applyBulkDiff() {
     let applied = 0;
     picked.forEach(r => {
         const song = songs.find(s => s.id === r.id);
-        if (!song) return;
+        if (!song || isSuperExSong(song)) return;
         const p = parseDifficulty(r.newRaw);
         song.diffRaw = r.newRaw;
         song.diffClass = p.diffClass;

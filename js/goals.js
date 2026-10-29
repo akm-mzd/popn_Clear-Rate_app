@@ -56,6 +56,7 @@ function getGoalTargetSongs(goal) {
             if (!goal.af.some(t => t === MEMO_FILTER_NONE ? tags.length === 0 : tags.includes(t))) return false;
         }
         if (!showUnreleased && clearRecords[song.id] === '未解禁') return false;
+        if (isSuperExSong(song) && !isSuperExIncluded()) return false;
         return true;
     });
 }

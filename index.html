@@ -6,7 +6,7 @@
     <title>Pop’n Clear Rate app</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
-    <link rel="stylesheet" href="style.css?v=3.31.0.0">
+    <link rel="stylesheet" href="style.css?v=3.32.0.0">
 </head>
 <body>
     <!-- 新しいデザイン（ver 3）の上部バーとナビ。以前の見た目では隠れる（js/ui-new.js） -->
@@ -150,6 +150,7 @@
                                 <label class="check-label"><input type="checkbox" value="逆詐称" onchange="renderTable()"> 逆詐称</label>
                                 <label class="check-label"><input type="checkbox" value="入門" onchange="renderTable()"> 入門</label>
                                 <label class="check-label"><input type="checkbox" value="未分類" onchange="renderTable()"> 未分類</label>
+                                <label class="check-label"><input type="checkbox" value="超EX" onchange="renderTable()"> 超EX</label>
                             </div>
                         </details>
                         <details class="filter-group filter-sub-details">
@@ -211,6 +212,7 @@
                     <label><input type="checkbox" id="show-easy-rate" onchange="renderTable()" style="margin:0;"> イージー</label>
                     <label><input type="checkbox" id="show-normal-rate" checked onchange="renderTable()" style="margin:0;"> ノーマル</label>
                     <label><input type="checkbox" id="show-unreleased" onchange="renderTable()" style="margin:0;"> 未解禁を含む</label>
+                    <label><input type="checkbox" id="show-superex" onchange="renderTable()" style="margin:0;"> 超EXを含む</label>
                     <label><input type="checkbox" id="show-diff-stats" onchange="renderTable(); closeMenuInClassic();" style="margin:0;"> 難易度別</label>
                     <label><input type="checkbox" id="show-medal-stats" onchange="renderTable(); closeMenuInClassic();" style="margin:0;"> メダル内訳</label>
                     <label><input type="checkbox" id="show-score-stats" onchange="renderTable(); closeMenuInClassic();" style="margin:0;"> スコア内訳</label>
@@ -551,6 +553,7 @@
             <div class="input-item" style="margin-bottom: 8px;">
                 <label>難易度 (例: 別格(+1.5) や 弱(-0.5))</label>
                 <input type="text" id="edit-diff">
+                <label class="edit-superex"><input type="checkbox" id="edit-superex" onchange="onEditSuperExChange(this.checked)"> 超EXTRA（難易度は「超EX」になります）</label>
             </div>
 
             <div class="input-item" style="margin-bottom: 8px;">
@@ -797,23 +800,23 @@
     <button id="back-to-top" onclick="scrollToTop()" title="トップに戻る">↑</button>
 
     <!-- 読み込み順に意味があります（config が最初、app が最後） -->
-    <script src="js/config.js?v=3.31.0.0"></script>
-    <script src="js/utils.js?v=3.31.0.0"></script>
-    <script src="js/cloud.js?v=3.31.0.0"></script>
-    <script src="js/users.js?v=3.31.0.0"></script>
-    <script src="js/table.js?v=3.31.0.0"></script>
-    <script src="js/modals.js?v=3.31.0.0"></script>
-    <script src="js/memo.js?v=3.31.0.0"></script>
-    <script src="js/history.js?v=3.31.0.0"></script>
-    <script src="js/growth.js?v=3.31.0.0"></script>
-    <script src="js/goals.js?v=3.31.0.0"></script>
-    <script src="js/admin.js?v=3.31.0.0"></script>
-    <script src="js/image-export.js?v=3.31.0.0"></script>
-    <script src="js/eagate-import.js?v=3.31.0.0"></script>
-    <script src="js/wiki-import.js?v=3.31.0.0"></script>
-    <script src="js/menu.js?v=3.31.0.0"></script>
-    <script src="js/ui-new.js?v=3.31.0.0"></script>
-    <script src="js/app.js?v=3.31.0.0"></script>
+    <script src="js/config.js?v=3.32.0.0"></script>
+    <script src="js/utils.js?v=3.32.0.0"></script>
+    <script src="js/cloud.js?v=3.32.0.0"></script>
+    <script src="js/users.js?v=3.32.0.0"></script>
+    <script src="js/table.js?v=3.32.0.0"></script>
+    <script src="js/modals.js?v=3.32.0.0"></script>
+    <script src="js/memo.js?v=3.32.0.0"></script>
+    <script src="js/history.js?v=3.32.0.0"></script>
+    <script src="js/growth.js?v=3.32.0.0"></script>
+    <script src="js/goals.js?v=3.32.0.0"></script>
+    <script src="js/admin.js?v=3.32.0.0"></script>
+    <script src="js/image-export.js?v=3.32.0.0"></script>
+    <script src="js/eagate-import.js?v=3.32.0.0"></script>
+    <script src="js/wiki-import.js?v=3.32.0.0"></script>
+    <script src="js/menu.js?v=3.32.0.0"></script>
+    <script src="js/ui-new.js?v=3.32.0.0"></script>
+    <script src="js/app.js?v=3.32.0.0"></script>
 
 </body>
 </html>
