@@ -479,25 +479,61 @@ function buildHistoryImportPickHtml(state) {
         return `<div class="hi-pick-wrap"><div class="hi-pick-title">曲名で合わなかった曲（${state.pickKeys.length}曲）</div>
             <div class="hi-note">バナーを比べています…（${pr.done} / ${pr.total || '?'}）</div></div>`;
     }
-    const banner = (src, alt) => src ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" loading="lazy">` : '<span class="hi-nobanner">バナーなし</span>';
-    const rows = state.pickKeys.map(k => {
+    const rows = state.pickKeys.map((k, i) => {
         const fs = state.fileSongs[k];
         const chosen = state.choice[k] || '';
-        const cands = (state.cands[k] || []).map(c => {
+        const list = state.cands[k] || [];
+        // 曲名で探して選んだ曲が候補に無いときは、先頭に出す
+        const items = chosen && !list.some(c => c.id === chosen) ? [{ id: chosen, sim: null }, ...list] : list;
+        const cands = items.map(c => {
             const song = songs.find(s => s.id === c.id);
             if (!song) return '';
             return `<button type="button" class="hi-cand${chosen === song.id ? ' active' : ''}" onclick="pickHistoryImportSong('${jsStringAttr(k)}', '${jsStringAttr(song.id)}')">
-                ${banner(safeUrl(song.bannerUrl, true), song.title)}<span class="hi-cand-title">${escapeHtml(song.title)}</span><span class="hi-cand-sim">${Math.round(Math.max(0, c.sim) * 100)}%</span></button>`;
+                ${historyImportBannerHtml(safeUrl(song.bannerUrl, true), song.title)}<span class="hi-cand-title">${escapeHtml(song.title)}</span><span class="hi-cand-sim">${c.sim === null ? `選んだ曲・Lv${escapeHtml(song.level)}` : `${Math.round(Math.max(0, c.sim) * 100)}%`}</span></button>`;
         }).join('');
+        const q = (state.search && state.search[k]) || '';
         return `<div class="hi-pick">
-            <div class="hi-pick-head">${banner(fs.bn, '写真のバナー')}<span><span class="level-badge">${escapeHtml(fs.lv)}</span> ${escapeHtml(fs.ti)}</span></div>
+            <div class="hi-pick-head">${historyImportBannerHtml(fs.bn, '写真のバナー')}<span><span class="level-badge">${escapeHtml(fs.lv)}</span> ${escapeHtml(fs.ti)}</span></div>
             <div class="hi-cands">${cands || '<span class="hi-note">同じレベルにバナーのある曲がありません</span>'}
                 <button type="button" class="hi-cand hi-cand-none${chosen === '' ? ' active' : ''}" onclick="pickHistoryImportSong('${jsStringAttr(k)}', '')">入れない</button></div>
+            <input type="search" class="hi-search" placeholder="曲名で探す" value="${escapeHtml(q)}" oninput="searchHistoryImportSong(${i}, this.value)">
+            <div class="hi-search-res" id="hi-search-res-${i}">${buildHistoryImportSearchHtml(state, k)}</div>
         </div>`;
     }).join('');
     const picked = state.pickKeys.filter(k => state.choice[k]).length;
     return `<div class="hi-pick-wrap"><div class="hi-pick-title">曲名で合わなかった曲（${state.pickKeys.length}曲・${picked}曲を選択中）</div>
-        <div class="hi-note">写真のバナー（左）に似ている順に、同じレベルの曲を出しています。押して選び直せます。</div>${rows}</div>`;
+        <div class="hi-note">写真のバナー（左）に似ている順に、同じレベルの曲を出しています。押して選び直せます。候補に無いときは、下の欄で曲名を探して選べます。</div>${rows}</div>`;
+}
+
+function historyImportBannerHtml(src, alt) {
+    return src ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" loading="lazy">` : '<span class="hi-nobanner">バナーなし</span>';
+}
+
+// 曲名で探す：アプリの全曲から、同じレベルの曲を先に8曲まで
+const HISTORY_IMPORT_SEARCH_MAX = 8;
+function buildHistoryImportSearchHtml(state, k) {
+    const terms = getSearchTerms((state.search && state.search[k]) || '');
+    if (terms.length === 0) return '';
+    const lv = String(state.fileSongs[k].lv);
+    const hits = songs.filter(s => songMatchesSearch(s, terms))
+        .sort((a, b) => (String(a.level) === lv ? 0 : 1) - (String(b.level) === lv ? 0 : 1));
+    if (hits.length === 0) return '<div class="hi-note">当てはまる曲がありません</div>';
+    const chosen = state.choice[k] || '';
+    return hits.slice(0, HISTORY_IMPORT_SEARCH_MAX).map(song =>
+        `<button type="button" class="hi-search-item${chosen === song.id ? ' active' : ''}" onclick="pickHistoryImportSong('${jsStringAttr(k)}', '${jsStringAttr(song.id)}')">
+            ${historyImportBannerHtml(safeUrl(song.bannerUrl, true), song.title)}<span class="level-badge">${escapeHtml(song.level)}</span>
+            <span class="hi-search-text"><span class="hi-cand-title">${escapeHtml(song.title)}</span><span class="hi-cand-sim">${escapeHtml(song.genre || '')}</span></span></button>`).join('')
+        + (hits.length > HISTORY_IMPORT_SEARCH_MAX ? `<div class="hi-note">ほか ${hits.length - HISTORY_IMPORT_SEARCH_MAX} 曲（言葉を足して絞ってください）</div>` : '');
+}
+
+// 打つたびに画面全体を描き直すと入力が切れるので、結果の欄だけ描き直す
+function searchHistoryImportSong(i, value) {
+    const state = pendingHistoryImport;
+    if (!state || !state.pickKeys[i]) return;
+    if (!state.search) state.search = {};
+    state.search[state.pickKeys[i]] = value;
+    const box = document.getElementById('hi-search-res-' + i);
+    if (box) box.innerHTML = buildHistoryImportSearchHtml(state, state.pickKeys[i]);
 }
 
 function pickHistoryImportSong(k, id) {

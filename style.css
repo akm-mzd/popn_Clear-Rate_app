@@ -1739,3 +1739,9 @@ button.hi-cand-none { justify-content: center; align-items: center; min-height: 
 .hi-nobanner { font-size: 10px; color: #999; }
 .hi-days-wrap { margin: 8px 0; font-size: 13px; }
 .hi-days-wrap summary { cursor: pointer; color: #555; }
+input.hi-search { display: block; width: 100%; box-sizing: border-box; margin: 6px 0 0; padding: 6px 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; font-family: inherit; }
+.hi-search-res { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+button.hi-search-item { display: flex; align-items: center; gap: 6px; width: 100%; margin: 0; padding: 4px 6px; border: 2px solid #ddd; border-radius: 8px; background: #fff; color: #333; font-family: inherit; text-align: left; cursor: pointer; }
+button.hi-search-item.active { border-color: #c2185b; background: #fce4ef; }
+button.hi-search-item img { width: 96px; height: 24px; object-fit: cover; border-radius: 3px; flex-shrink: 0; background: #eee; }
+.hi-search-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
