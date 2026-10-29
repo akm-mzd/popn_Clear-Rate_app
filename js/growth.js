@@ -371,7 +371,7 @@ function getSongHistory(id) {
 }
 
 // 履歴から選んだ記録のうち、今の記録と違うもの（{ medal: [今, 履歴], score: …, bad: … }）
-//   メダル・スコアは履歴の中で一番良いもの、BAD は履歴の中で一番少ないもの
+//   メダル・スコアは履歴の中で一番良いもの、BAD は履歴の中で一番少ないもの（今の記録より良いときだけ）
 function getSongHistoryLatestDiff(id) {
     const list = getSongHistory(id);
     const diff = {};
@@ -380,9 +380,11 @@ function getSongHistoryLatestDiff(id) {
         .reduce((best, e) => !best || rankOf(e.nm || '') > rankOf(best.nm || '') ? e : best, null);
     const scores = list.map(e => toScoreNum(e.ns)).filter(v => v !== null);
     const bads = list.map(e => toBadNum(e.nb)).filter(v => v !== null);
-    if (m && (m.nm || '') !== (clearRecords[id] || '')) diff.medal = [clearRecords[id] || '', m.nm || ''];
-    if (scores.length && Math.max(...scores) !== toScoreNum(scoreRecords[id])) diff.score = [toScoreNum(scoreRecords[id]), Math.max(...scores)];
-    if (bads.length && Math.min(...bads) !== toBadNum(getBadRecords()[id])) diff.bad = [toBadNum(getBadRecords()[id]), Math.min(...bads)];
+    // 今の記録より良いときだけ変える（今の記録の方が良ければ、そのまま。下げることはしない）
+    const curMedal = clearRecords[id] || '', curScore = toScoreNum(scoreRecords[id]), curBad = toBadNum(getBadRecords()[id]);
+    if (m && curMedal !== '未解禁' && rankOf(m.nm || '') > rankOf(curMedal)) diff.medal = [curMedal, m.nm || ''];
+    if (scores.length && (curScore === null || Math.max(...scores) > curScore)) diff.score = [curScore, Math.max(...scores)];
+    if (bads.length && (curBad === null || Math.min(...bads) < curBad)) diff.bad = [curBad, Math.min(...bads)];
     return diff;
 }
 
