@@ -493,9 +493,10 @@
     }
 
     // ---------- 最小BAD：詳細ページの EX 譜面の BAD の数（ハイスコアのときの数） ----------
-    //   クリアしていてフルコンボでない譜面だけ読む（フルコンボは BAD 0、未クリアは最小BAD がない）。
+    //   フルコンボ以上でない譜面を読む（フルコンボは BAD 0。クリアしていない譜面も読む。どこに入れるかはアプリが決める）。
     //   一覧のハイスコアと詳細ページのハイスコアが同じときだけ使う（別の難易度の譜面と取り違えないように）
-    const BAD_TARGET_MEDALS = ['銅星', '銅菱', '銅丸'];
+    const FC_MEDALS = ['金星', '銀星', '銀菱', '銀丸'];
+    const isBadTarget = c => !FC_MEDALS.includes(c.m) && c.s > 0;
     let badDiag = '';
     const toCount = t => { const v = clean(t).replace(/[,，]/g, ''); return /^\d{1,4}$/.test(v) ? parseInt(v, 10) : null; };
 
@@ -530,7 +531,7 @@
 
     // 詳細ページを読んだら、BAD も一緒に見る（旧曲の今作スコアを読むときにも使う）
     function noteBad(chart, doc) {
-        if (chart.badChecked || !BAD_TARGET_MEDALS.includes(chart.m)) return;
+        if (chart.badChecked || !isBadTarget(chart)) return;
         Object.defineProperty(chart, 'badChecked', { value: true, enumerable: false });
         const n = parseBestBad(doc, chart);
         if (n !== null) chart.b = n;
@@ -542,7 +543,7 @@
 
     // クリア済み・フルコンボでない譜面の詳細ページを読んで BAD を集める。読めた数を返す
     async function readBestBads(charts) {
-        const targets = charts.filter(c => c.no && BAD_TARGET_MEDALS.includes(c.m) && c.s >= 50000 && !c.badChecked);
+        const targets = charts.filter(c => c.no && isBadTarget(c) && !c.badChecked);
         let found = charts.filter(c => typeof c.b === 'number').length;
         let checked = 0;
         for (let i = 0; i < targets.length; i += 5) {
@@ -734,7 +735,7 @@
         addNote(versionError
             ? `旧曲の今作スコアは読めませんでした（${versionError}）。ポックラは歴代ベストで計算されます。`
             : `ポックラ用に、旧曲 ${versionChecked}曲の今作スコアを読み取りました。` + (extraNew.length ? `Lv45以下の新曲 ${extraNew.length}曲も読み取りました。` : ''));
-        addNote(badError ? `最小BAD は読めませんでした（${badError}）。` : `最小BAD：${badFound}曲を読み取りました（クリア済み・フルコンボでない曲。ハイスコアのときの BAD）。`);
+        addNote(badError ? `最小BAD は読めませんでした（${badError}）。` : `最小BAD・到達点BAD：${badFound}曲を読み取りました（フルコンボでない曲。ハイスコアのときの BAD）。`);
         addNote(officialPokkura !== null ? `公式のポックラ：${officialPokkura.toFixed(2)}` : '公式のポックラは読み取れませんでした（アプリでは計算値を出します）。');
         addNote(recent.list.length > 0 ? `最近プレーした曲：${recent.list.length}曲` + (recent.rt ? `（最終プレー ${recent.rt}）` : '') : '最近プレーした曲は読み取れませんでした。');
         addButton('アプリに送る（新しいタブで開く）', '#e91e63', () => sendToApp(json));
@@ -749,7 +750,7 @@
         } else if (unknown.length) {
             showDiag(buildDiag(firstDoc, firstUrl, diag, 'unknown medals'), `知らないメダル画像がありました（${unknown.join(', ')}）。その譜面は取り込みません。`);
         } else if (!badError && badFound === 0 && badDiag) {
-            showDiag(buildDiag(firstDoc, firstUrl, Object.assign({}, diag, { badDetail: badDiag }), 'no bad count'), '最小BAD を読み取れませんでした。直すために、この診断データを送ってもらえると助かります。');
+            showDiag(buildDiag(firstDoc, firstUrl, Object.assign({}, diag, { badDetail: badDiag }), 'no bad count'), 'BAD の数を読み取れませんでした。直すために、この診断データを送ってもらえると助かります。');
         } else if (officialPokkura === null) {
             showDiag(buildDiag(firstDoc, firstUrl, diag, 'no official pokkura'), '公式のポックラを読み取れませんでした。直すために、この診断データを送ってもらえると助かります。');
         }
