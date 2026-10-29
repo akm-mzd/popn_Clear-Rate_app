@@ -6,7 +6,7 @@
     <title>Pop’n Clear Rate app</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
-    <link rel="stylesheet" href="style.css?v=3.30.0.0">
+    <link rel="stylesheet" href="style.css?v=3.31.0.0">
 </head>
 <body>
     <!-- 新しいデザイン（ver 3）の上部バーとナビ。以前の見た目では隠れる（js/ui-new.js） -->
@@ -337,6 +337,7 @@
                         <button type="button" class="admin-btn" onclick="document.getElementById('history-import-file').click()">過去の更新履歴を取り込む</button>
                         <input type="file" id="history-import-file" accept=".json,application/json" style="display: none;" onchange="importHistoryFromFile(event)">
                         <button type="button" class="admin-btn" onclick="openHistoryGapModal()">過去の記録が足りない曲</button>
+                        <button type="button" class="admin-btn" onclick="applyHistoryBads()">履歴の BAD をまとめて反映</button>
                     </div>
                 </details>
 
@@ -587,8 +588,12 @@
             <h3 style="text-align: center; color: #555; border-bottom: 1px solid #eee; padding-bottom: 10px;">メダルを選択</h3>
             <div id="medal-grid" class="medal-grid"></div>
             <div id="ura-medal-box" class="ura-medal-box" style="display: none;"></div>
+            <div id="best-score-box" class="best-score-box"></div>
             <div id="bad-box" class="bad-box"></div>
-            <div id="memo-editor-medal"></div>
+            <details id="memo-fold-medal" class="memo-fold">
+                <summary onclick="flushMemoText()"><span class="memo-fold-title">メモ</span><span id="memo-fold-mark" class="memo-fold-mark"></span></summary>
+                <div id="memo-editor-medal"></div>
+            </details>
             <div id="song-history-box" class="song-history-box"></div>
             <div class="modal-actions" style="justify-content: center; margin-top: 20px;">
                 <button onclick="closeMedalModal()" style="border: 1px solid #ccc; background: #eee; padding: 8px 30px;">閉じる</button>
@@ -792,23 +797,23 @@
     <button id="back-to-top" onclick="scrollToTop()" title="トップに戻る">↑</button>
 
     <!-- 読み込み順に意味があります（config が最初、app が最後） -->
-    <script src="js/config.js?v=3.30.0.0"></script>
-    <script src="js/utils.js?v=3.30.0.0"></script>
-    <script src="js/cloud.js?v=3.30.0.0"></script>
-    <script src="js/users.js?v=3.30.0.0"></script>
-    <script src="js/table.js?v=3.30.0.0"></script>
-    <script src="js/modals.js?v=3.30.0.0"></script>
-    <script src="js/memo.js?v=3.30.0.0"></script>
-    <script src="js/history.js?v=3.30.0.0"></script>
-    <script src="js/growth.js?v=3.30.0.0"></script>
-    <script src="js/goals.js?v=3.30.0.0"></script>
-    <script src="js/admin.js?v=3.30.0.0"></script>
-    <script src="js/image-export.js?v=3.30.0.0"></script>
-    <script src="js/eagate-import.js?v=3.30.0.0"></script>
-    <script src="js/wiki-import.js?v=3.30.0.0"></script>
-    <script src="js/menu.js?v=3.30.0.0"></script>
-    <script src="js/ui-new.js?v=3.30.0.0"></script>
-    <script src="js/app.js?v=3.30.0.0"></script>
+    <script src="js/config.js?v=3.31.0.0"></script>
+    <script src="js/utils.js?v=3.31.0.0"></script>
+    <script src="js/cloud.js?v=3.31.0.0"></script>
+    <script src="js/users.js?v=3.31.0.0"></script>
+    <script src="js/table.js?v=3.31.0.0"></script>
+    <script src="js/modals.js?v=3.31.0.0"></script>
+    <script src="js/memo.js?v=3.31.0.0"></script>
+    <script src="js/history.js?v=3.31.0.0"></script>
+    <script src="js/growth.js?v=3.31.0.0"></script>
+    <script src="js/goals.js?v=3.31.0.0"></script>
+    <script src="js/admin.js?v=3.31.0.0"></script>
+    <script src="js/image-export.js?v=3.31.0.0"></script>
+    <script src="js/eagate-import.js?v=3.31.0.0"></script>
+    <script src="js/wiki-import.js?v=3.31.0.0"></script>
+    <script src="js/menu.js?v=3.31.0.0"></script>
+    <script src="js/ui-new.js?v=3.31.0.0"></script>
+    <script src="js/app.js?v=3.31.0.0"></script>
 
 </body>
 </html>

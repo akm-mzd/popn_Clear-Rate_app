@@ -883,3 +883,30 @@ function saveHistoryEdit() {
     refreshSongHistoryViews(next.id);
     showToast('toast-eagate', '記録を直しました', '#4caf50', 2000);
 }
+
+// ---------- 履歴の BAD をまとめて反映（履歴の中で一番少ない BAD が、今の記録より少ない・今の記録が無い曲だけ） ----------
+function findHistoryBadUpdates() {
+    const minById = {};
+    Object.values(getHistoryRecords()).forEach(e => {
+        if (!e || typeof e.t !== 'number') return;
+        const n = toBadNum(e.nb);
+        if (n !== null && (minById[e.id] === undefined || n < minById[e.id])) minById[e.id] = n;
+    });
+    const recs = getBadRecords();
+    return songs.filter(s => minById[s.id] !== undefined)
+        .map(song => ({ song, from: toBadNum(recs[song.id]), to: minById[song.id] }))
+        .filter(x => x.from === null || x.to < x.from);
+}
+
+function applyHistoryBads() {
+    const list = findHistoryBadUpdates();
+    if (list.length === 0) { alert('反映する曲はありません（履歴の BAD は、どの曲も今の記録と同じか多いです）。'); return; }
+    const sample = list.slice(0, 10).map(x => `Lv${x.song.level} ${x.song.title}：${x.from === null ? 'なし' : x.from} → ${x.to}`).join('\n');
+    if (!confirm(`${list.length}曲の BAD を、履歴の中で一番少ない数にします。\n\n${sample}${list.length > 10 ? `\n…ほか ${list.length - 10}曲` : ''}`)) return;
+    const recs = getBadRecords();
+    list.forEach(x => { recs[x.song.id] = x.to; });
+    scheduleAutoSave();
+    renderTable();
+    if (currentMedalEditId) refreshSongHistoryViews(currentMedalEditId);
+    showToast('toast-eagate', `${list.length}曲の BAD を反映しました`, '#4caf50', 3000);
+}

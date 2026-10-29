@@ -31,6 +31,9 @@ function openMedalModal(id) {
     renderUraMedalBox();
     renderBadBox();
     renderMemoEditor('memo-editor-medal', id);
+    // メモは最初は畳んでおく
+    document.getElementById('memo-fold-medal').open = false;
+    updateMemoFoldMark();
     renderSongHistoryBox(id, false);
     document.getElementById('medal-modal').style.display = 'flex';
 }

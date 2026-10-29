@@ -412,7 +412,25 @@ function refreshSongHistoryViews(id) {
     renderUraMedalBox();
 }
 
+// 履歴の中で一番高いスコア（初めて取った日も）。BAD の欄の上に出す
+function renderBestScoreBox(id) {
+    const box = document.getElementById('best-score-box');
+    if (!box) return;
+    let best = null;
+    getSongHistory(id).forEach(e => {
+        const s = toScoreNum(e.ns);
+        if (s !== null && (!best || s > best.s || (s === best.s && e.t < best.t))) best = { s, t: e.t };
+    });
+    if (!best) {
+        box.innerHTML = '<span class="bs-label">最高スコア</span><span class="bs-none">記録なし</span>';
+        return;
+    }
+    const d = new Date(best.t);
+    box.innerHTML = `<span class="bs-label">最高スコア</span><b class="bs-score">${best.s.toLocaleString('ja-JP')}</b><span class="bs-date">（${d.getFullYear() % 100}/${d.getMonth() + 1}/${d.getDate()}）</span>`;
+}
+
 function renderSongHistoryBox(id, showAll) {
+    renderBestScoreBox(id);
     const box = document.getElementById('song-history-box');
     if (!box) return;
     if (typeof showAll === 'boolean') { songHistoryShowAll = showAll; if (!showAll) songHistoryFormOpen = false; }
