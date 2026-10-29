@@ -152,6 +152,13 @@ function refreshMemoEditors() {
         const id = ed.dataset.songId;
         box.innerHTML = buildMemoEditorHtml(id);
     });
+    updateMemoFoldMark();
+}
+
+// メダルを選ぶ画面の畳んだメモの見出しに、中身の印（★・タグの色・📝）を出す
+function updateMemoFoldMark() {
+    const el = document.getElementById('memo-fold-mark');
+    if (el) el.innerHTML = currentMedalEditId ? buildMemoMarkHtml(currentMedalEditId) : '';
 }
 
 function readMemoTextFields(songId) {
@@ -178,6 +185,7 @@ function saveMemoText(songId) {
     if (['hs', 'sudden', 'comment'].every(k => (memo[k] || '') === (fields[k] || ''))) return;
     updateMemo(songId, fields);
     renderTable();
+    updateMemoFoldMark();
 }
 
 // 閉じる前などに、まだ保存していない文字を保存する
