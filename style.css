@@ -1797,3 +1797,7 @@ details.memo-fold .me-title { display: none; }
     .pk-tabs button { font-size: 12px; gap: 3px; padding: 0 2px; }
     .pk-tabs .pk-tab-count { min-width: 0; padding: 0 4px; }
 }
+body.view-pokkura #nu-filterbar,
+body.view-pokkura #nu-stat-card,
+body.view-pokkura #stats-display,
+body.view-pokkura #extended-stats-display { display: none !important; }

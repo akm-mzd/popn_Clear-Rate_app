@@ -1676,6 +1676,8 @@ function applyViewMode(displaySongs) {
     const grid = document.getElementById('diff-grid-view');
     if (!capture || !grid) return;
     const isGrid = viewMode !== 'list';
+    // ポックラ画面では、絞り込みとクリア率の表示を隠す（CSS の body.view-pokkura）
+    document.body.classList.toggle('view-pokkura', viewMode === 'pokkura');
     capture.style.display = isGrid ? 'none' : '';
     grid.style.display = isGrid ? '' : 'none';
     const specialGrid = viewMode === 'grid' && !(document.getElementById('search-input').value.trim()) && isSpecialViewLevel(currentViewLevel);
@@ -2469,6 +2471,7 @@ function renderPokkuraGrid() {
             ${subHtml}
         </div>`;
     html += `
+        <div id="pk-goal-slot" class="goal-strip" style="display: none;"></div>
         <div class="pk-tabs" role="tablist" aria-label="ポックラの曲">
             <button type="button" role="tab" id="pk-tab-top" aria-controls="pk-panel-top" onclick="setPokkuraTab('top', true)">対象曲<span class="pk-tab-count">${topCount}</span></button>
             <button type="button" role="tab" id="pk-tab-rest" aria-controls="pk-panel-rest" onclick="setPokkuraTab('rest', true)">圏外<span class="pk-tab-count">${restCount}</span></button>

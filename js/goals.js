@@ -179,7 +179,11 @@ function goalBarHtml(p) {
 
 // 一覧の上の小さな表示（今の表示レベルの、まだ達成していない目標を並び順で。横にスライドして全部見られる）
 function renderGoalStrip(list) {
-    const strip = document.getElementById('goal-strip');
+    // ポックラ画面では、ポックラの大きな枠と切り替えタブの間（#pk-goal-slot）に出す
+    const slot = viewMode === 'pokkura' ? document.getElementById('pk-goal-slot') : null;
+    const main = document.getElementById('goal-strip');
+    if (slot && main) { main.innerHTML = ''; main.style.display = 'none'; }
+    const strip = slot || main;
     if (!strip) return;
     const active = list.filter(x => !x.p.complete && isGoalForCurrentLevel(x.goal));
     if (active.length === 0) {
