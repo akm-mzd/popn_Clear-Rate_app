@@ -376,6 +376,8 @@ function openEagateImportPreview(text) {
             <div style="font-size:0.8em;color:#666;">アプリにない曲か、曲名・ジャンルの書き方が違う曲です。</div><ul>${items}</ul></details>`;
     }
 
+    // 更新履歴に残すか（この端末に覚えておく。最初は残す）
+    html += `<label class="eagate-history-opt"><input type="checkbox" id="eagate-record-history"${storageGet('popn_eagate_history') === 'off' ? '' : ' checked'} onchange="storageSet('popn_eagate_history', this.checked ? 'on' : 'off')"> 更新履歴に残す</label>`;
     document.getElementById('eagate-import-body').innerHTML = html;
     const applyBtn = document.getElementById('eagate-import-apply');
     applyBtn.textContent = `${currentUser} さんに反映`;
@@ -397,13 +399,15 @@ function applyEagateImport() {
         closeEagateImportModal();
         return;
     }
+    const cb = document.getElementById('eagate-record-history');
+    const recordHistory = !cb || cb.checked;
     pending.changes.forEach(c => {
         const change = {};
         if (c.newMedal !== null) { change.medal = [c.oldMedal, c.newMedal]; clearRecords[c.song.id] = c.newMedal; }
         if (c.newScore !== null) { change.score = [c.oldScore, c.newScore]; scoreRecords[c.song.id] = c.newScore; }
         if (c.newBad !== null && c.badReach) getBadReachRecords()[c.song.id] = c.newBad; // 到達点BAD は履歴に残さない
         else if (c.newBad !== null) { change.bad = [c.oldBad, c.newBad]; getBadRecords()[c.song.id] = c.newBad; }
-        addHistoryEntry(c.song, change, 'e');
+        if (recordHistory) addHistoryEntry(c.song, change, 'e');
     });
     if (!allUsersData[currentUser]) allUsersData[currentUser] = emptyUser();
     allUsersData[currentUser].clearRecords = clearRecords;
@@ -421,7 +425,8 @@ function applyEagateImport() {
     renderTable();
     showToast('toast-eagate', `公式データを反映しました（${pending.changes.length}曲）`, '#4caf50', 3000);
     // 何か上がったら、今日のまとめを出す
-    if (pending.changes.length > 0) openDailySummary(true);
+    //   （更新履歴に残さなかったときは、まとめに出るものが無いので開かない）
+    if (pending.changes.length > 0 && recordHistory) openDailySummary(true);
 }
 
 // ---------- 最近プレーした曲：ユーザーごとにクラウドに保存（recentRecords） ----------

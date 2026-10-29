@@ -428,12 +428,16 @@ function renderBestScoreBox(id) {
             if (s !== null && (!best || s > best.s || (s === best.s && e.t < best.t))) best = { s, t: e.t };
         });
     });
+    // 履歴に無くても、今のスコア（公式から読み取ったものなど）の方が高ければそちらを出す
+    const cur = toScoreNum(scoreRecords[id]);
+    if (cur !== null && (!best || cur > best.s)) best = { s: cur, t: null };
+    const editBtn = `<button type="button" class="bs-edit" onclick="openScoreModal('${jsStringAttr(id)}')">変更</button>`;
     if (!best) {
-        box.innerHTML = '<span class="bs-label">最高スコア</span><span class="bs-none">記録なし</span>';
+        box.innerHTML = `<span class="bs-label">最高スコア</span><span class="bs-none">記録なし</span>${editBtn}`;
         return;
     }
-    const d = new Date(best.t);
-    box.innerHTML = `<span class="bs-label">最高スコア</span><b class="bs-score">${best.s.toLocaleString('ja-JP')}</b><span class="bs-date">（${d.getFullYear() % 100}/${d.getMonth() + 1}/${d.getDate()}）</span>`;
+    const d = best.t === null ? null : new Date(best.t);
+    box.innerHTML = `<span class="bs-label">最高スコア</span><b class="bs-score">${best.s.toLocaleString('ja-JP')}</b><span class="bs-date">${d ? `（${d.getFullYear() % 100}/${d.getMonth() + 1}/${d.getDate()}）` : '（今の記録）'}</span>${editBtn}`;
 }
 
 function renderSongHistoryBox(id, showAll) {
