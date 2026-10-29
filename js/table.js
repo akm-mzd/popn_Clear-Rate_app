@@ -2349,36 +2349,8 @@ function formatPokkuraDate(iso) {
     return isNaN(d) ? '' : `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-// 旧ポックラの曲ごとの点（上位50曲と、その下の10曲）。popn-class の表と見比べられるように
+// 旧ポックラのタブに、上位50曲の下に薄く出す曲の数
 const OLD_POKKURA_LIST_EXTRA = 10;
-function buildOldPokkuraListHtml() {
-    const old = calcOldPokkura();
-    if (old.entries.length === 0) return '<div class="dg-empty">Lv48〜50 でスコアのある曲がありません</div>';
-    const fmt = n => Number(n).toLocaleString('ja-JP');
-    const rows = old.entries.slice(0, OLD_POKKURA_COUNT + OLD_POKKURA_LIST_EXTRA).map((e, i) => {
-        const song = e.song;
-        const bannerSrc = safeUrl(song.bannerUrl, true);
-        const bannerInner = bannerSrc
-            ? `<img src="${escapeHtml(bannerSrc)}" alt="${escapeHtml(song.title)}" loading="lazy">`
-            : `<span class="pk-rec-title">${escapeHtml(song.title)}</span>`;
-        const bonus = OLD_POKKURA_MEDAL_BONUS[e.medal] || 0;
-        return `
-            ${i === OLD_POKKURA_COUNT ? '<div class="pk-old-sep">ここから下は数えない（51位〜）</div>' : ''}
-            <div class="pk-rec-row${i >= OLD_POKKURA_COUNT ? ' pk-old-out' : ''}">
-                <span class="pk-rec-rank">${i + 1}</span>
-                <a class="pk-rec-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（攻略wikiを開く）">${bannerInner}</a>
-                <div class="pk-rec-body">
-                    <div class="pk-rec-meta">Lv${e.lv} ${escapeHtml(song.title)}</div>
-                    <button type="button" class="pk-rec-action" onclick="openMedalModal('${jsStringAttr(song.id)}')" title="メダル・スコアを見る">
-                        <span class="pk-rec-medal">${buildGridMedalInner(e.medal)}</span>${fmt(e.score)}<span class="pk-rec-sub">${bonus ? `（+${fmt(bonus)}）` : ''}</span></button>
-                </div>
-                <span class="pk-rec-gain">${e.point.toFixed(2)}</span>
-            </div>`;
-    }).join('');
-    return `<div class="pk-old-head">上位${OLD_POKKURA_COUNT}曲の平均 <b>${old.raw.toFixed(4)}</b>（表示は ${old.total.toFixed(2)}）・+0.01まで約${fmt(old.toNext)}点</div>
-        <div class="pk-old-note">1曲の点 ＝（10000×Lv＋スコア−50000＋メダルのボーナス）÷ 5440 を小数第2位で切り捨て。popn-class の表と見比べて、違う曲を探せます。</div>
-        <div class="pk-rec-list">${rows}</div>`;
-}
 
 // ポックラ画面のタブ（'top' = 対象曲 / 'rest' = 圏外 / 'up' = おすすめ / 'old' = 旧ポックラ）。描き直しても選んだタブのまま
 const POKKURA_TABS = ['top', 'rest', 'up', 'old'];
@@ -2504,13 +2476,14 @@ function renderPokkuraGrid() {
             <button type="button" role="tab" id="pk-tab-old" aria-controls="pk-panel-old" onclick="setPokkuraTab('old', true)">旧ポックラ</button>
         </div>`;
 
-    const section = (label, sub, color, list) => {
+    // pointText：ポイントの出し方（旧ポックラは1曲の点をそのまま出す）
+    const section = (label, sub, color, list, pointText) => {
         if (list.length === 0) return '';
         // ポイントの高い順に、表の向き（最初は左上が1位）に合わせて並べる
         const ordered = orderForDirection(list, COLS, getGridDirection('pokkura'));
         let cells = '';
         ordered.forEach(({ song, extra, point, score, isVersion, easySelectable, calcMedal }) => {
-            const pointHtml = `<span class="pk-point" title="ポイント ${point.toFixed(2)}">${pkFloor(point / 60, 3).toFixed(3)}</span>`;
+            const pointHtml = `<span class="pk-point" title="ポイント ${point.toFixed(2)}">${pointText ? pointText(point) : pkFloor(point / 60, 3).toFixed(3)}</span>`;
             if (extra) {
                 // Lv45 以下の新曲：アプリの曲ではないので、バナーなし・変更なし（表示だけ）
                 cells += `
@@ -2568,13 +2541,23 @@ function renderPokkuraGrid() {
     const restHtml = restCount > 0
         ? section('新曲', '圏外', '#c48a9b', pk.restNew) + section('旧曲', '圏外', '#a58bb3', pk.restOld)
         : '<div class="dg-empty">圏外の曲はありません</div>';
+    // 旧ポックラ：上位50曲と、その下の10曲（数えない）を、対象曲と同じ表で出す
+    const oldPkList = calcOldPokkura();
+    const oldItems = oldPkList.entries.map(e => ({ song: e.song, point: e.point, score: e.score }));
+    const oldPoint = p => p.toFixed(2);
+    const oldHtml = oldItems.length > 0
+        ? `<div class="pk-old-head">上位${OLD_POKKURA_COUNT}曲の平均 <b>${oldPkList.raw.toFixed(4)}</b>（表示は ${oldPkList.total.toFixed(2)}）・+0.01まで約${oldPkList.toNext.toLocaleString('ja-JP')}点</div>
+            <div class="pk-old-note">1曲の点 ＝（10000×Lv＋スコア−50000＋メダルのボーナス）÷ 5440 を小数第2位で切り捨て。popn-class の表と見比べて、違う曲を探せます。</div>`
+            + section('旧', `上位${OLD_POKKURA_COUNT}`, '#5d4037', oldItems.slice(0, OLD_POKKURA_COUNT), oldPoint)
+            + `<div class="pk-old-rest">${section('旧', '圏外', '#a1887f', oldItems.slice(OLD_POKKURA_COUNT, OLD_POKKURA_COUNT + OLD_POKKURA_LIST_EXTRA), oldPoint)}</div>`
+        : '<div class="dg-empty">Lv48〜50 でスコアのある曲がありません</div>';
     html += `
         ${buildDirectionBar('pokkura')}
         <div class="pk-slider" id="pk-slider">
             <div class="pk-panel" id="pk-panel-top" role="tabpanel" aria-labelledby="pk-tab-top">${topHtml}</div>
             <div class="pk-panel pk-panel-rest" id="pk-panel-rest" role="tabpanel" aria-labelledby="pk-tab-rest">${restHtml}</div>
             <div class="pk-panel pk-panel-up" id="pk-panel-up" role="tabpanel" aria-labelledby="pk-tab-up">${buildPokkuraRecHtml(pk)}</div>
-            <div class="pk-panel pk-panel-up" id="pk-panel-old" role="tabpanel" aria-labelledby="pk-tab-old">${buildOldPokkuraListHtml()}</div>
+            <div class="pk-panel" id="pk-panel-old" role="tabpanel" aria-labelledby="pk-tab-old">${oldHtml}</div>
         </div>
         ${buildPokkuraExplainHtml(pk)}`;
     grid.innerHTML = html;
@@ -2625,9 +2608,9 @@ function setPokkuraTab(tab, scroll, instant) {
     });
     // 高さは見えているパネルに合わせる（もう片方の長さで下に空白ができないように）
     fitPokkuraSliderHeight();
-    // おすすめ・旧ポックラはリストなので、向きの矢印は出さない
+    // おすすめはリストなので、向きの矢印は出さない
     const dirBar = document.querySelector('#diff-grid-view .dg-dir');
-    if (dirBar) dirBar.style.display = (tab === 'up' || tab === 'old') ? 'none' : '';
+    if (dirBar) dirBar.style.display = tab === 'up' ? 'none' : '';
     const left = POKKURA_TABS.indexOf(tab) * slider.clientWidth;
     if (instant) slider.scrollLeft = left;
     else if (scroll) slider.scrollTo({ left, behavior: 'smooth' });
