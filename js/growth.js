@@ -365,7 +365,46 @@ let songHistoryShowAll = false;
 let songHistoryFormOpen = false; // 「記録を足す」の欄を開いているか
 
 function getSongHistory(id) {
-    return Object.values(getHistoryRecords()).filter(e => e && e.id === id && typeof e.t === 'number').sort((a, b) => b.t - a.t);
+    const records = getHistoryRecords();
+    return Object.keys(records).filter(k => { const e = records[k]; return e && e.id === id && typeof e.t === 'number'; })
+        .map(k => ({ ...records[k], key: k })).sort((a, b) => b.t - a.t);
+}
+
+// 履歴の一番新しいメダル・スコア・BAD のうち、今の記録と違うもの（{ medal: [今, 履歴], score: …, bad: … }）
+function getSongHistoryLatestDiff(id) {
+    const list = getSongHistory(id);
+    const diff = {};
+    const m = list.find(e => 'nm' in e), sc = list.find(e => 'ns' in e), b = list.find(e => 'nb' in e);
+    if (m && (m.nm || '') !== (clearRecords[id] || '')) diff.medal = [clearRecords[id] || '', m.nm || ''];
+    if (sc && toScoreNum(sc.ns) !== toScoreNum(scoreRecords[id])) diff.score = [toScoreNum(scoreRecords[id]), toScoreNum(sc.ns)];
+    if (b && toBadNum(b.nb) !== toBadNum(getBadRecords()[id])) diff.bad = [toBadNum(getBadRecords()[id]), toBadNum(b.nb)];
+    return diff;
+}
+
+// 「記録を反映」：その曲の一番新しい履歴のメダル・スコア・BAD を今の記録にする（履歴は足さない）
+function applySongHistoryLatest(id) {
+    const diff = getSongHistoryLatestDiff(id);
+    const name = v => v === null || v === '' ? 'なし' : String(v);
+    const lines = [];
+    if (diff.medal) lines.push(`メダル：${diff.medal[0] || '未プレイ'} → ${diff.medal[1] || '未プレイ'}`);
+    if (diff.score) lines.push(`スコア：${name(diff.score[0])} → ${name(diff.score[1])}`);
+    if (diff.bad) lines.push(`BAD：${name(diff.bad[0])} → ${name(diff.bad[1])}`);
+    if (lines.length === 0) return;
+    if (!confirm(`この曲の一番新しい記録を、今の記録にしますか？\n${lines.join('\n')}`)) return;
+    if (diff.medal) { if (diff.medal[1] === '') delete clearRecords[id]; else clearRecords[id] = diff.medal[1]; }
+    if (diff.score) { if (diff.score[1] === null) delete scoreRecords[id]; else scoreRecords[id] = diff.score[1]; }
+    if (diff.bad) { const recs = getBadRecords(); if (diff.bad[1] === null) delete recs[id]; else recs[id] = diff.bad[1]; }
+    scheduleAutoSave();
+    renderTable();
+    refreshSongHistoryViews(id);
+}
+
+// メダルを選ぶ画面で開いている曲なら、その画面の記録・BAD・裏メダルを描き直す
+function refreshSongHistoryViews(id) {
+    if (currentMedalEditId !== id) return;
+    renderSongHistoryBox(id);
+    renderBadBox();
+    renderUraMedalBox();
 }
 
 function renderSongHistoryBox(id, showAll) {
@@ -376,6 +415,8 @@ function renderSongHistoryBox(id, showAll) {
     const song = songs.find(s => s.id === id);
     const cur = clearRecords[id] || '';
     const addBtn = `<button type="button" class="sh-add" onclick="toggleSongHistoryForm('${jsStringAttr(id)}')">${songHistoryFormOpen ? '閉じる' : '＋ 記録を足す'}</button>`;
+    const diff = getSongHistoryLatestDiff(id);
+    const applyBtn = Object.keys(diff).length ? `<button type="button" class="sh-apply" onclick="applySongHistoryLatest('${jsStringAttr(id)}')">記録を反映</button>` : '';
     const form = songHistoryFormOpen && song
         ? buildManualHistoryFormHtml(song, { date: localDateKey(Date.now()), from: cur === '未解禁' ? '' : cur, to: cur === '未解禁' ? '' : cur }, 'sh') : '';
     if (list.length === 0) {
@@ -394,11 +435,12 @@ function renderSongHistoryBox(id, showAll) {
         if ('nm' in e) parts.push(`<span class="hist-change">${historyMedalHtml(e.om)}<span class="hist-arrow">→</span>${historyMedalHtml(e.nm)}</span>`);
         if ('ns' in e) parts.push(historyScoreHtml(e.os, e.ns));
         if ('nb' in e) parts.push(historyBadHtml(e.ob, e.nb));
-        return `<div class="sh-row"><span class="sh-date">${d.getFullYear() % 100}/${d.getMonth() + 1}/${d.getDate()}</span><span class="sh-body">${parts.join('')}</span></div>`;
+        return `<div class="sh-row"><span class="sh-date">${d.getFullYear() % 100}/${d.getMonth() + 1}/${d.getDate()}</span><span class="sh-body">${parts.join('')}</span>
+            <button type="button" class="hist-delete sh-delete" onclick="deleteHistoryEntry('${jsStringAttr(e.key)}')" title="この記録を削除（管理者のみ）" aria-label="この記録を削除（管理者のみ）">✕</button></div>`;
     }).join('');
     const more = list.length > SONG_HISTORY_SHOW && !songHistoryShowAll
         ? `<button type="button" class="sh-more" onclick="renderSongHistoryBox('${jsStringAttr(id)}', true)">もっと見る（全${list.length}件）</button>` : '';
-    box.innerHTML = `<div class="sh-title">この曲の記録<span>${list.length}件</span>${addBtn}</div>${form}${chart ? `<div class="sh-chart">${chart}</div>` : ''}${rows}${more}`;
+    box.innerHTML = `<div class="sh-title">この曲の記録<span>${list.length}件</span>${applyBtn}${addBtn}</div>${form}${chart ? `<div class="sh-chart">${chart}</div>` : ''}${rows}${more}`;
 }
 
 function toggleSongHistoryForm(id) {

@@ -193,6 +193,7 @@ function deleteHistoryEntry(key) {
     delete records[key];
     scheduleAutoSave();
     renderTable();
+    refreshSongHistoryViews(e.id);
     const body = document.getElementById('history-modal-body');
     const scrollTop = body.scrollTop;
     renderHistoryModal();
