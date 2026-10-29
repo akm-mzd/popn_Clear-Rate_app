@@ -410,6 +410,7 @@
             multiInLevelPage: diag.multiInLevelPage,
             badRows: diag.badRows,
             pokkuraText: pcDiag,
+            badDetail: diag.badDetail || '',
             images: imgs,
             html: html.slice(0, 6000)
         });
@@ -491,6 +492,75 @@
         return { score: scoreFromText(text) || 0, medal };
     }
 
+    // ---------- 最小BAD：詳細ページの EX 譜面の BAD の数（ハイスコアのときの数） ----------
+    //   フルコンボ以上でない譜面を読む（フルコンボは BAD 0。クリアしていない譜面も読む。どこに入れるかはアプリが決める）。
+    //   一覧のハイスコアと詳細ページのハイスコアが同じときだけ使う（別の難易度の譜面と取り違えないように）
+    const FC_MEDALS = ['金星', '銀星', '銀菱', '銀丸'];
+    const isBadTarget = c => !FC_MEDALS.includes(c.m) && c.s > 0;
+    let badDiag = '';
+    const toCount = t => { const v = clean(t).replace(/[,，]/g, ''); return /^\d{1,4}$/.test(v) ? parseInt(v, 10) : null; };
+
+    function parseBestBad(doc, chart) {
+        const section = doc.querySelector('#ex');
+        if (!section) return null;
+        const tables = section.querySelectorAll('table');
+        const best = tables[0] ? tables[0].querySelector('tr.score td.play_value') : null;
+        if (!best || scoreFromText(best.textContent) !== chart.s) return null;
+        const nums = [];
+        section.querySelectorAll('th, td, dt, dd, span, div, li, p').forEach(el => {
+            if (el.children.length > 0 || !/^BAD$/i.test(clean(el.textContent))) return;
+            let n = el.nextElementSibling ? toCount(el.nextElementSibling.textContent) : null;
+            if (n === null && el.tagName === 'TH') {
+                // 見出しの行の下の行に数がある表
+                const row = el.closest('tr');
+                const idx = row ? Array.prototype.indexOf.call(row.children, el) : -1;
+                const next = row ? row.nextElementSibling : null;
+                if (next && next.children[idx]) n = toCount(next.children[idx].textContent);
+            }
+            if (n === null && el.parentElement && el.parentElement.nextElementSibling) n = toCount(el.parentElement.nextElementSibling.textContent);
+            if (n !== null) nums.push(n);
+        });
+        if (nums.length === 0) {
+            const re = /BAD\s*[:：]?\s*(\d{1,4})(?!\d)/gi;
+            let m;
+            const text = clean(section.textContent);
+            while ((m = re.exec(text))) nums.push(parseInt(m[1], 10));
+        }
+        return nums.length ? Math.min(...nums) : null;
+    }
+
+    // 詳細ページを読んだら、BAD も一緒に見る（旧曲の今作スコアを読むときにも使う）
+    function noteBad(chart, doc) {
+        if (chart.badChecked || !isBadTarget(chart)) return;
+        Object.defineProperty(chart, 'badChecked', { value: true, enumerable: false });
+        const n = parseBestBad(doc, chart);
+        if (n !== null) chart.b = n;
+        else if (!badDiag) {
+            const section = doc.querySelector('#ex');
+            badDiag = section ? section.outerHTML.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/\s+/g, ' ').slice(0, 6000) : 'no #ex';
+        }
+    }
+
+    // クリア済み・フルコンボでない譜面の詳細ページを読んで BAD を集める。読めた数を返す
+    async function readBestBads(charts) {
+        const targets = charts.filter(c => c.no && isBadTarget(c) && !c.badChecked);
+        let found = charts.filter(c => typeof c.b === 'number').length;
+        let checked = 0;
+        for (let i = 0; i < targets.length; i += 5) {
+            const batch = targets.slice(i, i + 5);
+            setStatus(`最小BAD を確認中… ${i + batch.length}/${targets.length}曲`);
+            for (const c of batch) {
+                noteBad(c, await fetchDoc(playdataUrl(`mu_detail.html?no=${encodeURIComponent(c.no)}&back=index`)));
+                checked++;
+                if (typeof c.b === 'number') found++;
+            }
+            // 最初の10曲で1つも読めなければ、ページの形が違うので止める（診断データを出す）
+            if (checked >= 10 && found === 0) break;
+            await sleep(PAGE_INTERVAL_MS);
+        }
+        return found;
+    }
+
     // 旧曲（Lv48〜50）に、今作のスコア（vs）とメダル（vm）を付ける。調べた数を返す
     async function addVersionRecords(charts, newNos) {
         const old = charts.filter(c => c.no && c.l >= 48 && c.l <= 50 && !newNos.has(c.no) && c.s >= 50000)
@@ -502,7 +572,9 @@
             const batch = old.slice(i, i + 5);
             setStatus(`旧曲の今作スコアを確認中… ${i + batch.length}/${old.length}曲（上位40曲が決まったら終わります）`);
             for (const item of batch) {
-                const rec = parseVersionRecord(await fetchDoc(playdataUrl(`mu_detail.html?no=${encodeURIComponent(item.c.no)}&back=index`)));
+                const detailDoc = await fetchDoc(playdataUrl(`mu_detail.html?no=${encodeURIComponent(item.c.no)}&back=index`));
+                noteBad(item.c, detailDoc);
+                const rec = parseVersionRecord(detailDoc);
                 if (!rec) continue;
                 // メダルのボーナスが同じなら、歴代のメダル（菱・丸の区別がある）を使う
                 const medal = (PK_BONUS[rec.medal] || 0) === (PK_BONUS[item.c.m] || 0) ? item.c.m : rec.medal;
@@ -621,6 +693,14 @@
             versionError = e.message;
         }
 
+        // 最小BAD（読めなくても取り込みは続ける）
+        let badFound = 0, badError = '';
+        try {
+            badFound = await readBestBads(charts);
+        } catch (e) {
+            badError = e.message;
+        }
+
         // 公式のポックラ（読めなくても取り込みは続ける）
         let officialPokkura = null;
         try {
@@ -655,6 +735,7 @@
         addNote(versionError
             ? `旧曲の今作スコアは読めませんでした（${versionError}）。ポックラは歴代ベストで計算されます。`
             : `ポックラ用に、旧曲 ${versionChecked}曲の今作スコアを読み取りました。` + (extraNew.length ? `Lv45以下の新曲 ${extraNew.length}曲も読み取りました。` : ''));
+        addNote(badError ? `最小BAD は読めませんでした（${badError}）。` : `最小BAD・到達点BAD：${badFound}曲を読み取りました（フルコンボでない曲。ハイスコアのときの BAD）。`);
         addNote(officialPokkura !== null ? `公式のポックラ：${officialPokkura.toFixed(2)}` : '公式のポックラは読み取れませんでした（アプリでは計算値を出します）。');
         addNote(recent.list.length > 0 ? `最近プレーした曲：${recent.list.length}曲` + (recent.rt ? `（最終プレー ${recent.rt}）` : '') : '最近プレーした曲は読み取れませんでした。');
         addButton('アプリに送る（新しいタブで開く）', '#e91e63', () => sendToApp(json));
@@ -668,6 +749,8 @@
             showDiag(buildDiag(firstDoc, firstUrl, diag, 'bad rows'), `読めなかった行が ${diag.badRows} 行ありました。その曲は取り込みません。`);
         } else if (unknown.length) {
             showDiag(buildDiag(firstDoc, firstUrl, diag, 'unknown medals'), `知らないメダル画像がありました（${unknown.join(', ')}）。その譜面は取り込みません。`);
+        } else if (!badError && badFound === 0 && badDiag) {
+            showDiag(buildDiag(firstDoc, firstUrl, Object.assign({}, diag, { badDetail: badDiag }), 'no bad count'), 'BAD の数を読み取れませんでした。直すために、この診断データを送ってもらえると助かります。');
         } else if (officialPokkura === null) {
             showDiag(buildDiag(firstDoc, firstUrl, diag, 'no official pokkura'), '公式のポックラを読み取れませんでした。直すために、この診断データを送ってもらえると助かります。');
         }

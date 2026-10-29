@@ -119,6 +119,8 @@ function parseEagatePayload(text) {
         const diff = ['E', 'N', 'H', 'EX'].includes(c.d) ? c.d : '';
         if (!medal && score === null) return;
         const chart = { title: c.t.slice(0, 300), genre: typeof c.g === 'string' ? c.g.slice(0, 300) : '', diff, level, medal, score };
+        // 最小BAD（ハイスコアのときの BAD。クリア済み・フルコンボでない譜面だけ）
+        chart.bad = Number.isInteger(c.b) && c.b >= 0 && c.b <= 9999 ? c.b : null;
         // ポックラ用：旧曲の今作スコア・メダル（あれば）
         if (Number.isInteger(c.vs) && c.vs >= 0 && c.vs <= 100000) {
             chart.versionScore = c.vs;
@@ -290,8 +292,16 @@ function buildEagateChanges(pairs) {
         const curScoreNum = parseInt(scoreRecords[song.id], 10);
         const newScore = chart.score !== null && (isNaN(curScoreNum) || chart.score > curScoreNum) ? chart.score : null;
 
-        if (newMedal !== null || newScore !== null) {
-            changes.push({ song, how, oldMedal: curMedal, newMedal, oldScore: isNaN(curScoreNum) ? null : curScoreNum, newScore });
+        // BAD（ハイスコアのときの数なので、スコアが同じでも変わっていることがある）
+        //   超EX でクリアしていない曲は最高到達点BAD（多いときだけ）、それ以外は最小BAD（少ないときだけ）
+        const afterMedal = newMedal !== null ? newMedal : curMedal;
+        const reach = isSuperExSong(song) && !(MEDAL_TYPES[afterMedal] || MEDAL_TYPES['']).isNormalClear;
+        const hasBad = chart.bad !== null && chart.bad !== undefined;
+        const curBad = toBadNum((reach ? getBadReachRecords() : getBadRecords())[song.id]);
+        const newBad = hasBad && (curBad === null || (reach ? chart.bad > curBad : chart.bad < curBad)) ? chart.bad : null;
+
+        if (newMedal !== null || newScore !== null || newBad !== null) {
+            changes.push({ song, how, oldMedal: curMedal, newMedal, oldScore: isNaN(curScoreNum) ? null : curScoreNum, newScore, oldBad: curBad, newBad, badReach: reach });
         }
     });
     return changes;
@@ -326,14 +336,16 @@ function openEagateImportPreview(text) {
 
     const medalCount = changes.filter(c => c.newMedal !== null).length;
     const scoreCount = changes.filter(c => c.newScore !== null).length;
+    const badCount = changes.filter(c => c.newBad !== null && !c.badReach).length;
+    const reachCount = changes.filter(c => c.newBad !== null && c.badReach).length;
     const when = parsed.at ? new Date(parsed.at) : null;
     const whenText = when && !isNaN(when) ? `${when.getMonth() + 1}/${when.getDate()} ${when.getHours()}:${String(when.getMinutes()).padStart(2, '0')} に読み取ったデータ` : '';
 
     let html = `<div class="eagate-summary">
         <div>${escapeHtml(whenText)}</div>
         <div>公式の譜面 <b>${parsed.charts.length}</b> 件のうち、アプリの曲（Lv${EAGATE_MIN_LEVEL}〜${EAGATE_MAX_LEVEL}）と合ったもの <b>${pairs.length}</b> 件</div>
-        <div>メダル更新 <b>${medalCount}</b> 件 / スコア更新 <b>${scoreCount}</b> 件</div>
-        <div style="font-size:0.85em;color:#666;">※ メダルは上がるときだけ、スコアは高いときだけ更新します。</div>
+        <div>メダル更新 <b>${medalCount}</b> 件 / スコア更新 <b>${scoreCount}</b> 件 / 最小BAD 更新 <b>${badCount}</b> 件${reachCount ? ` / 到達点BAD 更新 <b>${reachCount}</b> 件` : ''}</div>
+        <div style="font-size:0.85em;color:#666;">※ メダルは上がるときだけ、スコアは高いときだけ、最小BAD は少なくなるときだけ更新します（超EX のクリアしていない曲は、最高到達点BAD が多くなるときだけ）。</div>
         ${versionCount > 0 ? `<div style="font-size:0.85em;color:#666;">ポックラ用に、旧曲 <b>${versionCount}</b> 曲の今作スコアも保存します。</div>` : ''}
         ${extraCount > 0 ? `<div style="font-size:0.85em;color:#666;">ポックラ用に、Lv45以下の新曲 <b>${extraCount}</b> 曲も保存します。</div>` : ''}
         ${parsed.pc !== null ? `<div style="font-size:0.85em;color:#666;">公式のポックラ <b>${parsed.pc.toFixed(2)}</b> も保存します。</div>` : ''}
@@ -345,8 +357,9 @@ function openEagateImportPreview(text) {
             <td><span class="level-badge">${escapeHtml(c.song.level)}</span> ${escapeHtml(c.song.title)}${EAGATE_HOW_LABELS[c.how] ? ` <span class="eagate-how">${EAGATE_HOW_LABELS[c.how]}</span>` : ''}</td>
             <td>${c.newMedal !== null ? `${medalLabelHtml(c.oldMedal)} → ${medalLabelHtml(c.newMedal)}` : '<span style="color:#bbb;">-</span>'}</td>
             <td>${c.newScore !== null ? `${c.oldScore === null ? '-' : c.oldScore} → <b>${c.newScore}</b>` : '<span style="color:#bbb;">-</span>'}</td>
+            <td>${c.newBad !== null ? `${c.badReach ? '到達 ' : ''}${c.oldBad === null ? '-' : c.oldBad} → <b>${c.newBad}</b>` : '<span style="color:#bbb;">-</span>'}</td>
         </tr>`).join('');
-        html += `<div class="eagate-change-list"><table><thead><tr><th>曲</th><th>メダル</th><th>スコア</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+        html += `<div class="eagate-change-list"><table><thead><tr><th>曲</th><th>メダル</th><th>スコア</th><th>BAD</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     } else {
         html += '<div style="margin:10px 0;color:#666;">更新するものはありません。</div>';
     }
@@ -388,6 +401,8 @@ function applyEagateImport() {
         const change = {};
         if (c.newMedal !== null) { change.medal = [c.oldMedal, c.newMedal]; clearRecords[c.song.id] = c.newMedal; }
         if (c.newScore !== null) { change.score = [c.oldScore, c.newScore]; scoreRecords[c.song.id] = c.newScore; }
+        if (c.newBad !== null && c.badReach) getBadReachRecords()[c.song.id] = c.newBad; // 到達点BAD は履歴に残さない
+        else if (c.newBad !== null) { change.bad = [c.oldBad, c.newBad]; getBadRecords()[c.song.id] = c.newBad; }
         addHistoryEntry(c.song, change, 'e');
     });
     if (!allUsersData[currentUser]) allUsersData[currentUser] = emptyUser();
