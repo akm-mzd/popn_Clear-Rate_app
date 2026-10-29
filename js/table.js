@@ -678,6 +678,7 @@ function getDiffSortValue(song) {
     if (song.diffClass === '弱') return -1.0;
     if (song.diffClass === '逆詐称') return -1.5;
     if (song.diffClass === '入門') return -2.0;
+    if (song.diffClass === SUPER_EX) return -1000; // 超EX は未定（-999）の後ろ
     return -999;
 }
 
@@ -750,7 +751,13 @@ function makeSongFilter(opts = {}) {
 
 // 曲の一覧から統計の数を出す（クリア数・難易度別・メダル数・スコアランク数・スコアの合計・レベル別のスコア）
 //   未解禁の曲は、showUnreleased のときだけクリア率の母数に入れる（メダル数は未解禁も数える）
-const STATS_DIFF_ORDER = ['危険', '別格', '詐称', '強', '中(+)', '中(-)', '弱', '逆詐称', '入門', '未分類'];
+const STATS_DIFF_ORDER = ['危険', '別格', '詐称', '強', '中(+)', '中(-)', '弱', '逆詐称', '入門', '未分類', '超EX'];
+
+// 超EX の曲を統計（クリア率・総数・メダル数など）に入れるか（「超EXを含む」のチェック）
+function isSuperExIncluded() {
+    const cb = document.getElementById('show-superex');
+    return !!(cb && cb.checked);
+}
 
 function computeStats(statsSongs, showUnreleased) {
     let kuroHishiClearCount = 0, kuroBoshiClearCount = 0, easyClearCount = 0, normalClearCount = 0, rateTotal = 0;
@@ -764,7 +771,9 @@ function computeStats(statsSongs, showUnreleased) {
     STATS_DIFF_ORDER.forEach(k => { diffStats[k] = { total: 0, kuroHishi: 0, kuroBoshi: 0, easy: 0, normal: 0 }; });
     const levelScores = {}; // { レベル: { total: 曲数, count: スコアのある曲数, sum: 合計 } }
 
+    const showSuperEx = isSuperExIncluded();
     statsSongs.forEach(song => {
+        if (!showSuperEx && isSuperExSong(song)) return; // 超EX は「超EXを含む」のときだけ数える（総数にも入れない）
         const medalKey = clearRecords[song.id] || '';
         const medalInfo = MEDAL_TYPES[medalKey] || MEDAL_TYPES[''];
         medalCounts[MEDAL_TYPES[medalKey] ? medalKey : '']++;
@@ -1053,7 +1062,7 @@ function renderTable() {
     });
 
     lastDisplaySongs = displaySongs;
-    lastStatsContext = { baseSongs, isFiltered, songFilter, searchQuery, showUnreleased };
+    lastStatsContext = { baseSongs, isFiltered, songFilter, searchQuery, showUnreleased, showSuperEx: isSuperExIncluded() };
     applyViewMode(displaySongs);
     updateSortHeaders();
 
@@ -1365,6 +1374,12 @@ function setStatsUnreleased(checked) {
     renderTable();
 }
 
+function setStatsSuperEx(checked) {
+    const cb = document.getElementById('show-superex');
+    if (cb) cb.checked = checked;
+    renderTable();
+}
+
 const NS_CLEAR_ROWS = [
     ['ノーマル以上', 'normalClearCount', 'normal', '#d32f2f'],
     ['イージー以上', 'easyClearCount', 'easy', '#2e9d2a'],
@@ -1377,7 +1392,8 @@ function buildStatsPageHtml(page, st) {
     const pct = (n, d) => d > 0 ? n / d * 100 : 0;
     const filtered = lastStatsContext.isFiltered;
     let html = `<div class="ns-head"><span class="ns-title">${escapeHtml(page.title)}</span>${filtered ? '<span class="ns-filtered">絞り込み中</span>' : ''}
-        <label class="ns-unreleased"><input type="checkbox" ${lastStatsContext.showUnreleased ? 'checked' : ''} onchange="setStatsUnreleased(this.checked)"> 未解禁を含む</label></div>`;
+        <label class="ns-unreleased"><input type="checkbox" ${lastStatsContext.showUnreleased ? 'checked' : ''} onchange="setStatsUnreleased(this.checked)"> 未解禁を含む</label>
+        <label class="ns-unreleased"><input type="checkbox" ${lastStatsContext.showSuperEx ? 'checked' : ''} onchange="setStatsSuperEx(this.checked)"> 超EXを含む</label></div>`;
 
     // クリア率
     html += `<section class="ns-card"><div class="ns-card-title">クリア率</div>
@@ -1707,8 +1723,8 @@ function renderDiffGrid(targetSongs) {
     let html = buildDirectionBar('grid');
     const vertical = getGridVertical('grid');
     orderRowsForVertical(buildDiffTableGroups(targetSongs), vertical).forEach(g => {
-        const labelHtml = g.cls === '未定'
-            ? '<span class="dg-label-cls">未定</span>'
+        const labelHtml = (g.cls === '未定' || g.cls === SUPER_EX)
+            ? `<span class="dg-label-cls">${escapeHtml(g.cls)}</span>`
             : `<span class="dg-label-cls">${escapeHtml(g.cls)}</span><span class="dg-label-idx">${escapeHtml(g.label)}</span>`;
         const lightLabel = (g.cls === '弱' || (g.cls === '中' && g.label.startsWith('-'))) ? ' dg-label-light' : '';
 

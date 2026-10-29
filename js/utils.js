@@ -119,8 +119,12 @@ function showLoading(show, text = '通信中...') {
     document.getElementById('loading').style.display = show ? 'flex' : 'none';
 }
 
+const SUPER_EX = '超EX'; // 超EXTRA（難易度の文字・種類。指数は持たない）
+function isSuperExSong(song) { return !!song && song.diffClass === SUPER_EX; }
+
 function parseDifficulty(rawStr) {
     if (!rawStr) return { diffClass: '未分類', diffIndex: null };
+    if (/超\s*EX/i.test(String(rawStr).normalize('NFKC'))) return { diffClass: SUPER_EX, diffIndex: null };
     let diffClass = '未分類';
     let diffIndex = null;
     let normalizedStr = rawStr
@@ -197,6 +201,7 @@ function getDifficultyColor(diffClass, index) {
     const absIndex = Math.abs(effIndex);
     const alpha = 0.3 + Math.min(1.0, absIndex) * 0.7;
 
+    if (diffClass === SUPER_EX) return { color: '#6a1b9a', shadow: 'none' };
     if (diffClass === '危険') {
         return { 
             color: '#FFD700', 
@@ -237,7 +242,8 @@ const DIFF_TABLE_COLORS = {
     '弱': '#81d4fa',      // 水色
     '逆詐称': '#1a4fa3',  // 濃い青
     '入門': '#42a5f5',
-    '未定': '#9e9e9e'
+    '未定': '#9e9e9e',
+    '超EX': '#6a1b9a'     // 超EXTRA：未定の下
 };
 
 // 楽曲を「難易度の種類＋指数(小数第1位)」ごとにまとめ、指数の大きい順に並べる
@@ -247,7 +253,11 @@ function buildDiffTableGroups(targetSongs) {
         let cls = song.diffClass || '未分類';
         const idx = song.diffIndex;
         let key, label, sortVal;
-        if (cls === '未分類' || idx === null || idx === undefined || isNaN(idx)) {
+        if (cls === SUPER_EX) {
+            key = SUPER_EX;
+            label = '';
+            sortVal = -Infinity;
+        } else if (cls === '未分類' || idx === null || idx === undefined || isNaN(idx)) {
             cls = '未定';
             key = '未定';
             label = '';
@@ -271,8 +281,8 @@ function buildDiffTableGroups(targetSongs) {
     });
     const groups = Object.values(groupMap);
     // 指数が同じ行は、難易度の種類が強い方を上にする
-    const clsRank = { '危険': 8, '別格': 7, '詐称': 6, '強': 5, '中': 4, '弱': 3, '逆詐称': 2, '入門': 1, '未定': 0 };
-    groups.sort((a, b) => (b.sortVal - a.sortVal) || ((clsRank[b.cls] || 0) - (clsRank[a.cls] || 0)));
+    const clsRank = { '危険': 8, '別格': 7, '詐称': 6, '強': 5, '中': 4, '弱': 3, '逆詐称': 2, '入門': 1, '未定': 0, '超EX': -1 };
+    groups.sort((a, b) => (b.sortVal - a.sortVal) || ((clsRank[b.cls] ?? 0) - (clsRank[a.cls] ?? 0)));
     // 行内はカッコ内の指数が高い順（同じ指数は曲名順）
     groups.forEach(g => g.songs.sort((a, b) => {
         const ia = (a.diffIndex === null || a.diffIndex === undefined || isNaN(a.diffIndex)) ? -Infinity : a.diffIndex;

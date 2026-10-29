@@ -64,12 +64,45 @@ function renderBadBox() {
     if (!box) return;
     const id = currentMedalEditId;
     if (!id) { box.innerHTML = ''; return; }
+    const song = songs.find(s => s.id === id);
+    const medalInfo = MEDAL_TYPES[clearRecords[id] || ''] || MEDAL_TYPES[''];
+    // 超EX の曲は、クリアするまで「最高到達点BAD」（落ちるまでに出した BAD。多いほど遠くまで行けた）
+    if (isSuperExSong(song) && !medalInfo.isNormalClear) {
+        const reach = toBadNum(getBadReachRecords()[id]);
+        box.innerHTML = `
+        <label class="bad-label" for="bad-input">最高到達点BAD</label>
+        <input type="number" id="bad-input" class="bad-input" inputmode="numeric" min="0" max="9999" placeholder="未記録" value="${reach === null ? '' : reach}"
+            onchange="setBadReachFromModal('${jsStringAttr(id)}', this.value)" onkeydown="if (event.key === 'Enter') this.blur()">`;
+        return;
+    }
     const rec = toBadNum(getBadRecords()[id]);
     const shown = getSongBad(id);
     box.innerHTML = `
-        <label class="bad-label" for="bad-input">BAD<span>クリアしたときの一番少ない数</span></label>
+        <label class="bad-label" for="bad-input">最小BAD</label>
         <input type="number" id="bad-input" class="bad-input" inputmode="numeric" min="0" max="9999" placeholder="${shown === 0 && rec === null ? '0（フルコン）' : '未記録'}" value="${rec === null ? '' : rec}"
             onchange="setBadFromModal('${jsStringAttr(id)}', this.value)" onkeydown="if (event.key === 'Enter') this.blur()">`;
+}
+
+function setBadReachFromModal(id, value) {
+    const recs = getBadReachRecords();
+    const n = toBadNum(value.trim() === '' ? null : value);
+    if (n === null) delete recs[id]; else recs[id] = n;
+    scheduleAutoSave();
+    renderTable();
+    renderBadBox();
+}
+
+// 楽曲データの編集：超EXTRA のチェック。入れると難易度の欄を「超EX」にして入力できなくする
+function setEditSuperExState(on) {
+    const cb = document.getElementById('edit-superex');
+    const input = document.getElementById('edit-diff');
+    if (cb) cb.checked = on;
+    if (input) input.disabled = on;
+}
+
+function onEditSuperExChange(on) {
+    document.getElementById('edit-diff').value = on ? SUPER_EX : '';
+    setEditSuperExState(on);
 }
 
 function setBadFromModal(id, value) {
@@ -271,6 +304,7 @@ function openAddModal() {
     document.getElementById('edit-bpm').value = "";
     document.getElementById('edit-notes').value = "";
     document.getElementById('edit-diff').value = "";
+    setEditSuperExState(false);
     document.getElementById('edit-wiki-url').value = "";
     document.getElementById('edit-banner-url').value = "";
 
@@ -295,6 +329,7 @@ function openEditModal(id) {
     document.getElementById('edit-bpm').value = song.bpm || "";
     document.getElementById('edit-notes').value = song.notes || 0;
     document.getElementById('edit-diff').value = song.diffRaw || "";
+    setEditSuperExState(isSuperExSong(song));
     document.getElementById('edit-banner-url').value = song.bannerUrl || "";
     document.getElementById('edit-wiki-url').value = song.wikiUrl || "";
     document.getElementById('edit-attrs').value = getSongAttrs(song).join('、');

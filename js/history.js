@@ -21,6 +21,13 @@ function getBadRecords(user = currentUser) {
     return allUsersData[user].badRecords;
 }
 
+// 超EX の曲の「最高到達点BAD」（クリアするまでの記録。クリアしたあとも残す）
+function getBadReachRecords(user = currentUser) {
+    if (!allUsersData[user]) allUsersData[user] = emptyUser();
+    if (!allUsersData[user].badReachRecords) allUsersData[user].badReachRecords = {};
+    return allUsersData[user].badReachRecords;
+}
+
 const toBadNum = v => (v === undefined || v === null || v === '' || isNaN(parseInt(v, 10)) || parseInt(v, 10) < 0) ? null : parseInt(v, 10);
 
 // 曲の BAD の数：記録があればその数、なければフルコンボ以上（銀丸以上）なら 0、どちらでもなければ null
@@ -157,19 +164,22 @@ function deleteHistoryEntry(key) {
     const lines = [];
     const medalName = k => k === '' ? '未プレイ' : k;
     const scoreName = v => v === null || v === undefined ? 'なし' : String(v);
-    if (song && plan.revert.medal) lines.push(`メダル：${medalName(plan.revert.medal.from)} → ${medalName(plan.revert.medal.to)} に戻します`);
-    if (song && plan.revert.score) lines.push(`スコア：${scoreName(plan.revert.score.from)} → ${scoreName(plan.revert.score.to)} に戻します`);
-    if (song && plan.revert.bad) lines.push(`BAD：${scoreName(plan.revert.bad.from)} → ${scoreName(plan.revert.bad.to)} に戻します`);
+    if (song && plan.revert.medal) lines.push(`メダル：${medalName(plan.revert.medal.from)} → ${medalName(plan.revert.medal.to)} に戻せます`);
+    if (song && plan.revert.score) lines.push(`スコア：${scoreName(plan.revert.score.from)} → ${scoreName(plan.revert.score.to)} に戻せます`);
+    if (song && plan.revert.bad) lines.push(`BAD：${scoreName(plan.revert.bad.from)} → ${scoreName(plan.revert.bad.to)} に戻せます`);
     if (plan.relink.length > 0) lines.push('（この曲はあとでも更新しているので、その分は今のままです）');
     if (lines.length === 0) lines.push('（曲のメダル・スコア・BAD は変わりません）');
     if (!confirm(`この履歴を削除しますか？\n${e.ti}\n${lines.join('\n')}`)) return;
+    // 戻すものがあるときは、戻すかどうかを選べる（キャンセルなら履歴だけ消す）
+    const hasRevert = !!song && Object.keys(plan.revert).length > 0;
+    const revert = hasRevert && confirm('メダル・スコア・BAD も変更前に戻しますか？\n（キャンセルを押すと、戻さずに履歴だけ消します）');
 
     // 変更前に戻す（今の値が履歴の「変更後」と違うときは、別の方法で変わっているので触らない）
-    if (song && plan.revert.medal && (clearRecords[e.id] || '') === plan.revert.medal.from) {
+    if (revert && plan.revert.medal && (clearRecords[e.id] || '') === plan.revert.medal.from) {
         if (plan.revert.medal.to === '') delete clearRecords[e.id];
         else clearRecords[e.id] = plan.revert.medal.to;
     }
-    if (song && plan.revert.score) {
+    if (revert && plan.revert.score) {
         const cur = scoreRecords[e.id];
         const curNum = cur === undefined || cur === null || cur === '' ? null : parseInt(cur, 10);
         if (curNum === plan.revert.score.from) {
@@ -177,7 +187,7 @@ function deleteHistoryEntry(key) {
             else scoreRecords[e.id] = plan.revert.score.to;
         }
     }
-    if (song && plan.revert.bad) {
+    if (revert && plan.revert.bad) {
         const recs = getBadRecords();
         if (toBadNum(recs[e.id]) === plan.revert.bad.from) {
             if (plan.revert.bad.to === null) delete recs[e.id]; else recs[e.id] = plan.revert.bad.to;

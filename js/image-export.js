@@ -356,8 +356,8 @@ function buildDiffTableRoot(targetSongs, levelText) {
     orderRowsForVertical(groups, vertical).forEach(g => {
         const color = getDiffTableLabelColor(g);
         const textShadow = (g.cls === '弱' || (g.cls === '中' && g.label.startsWith('-'))) ? 'text-shadow: 0 1px 2px rgba(0,0,0,0.45);' : '';
-        const labelHtml = g.cls === '未定'
-            ? `<div style="font-size: 14px; line-height: 1;">未定</div>`
+        const labelHtml = (g.cls === '未定' || g.cls === SUPER_EX)
+            ? `<div style="font-size: 14px; line-height: 1;">${escapeHtml(g.cls)}</div>`
             : `<div style="font-size: 12px; line-height: 1;">${escapeHtml(g.cls)}</div><div style="font-size: 17px; line-height: 1; margin-top: 4px;">${escapeHtml(g.label)}</div>`;
         html += `<div style="display: flex; gap: 10px; align-items: stretch;">
             <div style="width: 58px; min-height: 42px; flex-shrink: 0; background: ${color}; color: #fff; font-weight: bold; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 4px 0; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,0.25); ${textShadow}">${labelHtml}</div>
