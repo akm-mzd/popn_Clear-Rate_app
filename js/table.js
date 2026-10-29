@@ -349,29 +349,44 @@ function updateDynamicFilters() {
 }
 
 // ---------- 「更新」「最近」（レベルの代わりに選ぶ） ----------
-//   更新：更新履歴のある曲を日付ごとに。期間は 1か月 / 全部（この端末に popn_updated_range で保存）
+//   更新：更新履歴のある曲を日付ごとに。月ごとに ‹ › で切り替える（最初は今月）
 //   最近：公式データ取り込みで読んだ「最近プレーした曲」（recentRecords）
 const SPECIAL_VIEW_LEVELS = { UPDATED: '更新', RECENT: '最近' };
-const UPDATED_RANGE_DAYS = 31;
 
 function isSpecialViewLevel(level) {
     return Object.prototype.hasOwnProperty.call(SPECIAL_VIEW_LEVELS, level);
 }
 
-function getUpdatedRange() {
-    return storageGet('popn_updated_range') === 'all' ? 'all' : 'month';
+// 見ている月（月の数え方は 年×12＋月。null は今月）
+let updatedMonthIndex = null;
+const monthIndexOf = t => { const d = new Date(t); return d.getFullYear() * 12 + d.getMonth(); };
+
+function getUpdatedMonthIndex() {
+    return updatedMonthIndex === null ? monthIndexOf(Date.now()) : updatedMonthIndex;
 }
 
-function setUpdatedRange(range) {
-    storageSet('popn_updated_range', range === 'all' ? 'all' : 'month');
+// 更新履歴のある一番古い月（履歴が無ければ今月）
+function getOldestUpdatedMonthIndex() {
+    let oldest = monthIndexOf(Date.now());
+    Object.values(getHistoryRecords()).forEach(e => { if (e && typeof e.t === 'number') oldest = Math.min(oldest, monthIndexOf(e.t)); });
+    return oldest;
+}
+
+// 前の月（-1）・次の月（+1）へ。履歴のある一番古い月から今月までの間だけ
+function moveUpdatedMonth(step) {
+    const next = getUpdatedMonthIndex() + step;
+    if (next > monthIndexOf(Date.now()) || next < getOldestUpdatedMonthIndex()) return;
+    updatedMonthIndex = next;
     renderTable();
 }
 
-// 期間内の更新履歴（新しい順）
+// 見ている月の更新履歴（新しい順）
 function getUpdatedHistoryList() {
     const records = getHistoryRecords();
-    const since = getUpdatedRange() === 'all' ? 0 : Date.now() - UPDATED_RANGE_DAYS * 24 * 60 * 60 * 1000;
-    return Object.values(records).filter(e => e && typeof e.t === 'number' && e.t >= since).sort((a, b) => b.t - a.t);
+    const mi = getUpdatedMonthIndex();
+    const from = new Date(Math.floor(mi / 12), mi % 12, 1).getTime();
+    const to = new Date(Math.floor(mi / 12), mi % 12 + 1, 1).getTime();
+    return Object.values(records).filter(e => e && typeof e.t === 'number' && e.t >= from && e.t < to).sort((a, b) => b.t - a.t);
 }
 
 // レベルの代わりに「更新」「最近」を選んだときの曲
@@ -1791,14 +1806,13 @@ function renderUpdatedGrid(targetSongs) {
     const grid = document.getElementById('diff-grid-view');
     const showScore = document.getElementById('show-score-col').checked;
     lastGridNarrow = isNarrowScreen();
-    const range = getUpdatedRange();
+    const mi = getUpdatedMonthIndex();
+    const monthLabel = `${Math.floor(mi / 12)}年${mi % 12 + 1}月`;
     const rangeBar = `
-        <div class="sv-bar">
-            <span class="sv-bar-text">${range === 'all' ? 'すべての更新' : `直近${UPDATED_RANGE_DAYS}日の更新`}</span>
-            <div class="sv-range" role="group" aria-label="期間">
-                <button type="button" class="${range === 'month' ? 'active' : ''}" onclick="setUpdatedRange('month')">1か月</button>
-                <button type="button" class="${range === 'all' ? 'active' : ''}" onclick="setUpdatedRange('all')">全部</button>
-            </div>
+        <div class="sv-bar sv-month-bar">
+            <button type="button" class="sv-month-btn" onclick="moveUpdatedMonth(-1)" aria-label="前の月"${mi <= getOldestUpdatedMonthIndex() ? ' disabled' : ''}>‹</button>
+            <span class="sv-bar-text sv-month-label">${monthLabel}の更新</span>
+            <button type="button" class="sv-month-btn" onclick="moveUpdatedMonth(1)" aria-label="次の月"${mi >= monthIndexOf(Date.now()) ? ' disabled' : ''}>›</button>
         </div>`;
 
     // 日付ごと・曲ごとにまとめる（その日の最初の変更前 → 最後の変更後）
@@ -1824,7 +1838,7 @@ function renderUpdatedGrid(targetSongs) {
     });
 
     if (days.length === 0) {
-        grid.innerHTML = rangeBar + `<div class="dg-empty">${range === 'all' ? '更新履歴がありません' : `直近${UPDATED_RANGE_DAYS}日の更新はありません（「全部」で前の更新も見られます）`}</div>`;
+        grid.innerHTML = rangeBar + `<div class="dg-empty">${monthLabel}の更新はありません（‹ で前の月も見られます）</div>`;
         return;
     }
     // 日の中の並び：メダルが変わった曲（変わったあとのメダルが良い順）→ スコアだけ変わった曲（変わったあとのスコアが高い順）→ その他。
