@@ -1745,3 +1745,20 @@ button.hi-search-item { display: flex; align-items: center; gap: 6px; width: 100
 button.hi-search-item.active { border-color: #c2185b; background: #fce4ef; }
 button.hi-search-item img { width: 96px; height: 24px; object-fit: cover; border-radius: 3px; flex-shrink: 0; background: #eee; }
 .hi-search-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.hg-lvs { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+button.hg-lv { width: auto; flex: none; margin: 0; padding: 4px 10px; border: 1px solid #ccc; border-radius: 14px; background: #fff; color: #333; font-family: inherit; font-size: 13px; cursor: pointer; }
+button.hg-lv small { margin-left: 4px; color: #888; }
+button.hg-lv.active { border-color: #c2185b; background: #c2185b; color: #fff; }
+button.hg-lv.active small { color: #fce4ef; }
+.hg-song { border-bottom: 1px solid #eee; }
+.hg-song.open { background: #fdf3f7; }
+button.hg-head { display: flex; align-items: center; gap: 8px; width: 100%; margin: 0; padding: 6px 4px; border: none; background: none; color: #333; font-family: inherit; text-align: left; cursor: pointer; }
+button.hg-head > img { width: 96px; height: 24px; object-fit: cover; border-radius: 3px; flex-shrink: 0; background: #eee; }
+.hg-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.hg-title { font-size: 13px; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hg-gap { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; font-size: 12px; }
+.hg-where { color: #888; font-size: 11px; margin-left: 4px; }
+.hg-form { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; padding: 4px 6px 10px; }
+.hg-form label { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: #555; min-width: 0; }
+.hg-form input, .hg-form select { width: 100%; box-sizing: border-box; padding: 5px 6px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; font-family: inherit; }
+.hg-form .admin-btn { grid-column: 1 / -1; margin: 4px 0 0; padding: 8px; border: none; border-radius: 8px; background: #c2185b; color: #fff; font-weight: bold; font-family: inherit; cursor: pointer; }

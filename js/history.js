@@ -643,3 +643,147 @@ function applyHistoryImport() {
     const nBad = Object.keys(c.badSet).length;
     showToast('toast-eagate', `過去の更新履歴を取り込みました（${c.add.length}件${c.merges.length ? `・BAD 書き足し ${c.merges.length}件` : ''}${c.fills.length ? `・書き足し ${c.fills.length}件` : ''}${nBad ? `・BAD ${nBad}曲` : ''}）`, '#4caf50', 3000);
 }
+
+// ---------- 過去の記録が足りない曲（メダルの履歴が、未プレイから今のメダルまでつながらない曲） ----------
+let historyGapLevel = 'all';
+let historyGapOpenId = null;
+
+// 曲ごとに、抜けている所（from → to、前後の履歴の日時）を古い順に返す
+function findHistoryGaps() {
+    const byId = {};
+    Object.values(getHistoryRecords()).forEach(e => {
+        if (e && typeof e.t === 'number' && 'nm' in e) (byId[e.id] = byId[e.id] || []).push(e);
+    });
+    const result = [];
+    songs.forEach(song => {
+        const cur = clearRecords[song.id] || '';
+        if (cur === '' || cur === '未解禁') return;
+        const list = (byId[song.id] || []).sort((a, b) => a.t - b.t);
+        const gaps = [];
+        let prev = '', prevT = null;
+        list.forEach(e => {
+            const om = e.om || '';
+            if (om !== prev) gaps.push({ from: prev, to: om, after: prevT, before: e.t });
+            prev = e.nm || '';
+            prevT = e.t;
+        });
+        if (prev !== cur) gaps.push({ from: prev, to: cur, after: prevT, before: null });
+        if (gaps.length) result.push({ song, gaps, none: list.length === 0 });
+    });
+    const lvNum = v => { const n = parseInt(v, 10); return isNaN(n) ? 999 : n; };
+    return result.sort((a, b) => lvNum(a.song.level) - lvNum(b.song.level) || String(a.song.title).localeCompare(String(b.song.title), 'ja'));
+}
+
+function openHistoryGapModal() {
+    historyGapOpenId = null;
+    renderHistoryGapModal();
+    document.getElementById('history-gap-modal').style.display = 'flex';
+}
+
+function closeHistoryGapModal() {
+    document.getElementById('history-gap-modal').style.display = 'none';
+}
+
+function setHistoryGapLevel(lv) {
+    historyGapLevel = lv;
+    historyGapOpenId = null;
+    renderHistoryGapModal();
+}
+
+function toggleHistoryGapSong(id) {
+    historyGapOpenId = historyGapOpenId === id ? null : id;
+    renderHistoryGapModal();
+}
+
+const historyGapDateText = t => t === null ? '' : localDateKey(t).replace(/-/g, '/');
+
+function renderHistoryGapModal() {
+    const all = findHistoryGaps();
+    const levels = [...new Set(all.map(x => String(x.song.level)))];
+    if (historyGapLevel !== 'all' && !levels.includes(historyGapLevel)) historyGapLevel = 'all';
+    const list = historyGapLevel === 'all' ? all : all.filter(x => String(x.song.level) === historyGapLevel);
+    document.getElementById('history-gap-title').textContent = `過去の記録が足りない曲（${all.length}曲）`;
+    const body = document.getElementById('history-gap-body');
+    const scrollTop = body.scrollTop;
+    const lvBtn = (v, label, n) => `<button type="button" class="hg-lv${historyGapLevel === v ? ' active' : ''}" onclick="setHistoryGapLevel('${jsStringAttr(v)}')">${escapeHtml(label)}<small>${n}</small></button>`;
+    const head = `<div class="hi-note">メダルが付いているのに、更新履歴が未プレイから今のメダルまでつながらない曲です。押すと、抜けている記録を手で足せます（今のメダル・スコアは変わりません）。</div>
+        <div class="hg-lvs">${lvBtn('all', 'すべて', all.length)}${levels.map(lv => lvBtn(lv, 'Lv' + lv, all.filter(x => String(x.song.level) === lv).length)).join('')}</div>`;
+    if (list.length === 0) {
+        body.innerHTML = head + '<div class="hist-empty">足りない曲はありません。</div>';
+        return;
+    }
+    body.innerHTML = head + list.map(({ song, gaps, none }) => {
+        const g = gaps[0];
+        const open = historyGapOpenId === song.id;
+        const banner = safeUrl(song.bannerUrl, true);
+        const where = none ? '履歴なし' : g.before === null ? `${historyGapDateText(g.after)} より後` : g.after === null ? `${historyGapDateText(g.before)} より前` : `${historyGapDateText(g.after)}〜${historyGapDateText(g.before)}`;
+        return `<div class="hg-song${open ? ' open' : ''}">
+            <button type="button" class="hg-head" onclick="toggleHistoryGapSong('${jsStringAttr(song.id)}')">
+                ${banner ? `<img src="${escapeHtml(banner)}" alt="" loading="lazy">` : '<span class="hi-nobanner">バナーなし</span>'}
+                <span class="hg-info">
+                    <span class="hg-title"><span class="level-badge">${escapeHtml(song.level)}</span> ${escapeHtml(song.title)}</span>
+                    <span class="hg-gap">${historyMedalHtml(g.from)}<span class="hist-arrow">→</span>${historyMedalHtml(g.to)}<span class="hg-where">${escapeHtml(where)}${gaps.length > 1 ? `・ほか${gaps.length - 1}か所` : ''}</span></span>
+                </span>
+            </button>
+            ${open ? buildHistoryGapFormHtml(song, g) : ''}
+        </div>`;
+    }).join('');
+    body.scrollTop = scrollTop;
+}
+
+function buildHistoryGapFormHtml(song, g) {
+    const today = localDateKey(Date.now());
+    const def = g.before !== null ? localDateKey(g.before) : g.after !== null ? localDateKey(g.after) : '';
+    const options = sel => Object.keys(MEDAL_TYPES).filter(k => k !== '未解禁')
+        .map(k => `<option value="${escapeHtml(k)}"${k === sel ? ' selected' : ''}>${escapeHtml(MEDAL_TYPES[k].label)}</option>`).join('');
+    return `<div class="hg-form">
+        <label>日付<input type="date" id="hg-date" value="${def}" max="${today}"></label>
+        <label>変更前のメダル<select id="hg-om">${options(g.from)}</select></label>
+        <label>変更後のメダル<select id="hg-nm">${options(g.to)}</select></label>
+        <label>スコア<input type="number" id="hg-score" min="0" max="100000" inputmode="numeric" placeholder="空欄でもよい"></label>
+        <label>BAD<input type="number" id="hg-bad" min="0" inputmode="numeric" placeholder="空欄でもよい"></label>
+        <button type="button" class="admin-btn admin-btn-main" onclick="addHistoryGapEntry('${jsStringAttr(song.id)}')">この記録を足す</button>
+    </div>`;
+}
+
+// 手で入れた過去の記録を、更新履歴に1件足す（今のメダル・スコアと、今ある履歴は変えない）
+function addHistoryGapEntry(id) {
+    const song = songs.find(s => s.id === id);
+    if (!song) return;
+    const dateText = document.getElementById('hg-date').value;
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateText);
+    if (!m) { alert('日付を入れてください。'); return; }
+    const day = new Date(+m[1], +m[2] - 1, +m[3]);
+    if (day.getTime() > Date.now()) { alert('今日より後の日付は入れられません。'); return; }
+    const om = document.getElementById('hg-om').value;
+    const nm = document.getElementById('hg-nm').value;
+    const toNum = v => (v === '' || isNaN(parseInt(v, 10)) || parseInt(v, 10) < 0) ? null : parseInt(v, 10);
+    const ns = toNum(document.getElementById('hg-score').value);
+    const nb = toNum(document.getElementById('hg-bad').value);
+    if (ns !== null && ns > 100000) { alert('スコアは 100000 までです。'); return; }
+    if (om === nm && ns === null && nb === null) { alert('メダルが変わっていないか、スコア・BAD が空です。'); return; }
+
+    // 時刻はその日の12時。同じ日に前後の履歴があれば、その間に入るようにずらす
+    const records = getHistoryRecords();
+    const mine = Object.values(records).filter(e => e && e.id === id && typeof e.t === 'number');
+    const dayStart = day.getTime(), dayEnd = dayStart + DAY_MS;
+    let t = dayStart + 12 * 3600000;
+    const gap = (findHistoryGaps().find(x => x.song.id === id) || { gaps: [] }).gaps
+        .find(g => (g.after === null || g.after < dayEnd) && (g.before === null || g.before >= dayStart));
+    if (gap) {
+        if (gap.after !== null && t <= gap.after) t = gap.after + 60000;
+        if (gap.before !== null && t >= gap.before) t = gap.before - 60000;
+    }
+    while (mine.some(e => e.t === t)) t++;
+
+    const entry = { t, id: song.id, ti: song.title, lv: song.level, src: 'm' };
+    if (om !== nm) { entry.om = om; entry.nm = nm; }
+    // 変更前のスコア・BAD は、その日時より前の一番新しい履歴から
+    const before = mine.filter(e => e.t < t).sort((a, b) => b.t - a.t);
+    if (ns !== null) { const p = before.find(e => 'ns' in e); entry.os = p ? toScoreNum(p.ns) : null; entry.ns = ns; }
+    if (nb !== null) { const p = before.find(e => 'nb' in e); entry.ob = p ? toBadNum(p.nb) : null; entry.nb = nb; }
+    records[t.toString(36) + '_' + Math.random().toString(36).slice(2, 7)] = entry;
+    scheduleAutoSave();
+    renderHistoryGapModal();
+    showToast('toast-eagate', `「${song.title}」の過去の記録を足しました`, '#4caf50', 2000);
+}
