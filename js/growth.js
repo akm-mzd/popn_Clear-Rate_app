@@ -176,26 +176,45 @@ function buildPokkuraGrowthSeries(unit) {
 //   pointWidth：点が多いとき、1点あたりの幅（px）。指定すると、目盛りを左に固定し、グラフは横スクロールにする
 function buildLineChartSvg(points, series, format = v => String(v), integer = false, pointWidth = 0) {
     if (pointWidth && points.length > GROWTH_SCROLL_MIN_POINTS) return buildScrollLineChartHtml(points, series, format, integer, pointWidth);
-    const W = 320, H = 150, L = 40, R = 10, T = 10, B = 24;
-    const values = [];
-    points.forEach(p => series.forEach(s => { if (typeof p[s.key] === 'number') values.push(p[s.key]); }));
-    if (values.length === 0) return '';
-    let lo = Math.min(...values), hi = Math.max(...values);
-    if (lo === hi) {
-        hi += 1;
-        if (!(integer && lo <= 0)) lo -= 1;
-    }
-    const ticks = integer && hi - lo < 2 ? [hi, lo] : [hi, (hi + lo) / 2, lo];
-    const pad = (hi - lo) * 0.08;
-    const min = lo - pad, max = hi + pad;
+    // axis: 'right' の線は、右の目盛りで別の範囲を持つ（スコアと BAD のように大きさが違う数を1つのグラフに出す）
+    const rightSeries = series.filter(s => s.axis === 'right');
+    const W = 320, H = 150, L = 40, R = rightSeries.length ? 30 : 10, T = 10, B = 24;
+    const rangeOf = list => {
+        const values = [];
+        points.forEach(p => list.forEach(s => { if (typeof p[s.key] === 'number') values.push(p[s.key]); }));
+        if (values.length === 0) return null;
+        let lo = Math.min(...values), hi = Math.max(...values);
+        const isInt = integer || list.every(s => s.integer);
+        if (lo === hi) {
+            hi += 1;
+            if (!(isInt && lo <= 0)) lo -= 1;
+        }
+        const ticks = isInt && hi - lo < 2 ? [hi, lo] : [hi, (hi + lo) / 2, lo];
+        const pad = (hi - lo) * 0.08;
+        return { ticks, min: lo - pad, max: hi + pad };
+    };
+    const leftRange = rangeOf(series.filter(s => s.axis !== 'right'));
+    const rightRange = rightSeries.length ? rangeOf(rightSeries) : null;
+    if (!leftRange && !rightRange) return '';
     const x = i => L + (points.length === 1 ? (W - L - R) / 2 : i * (W - L - R) / (points.length - 1));
-    const y = v => T + (max - v) / (max - min) * (H - T - B);
+    const yOf = range => v => T + (range.max - v) / (range.max - range.min) * (H - T - B);
+    const y = yOf(leftRange || rightRange);
     let svg = `<svg class="gr-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="${escapeHtml(series.map(s => s.name).join('・'))}の推移">`;
-    // 目盛り（上・真ん中・下）
-    ticks.forEach(v => {
-        svg += `<line x1="${L}" x2="${W - R}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" class="gr-grid"/>`;
-        svg += `<text x="${L - 4}" y="${(y(v) + 3).toFixed(1)}" class="gr-axis" text-anchor="end">${escapeHtml(format(Math.round(v * 100) / 100))}</text>`;
-    });
+    // 目盛り（上・真ん中・下）。右の目盛りは文字だけ
+    if (leftRange) {
+        leftRange.ticks.forEach(v => {
+            svg += `<line x1="${L}" x2="${W - R}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" class="gr-grid"/>`;
+            svg += `<text x="${L - 4}" y="${(y(v) + 3).toFixed(1)}" class="gr-axis" text-anchor="end">${escapeHtml(format(Math.round(v * 100) / 100))}</text>`;
+        });
+    }
+    if (rightRange) {
+        const yr = yOf(rightRange);
+        const color = rightSeries[0].color;
+        rightRange.ticks.forEach(v => {
+            if (!leftRange) svg += `<line x1="${L}" x2="${W - R}" y1="${yr(v).toFixed(1)}" y2="${yr(v).toFixed(1)}" class="gr-grid"/>`;
+            svg += `<text x="${W - R + 4}" y="${(yr(v) + 3).toFixed(1)}" class="gr-axis" text-anchor="start" style="fill: ${color};">${escapeHtml((rightSeries[0].format || format)(Math.round(v * 100) / 100))}</text>`;
+        });
+    }
     // 横軸の文字（点が少なければ全部、多ければ最初・真ん中・最後）
     const labelIdx = points.length <= 6 ? points.map((p, i) => i) : [...new Set([0, Math.floor((points.length - 1) / 2), points.length - 1])];
     labelIdx.forEach(i => {
@@ -203,11 +222,13 @@ function buildLineChartSvg(points, series, format = v => String(v), integer = fa
         svg += `<text x="${x(i).toFixed(1)}" y="${H - 6}" class="gr-axis" text-anchor="${anchor}">${escapeHtml(points[i].label)}</text>`;
     });
     series.forEach(s => {
-        const pts = points.map((p, i) => typeof p[s.key] === 'number' ? `${x(i).toFixed(1)},${y(p[s.key]).toFixed(1)}` : null).filter(Boolean);
+        const ys = s.axis === 'right' ? yOf(rightRange) : y;
+        const fmt = s.format || format;
+        const pts = points.map((p, i) => typeof p[s.key] === 'number' ? `${x(i).toFixed(1)},${ys(p[s.key]).toFixed(1)}` : null).filter(Boolean);
         if (pts.length > 1) svg += `<polyline points="${pts.join(' ')}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
         points.forEach((p, i) => {
             if (typeof p[s.key] !== 'number') return;
-            svg += `<circle cx="${x(i).toFixed(1)}" cy="${y(p[s.key]).toFixed(1)}" r="${points.length > 15 ? 2 : 3}" fill="${s.color}"><title>${escapeHtml(`${p.label} ${s.name}：${format(p[s.key])}`)}</title></circle>`;
+            svg += `<circle cx="${x(i).toFixed(1)}" cy="${ys(p[s.key]).toFixed(1)}" r="${points.length > 15 ? 2 : 3}" fill="${s.color}"><title>${escapeHtml(`${p.label} ${s.name}：${fmt(p[s.key])}`)}</title></circle>`;
         });
     });
     return svg + '</svg>';
@@ -408,12 +429,13 @@ function applySongHistoryLatest(id) {
     refreshSongHistoryViews(id);
 }
 
-// メダルを選ぶ画面で開いている曲なら、その画面の記録・BAD・裏メダルを描き直す
+// 曲の詳細ページ・メダルを選ぶ画面で開いている曲なら、その画面（記録・最高スコア・BAD・裏メダル）を描き直す
 function refreshSongHistoryViews(id) {
-    if (currentMedalEditId !== id) return;
+    if (currentMedalEditId === id) renderUraMedalBox();
+    if (currentDetailSongId !== id) return;
+    renderSongDetailHead();
     renderSongHistoryBox(id);
     renderBadBox();
-    renderUraMedalBox();
 }
 
 // 履歴の中で一番高いスコア（初めて取った日も）。BAD の欄の上に出す
@@ -457,11 +479,24 @@ function renderSongHistoryBox(id, showAll) {
         box.innerHTML = `<div class="sh-title">この曲の記録${addBtn}</div>${form}<div class="sh-empty">まだ記録がありません</div>`;
         return;
     }
-    // スコアの線（古い順。2回以上スコアがあるとき）
-    const scorePoints = list.slice().reverse().filter(e => 'ns' in e && e.ns !== null)
-        .map(e => { const d = new Date(e.t); return { label: `${d.getMonth() + 1}/${d.getDate()}`, s: e.ns }; });
-    const chart = scorePoints.length >= 2
-        ? buildLineChartSvg(scorePoints, [{ key: 's', name: 'スコア', color: '#1565c0' }], v => Math.round(v).toLocaleString('ja-JP')) : '';
+    // スコア（赤・左の目盛り）と最小BAD（青・右の目盛り）の線（古い順。どちらかが2回以上あるとき）
+    const chartPoints = list.slice().reverse().filter(e => ('ns' in e && e.ns !== null) || ('nb' in e && e.nb !== null))
+        .map(e => {
+            const d = new Date(e.t);
+            const p = { label: `${d.getMonth() + 1}/${d.getDate()}` };
+            if ('ns' in e && e.ns !== null) p.s = e.ns;
+            if ('nb' in e && e.nb !== null) p.b = toBadNum(e.nb);
+            return p;
+        });
+    const nScore = chartPoints.filter(p => typeof p.s === 'number').length;
+    const nBad = chartPoints.filter(p => typeof p.b === 'number').length;
+    const chartSeries = [];
+    if (nScore > 0) chartSeries.push({ key: 's', name: 'スコア', color: '#e53935' });
+    if (nBad > 0) chartSeries.push({ key: 'b', name: '最小BAD', color: '#1565c0', axis: nScore > 0 ? 'right' : 'left', integer: true, format: v => String(Math.round(v)) });
+    const chart = (nScore >= 2 || nBad >= 2)
+        ? buildLineChartSvg(chartPoints, chartSeries, v => Math.round(v).toLocaleString('ja-JP'))
+            + `<div class="gr-legend sh-legend">${chartSeries.map(s => `<span><i style="background: ${s.color};"></i>${s.name}${s.axis === 'right' ? '（右）' : ''}</span>`).join('')}</div>`
+        : '';
     const shown = songHistoryShowAll ? list : list.slice(0, SONG_HISTORY_SHOW);
     const rows = shown.map(e => {
         const d = new Date(e.t);

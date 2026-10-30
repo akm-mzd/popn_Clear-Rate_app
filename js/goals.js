@@ -2,8 +2,9 @@
 // goals.js
 // 目標（例：Lv49 の弱を全部ノーマルクリア、Lv47 で銅菱以上を100曲）と、その進み具合。
 // 目標はユーザーごとに goalRecords（{ 目標ID: 目標 }）としてクラウドに保存する。
-//   目標 = { name, lv: [レベル], df: [難易度], af: [タグ（メモ）], kind: 'medal'|'score'|'rank'|'pokkura',
-//           medal: 条件キー, score: 点数, rank: ランク, n: 曲数（null = 全曲）, t: 作った日時, done: 初めて達成した日時,
+//   目標 = { name, lv: [レベル], df: [難易度], af: [タグ（メモ）], kind: 'medal'|'score'|'rank'|'bad'|'pokkura',
+//           medal: 条件キー, score: 点数, rank: ランク, bad: BAD の数, bo: 'lt'（未満）|'le'（以下）,
+//           n: 曲数（null = 全曲）, t: 作った日時, done: 初めて達成した日時,
 //           pc: ポップンクラスの目標値, st: 作ったときのポップンクラス（進み具合の起点） }
 //   並び順は、達成まで近い順（進み具合の割合が大きい順。達成した目標は下）。
 //   ポップンクラスの目標は、ポックラ画面で見せる（公式の値。なければアプリの計算値で判定）
@@ -62,6 +63,11 @@ function getGoalTargetSongs(goal) {
 }
 
 function isGoalSongDone(goal, song) {
+    // BAD：最小BAD（記録が無ければ達成していない）
+    if (goal.kind === 'bad') {
+        const n = getSongBad(song.id);
+        return n !== null && (goal.bo === 'le' ? n <= (goal.bad || 0) : n < (goal.bad || 0));
+    }
     if (goal.kind === 'score') return (parseInt(scoreRecords[song.id], 10) || 0) >= (goal.score || 0);
     if (goal.kind === 'rank') {
         const rank = getSongScoreRank(song);
@@ -105,6 +111,7 @@ function describeGoalCondition(goal) {
     if (goal.kind === 'pokkura') return `ポップンクラス ${(goal.pc || 0).toFixed(2)}以上`;
     if (goal.kind === 'score') return `スコア${goal.score}以上`;
     if (goal.kind === 'rank') return `${goal.rank}以上`;
+    if (goal.kind === 'bad') return `BAD${goal.bad || 0}${goal.bo === 'le' ? '以下' : '未満'}`;
     const opt = GOAL_MEDAL_OPTIONS.find(o => o.value === goal.medal);
     return opt ? opt.label : '';
 }
@@ -145,7 +152,7 @@ function getSortedGoals() {
 //   ポックラ画面ではポップンクラスの目標だけ。それ以外の画面では、ポップンクラス以外の目標を表示レベルに合わせて
 //   （レベルを決めていない目標と「すべて」表示のときは、いつも見せる）
 function isGoalForCurrentLevel(goal) {
-    if (viewMode === 'pokkura') return goal.kind === 'pokkura';
+    if (viewMode === 'pokkura' || viewMode === 'oldpokkura') return goal.kind === 'pokkura';
     if (goal.kind === 'pokkura') return false;
     if (currentViewLevel === 'ALL' || isSpecialViewLevel(currentViewLevel) || !goal.lv || goal.lv.length === 0) return true;
     return goal.lv.includes(String(currentViewLevel));
@@ -180,7 +187,7 @@ function goalBarHtml(p) {
 // 一覧の上の小さな表示（今の表示レベルの、まだ達成していない目標を並び順で。横にスライドして全部見られる）
 function renderGoalStrip(list) {
     // ポックラ画面では、ポックラの大きな枠と切り替えタブの間（#pk-goal-slot）に出す
-    const slot = viewMode === 'pokkura' ? document.getElementById('pk-goal-slot') : null;
+    const slot = (viewMode === 'pokkura' || viewMode === 'oldpokkura') ? document.getElementById('pk-goal-slot') : null;
     const main = document.getElementById('goal-strip');
     if (slot && main) { main.innerHTML = ''; main.style.display = 'none'; }
     const strip = slot || main;
@@ -301,6 +308,9 @@ function openGoalForm(id) {
     const levels = getSortedLevels();
     form.innerHTML = `
         <div class="goal-form-title">${goal ? '目標を編集' : '新しい目標'}</div>
+        <div class="goal-field"><div class="goal-label">かんたん入力 <span>（打つと下の欄が埋まります）</span></div>
+            <input type="text" id="goal-quick" placeholder="例：47 BAD10未満 10曲 ／ 48 49 銅丸以上 ／ ポックラ 98.5" oninput="applyGoalQuickText(this.value)">
+            <div class="goal-quick-result" id="goal-quick-result"></div></div>
         <div class="goal-field goal-song-only"><div class="goal-label">レベル <span>（選ばなければ全レベル）</span></div>
             <div class="goal-opts">${goalChipsHtml('goal-lv', levels, g.lv || [])}</div></div>
         <div class="goal-field goal-song-only"><div class="goal-label">難易度 <span>（選ばなければすべて）</span></div>
@@ -313,11 +323,13 @@ function openGoalForm(id) {
                     <option value="medal"${g.kind === 'medal' ? ' selected' : ''}>メダル</option>
                     <option value="score"${g.kind === 'score' ? ' selected' : ''}>スコア</option>
                     <option value="rank"${g.kind === 'rank' ? ' selected' : ''}>ランク</option>
+                    <option value="bad"${g.kind === 'bad' ? ' selected' : ''}>BAD</option>
                     <option value="pokkura"${g.kind === 'pokkura' ? ' selected' : ''}>ポップンクラス</option>
                 </select>
                 <select id="goal-medal" onchange="updateGoalFormPreview()">${GOAL_MEDAL_OPTIONS.map(o => `<option value="${o.value}"${o.value === g.medal ? ' selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}</select>
                 <span id="goal-score-wrap"><input type="number" id="goal-score" min="0" max="100000" step="100" value="${g.score || 95000}" oninput="updateGoalFormPreview()"> 点以上</span>
                 <span id="goal-pc-wrap"><input type="number" id="goal-pc" min="0" max="999" step="0.01" value="${pcDefault.toFixed(2)}" oninput="updateGoalFormPreview()"> 以上</span>
+                <span id="goal-bad-wrap">BAD <input type="number" id="goal-bad" min="0" max="9999" step="1" value="${typeof g.bad === 'number' ? g.bad : 10}" oninput="updateGoalFormPreview()"> <select id="goal-bo" onchange="updateGoalFormPreview()"><option value="lt"${g.bo !== 'le' ? ' selected' : ''}>未満</option><option value="le"${g.bo === 'le' ? ' selected' : ''}>以下</option></select></span>
                 <span id="goal-rank-wrap"><select id="goal-rank" onchange="updateGoalFormPreview()">${SCORE_RANK_KEYS.map(k => `<option value="${k}"${k === g.rank ? ' selected' : ''}>${k}</option>`).join('')}</select> 以上</span>
             </div></div>
         <div class="goal-field goal-song-only"><div class="goal-label">曲数</div>
@@ -355,6 +367,10 @@ function readGoalForm() {
     if (kind === 'medal') goal.medal = document.getElementById('goal-medal').value;
     if (kind === 'score') goal.score = Math.max(0, Math.min(100000, parseInt(document.getElementById('goal-score').value, 10) || 0));
     if (kind === 'rank') goal.rank = document.getElementById('goal-rank').value;
+    if (kind === 'bad') {
+        goal.bad = Math.max(0, Math.min(9999, parseInt(document.getElementById('goal-bad').value, 10) || 0));
+        goal.bo = document.getElementById('goal-bo').value === 'le' ? 'le' : 'lt';
+    }
     if (kind === 'pokkura') {
         goal.pc = Math.round((parseFloat(document.getElementById('goal-pc').value) || 0) * 100) / 100;
         goal.lv = []; goal.df = []; goal.af = []; goal.n = null;
@@ -368,6 +384,7 @@ function updateGoalFormPreview() {
     document.getElementById('goal-medal').style.display = kind === 'medal' ? '' : 'none';
     document.getElementById('goal-score-wrap').style.display = kind === 'score' ? '' : 'none';
     document.getElementById('goal-rank-wrap').style.display = kind === 'rank' ? '' : 'none';
+    document.getElementById('goal-bad-wrap').style.display = kind === 'bad' ? '' : 'none';
     document.getElementById('goal-pc-wrap').style.display = kind === 'pokkura' ? '' : 'none';
     document.querySelectorAll('#goal-form .goal-song-only').forEach(el => { el.style.display = kind === 'pokkura' ? 'none' : ''; });
     const goal = readGoalForm();
@@ -375,6 +392,104 @@ function updateGoalFormPreview() {
     document.getElementById('goal-preview').textContent = kind === 'pokkura'
         ? `いまのポップンクラス ${getCurrentPokkuraValue().toFixed(2)}（${describeGoal(goal)}）`
         : `対象 ${p.total}曲・いま ${p.achieved}曲 達成（${describeGoal(goal)}）`;
+}
+
+// ---------- かんたん入力：文字から目標を読む（例「47 BAD10未満 10曲」「48 49 銅丸以上」「ポックラ 98.5」） ----------
+//   読めたものだけを返す。{ lv, df, af, kind, medal, score, rank, bad, bo, n, pc, name, labels: 読めた中身の文字 }
+const GOAL_QUICK_MEDALS = [
+    [/金星|パーフェクト|パフェ/, '金星'], [/銀星/, '銀星'], [/銀菱/, '銀菱'], [/銀丸|フルコン|fc/i, '銀丸'],
+    [/銅星/, '銅星'], [/銅菱/, '銅菱'], [/銅丸/, '銅丸'], [/ノーマル|ノマゲ|クリア/, 'normal'],
+    [/イージー|easy/i, 'easy'], [/黒星/, 'kuroboshi'], [/黒菱/, 'kurohishi']
+];
+const GOAL_QUICK_FILLER = /以上|以下|未満|の|を|で|に|は|、|,|・|スコア|メダル|ランク|難易度|目標|曲数|\s+/g;
+
+function parseGoalText(text) {
+    let t = String(text || '').normalize('NFKC').replace(/ばっど|バッド/g, 'BAD').replace(/bad/gi, 'BAD');
+    const out = { labels: [] };
+    const take = re => { const m = t.match(re); if (m) t = t.replace(m[0], ' '); return m; };
+    let m;
+    if ((m = take(/(?:ポックラ|ぽっくら|ポップンクラス|ポップン|pokkura)\s*(\d{2,3}(?:\.\d+)?)/i))) {
+        out.kind = 'pokkura'; out.pc = parseFloat(m[1]); out.labels.push(`ポップンクラス ${out.pc.toFixed(2)}以上`);
+        return out;
+    }
+    if ((m = take(/BAD\s*(\d{1,4})\s*(未満|以下|より少ない)?/))) {
+        out.kind = 'bad'; out.bad = parseInt(m[1], 10); out.bo = m[2] === '以下' ? 'le' : 'lt';
+        out.labels.push(`BAD ${out.bad}${out.bo === 'le' ? '以下' : '未満'}`);
+    }
+    if ((m = take(/(\d{1,4})\s*曲/))) { out.n = parseInt(m[1], 10); out.labels.push(`${out.n}曲`); }
+    else if (take(/全曲|全部/)) { out.n = null; out.labels.push('全曲'); }
+    if (!out.kind && (m = take(/(\d{2,3}(?:\.\d)?)\s*k/i))) {
+        out.kind = 'score'; out.score = Math.round(parseFloat(m[1]) * 1000);
+    } else if (!out.kind && (m = take(/(\d{5,6})\s*点?/))) {
+        out.kind = 'score'; out.score = parseInt(m[1], 10);
+    }
+    if (out.kind === 'score') { out.score = Math.max(0, Math.min(100000, out.score)); out.labels.push(`スコア ${out.score}以上`); }
+    if (!out.kind) {
+        for (const [re, key] of GOAL_QUICK_MEDALS) {
+            if (take(re)) {
+                out.kind = 'medal'; out.medal = key;
+                const opt = GOAL_MEDAL_OPTIONS.find(o => o.value === key);
+                out.labels.push(opt ? opt.label : key);
+                break;
+            }
+        }
+    }
+    if (!out.kind && (m = take(/(^|[^A-Za-z])(AAA|AA|S|A|B|C|D|E)(?=[^A-Za-z]|$)/))) {
+        out.kind = 'rank'; out.rank = m[2]; out.labels.push(`${m[2]}以上`);
+        t = ' ' + t;
+    }
+    // 難易度（長い名前から）。「中」だけなら中(+)・中(-)の両方
+    const df = [];
+    ['逆詐称', '詐称', '危険', '別格', '入門', '未分類', '中(+)', '中(-)', '中+', '中-', '強', '中', '弱'].forEach(name => {
+        if (!t.includes(name)) return;
+        t = t.replace(name, ' ');
+        if (name === '中') df.push('中(+)', '中(-)');
+        else if (name === '中+') df.push('中(+)');
+        else if (name === '中-') df.push('中(-)');
+        else df.push(name);
+    });
+    if (df.length) { out.df = [...new Set(df)]; out.labels.push(out.df.join('・')); }
+    // タグ
+    const af = getMemoTagNames().filter(name => name && t.includes(name));
+    af.forEach(name => { t = t.replace(name, ' '); });
+    if (af.length) { out.af = af; out.labels.push(`タグ：${af.join('・')}`); }
+    // レベル（残った数のうち、曲にあるレベル）
+    const levels = getSortedLevels().map(String);
+    const lv = [];
+    t = t.replace(/(?:lv\.?\s*)?(\d{1,3})/gi, (all, d) => { if (levels.includes(String(parseInt(d, 10)))) { lv.push(String(parseInt(d, 10))); return ' '; } return all; });
+    if (lv.length) { out.lv = [...new Set(lv)]; out.labels.unshift(out.lv.map(l => `Lv${l}`).join('・')); }
+    const rest = t.replace(GOAL_QUICK_FILLER, '').trim();
+    if (rest) out.name = rest;
+    return out;
+}
+
+// かんたん入力の文字で、下の入力欄を埋める
+function applyGoalQuickText(text) {
+    const box = document.getElementById('goal-quick-result');
+    const r = parseGoalText(text);
+    if (!String(text || '').trim()) { box.textContent = ''; return; }
+    const setChecks = (name, values) => document.querySelectorAll(`#goal-form input[name="${name}"]`).forEach(cb => { cb.checked = values.includes(cb.value); });
+    if (r.kind) document.getElementById('goal-kind').value = r.kind;
+    if (r.kind === 'pokkura') document.getElementById('goal-pc').value = r.pc.toFixed(2);
+    if (r.kind === 'medal') document.getElementById('goal-medal').value = r.medal;
+    if (r.kind === 'score') document.getElementById('goal-score').value = r.score;
+    if (r.kind === 'rank') document.getElementById('goal-rank').value = r.rank;
+    if (r.kind === 'bad') { document.getElementById('goal-bad').value = r.bad; document.getElementById('goal-bo').value = r.bo; }
+    if (r.kind !== 'pokkura') {
+        setChecks('goal-lv', r.lv || []);
+        setChecks('goal-df', r.df || []);
+        setChecks('goal-af', r.af || []);
+        if ('n' in r) {
+            const mode = r.n ? 'num' : 'all';
+            const radio = document.querySelector(`#goal-form input[name="goal-n-mode"][value="${mode}"]`);
+            if (radio) radio.checked = true;
+            if (r.n) document.getElementById('goal-n').value = r.n;
+        }
+    }
+    document.getElementById('goal-name').value = r.name || '';
+    box.classList.toggle('is-none', !r.labels.length);
+    box.textContent = r.labels.length ? `読めた中身：${r.labels.join('・')}${r.name ? `（名前：${r.name}）` : ''}` : '読めるものがありません';
+    updateGoalFormPreview();
 }
 
 function saveGoalForm() {
@@ -434,6 +549,7 @@ function closeGoalDetail() {
 
 // まだの曲は「あと少し」の順（メダルなら今のメダルが良い順、スコア・ランクならスコアが高い順）
 function goalCloseness(goal, song) {
+    if (goal.kind === 'bad') { const n = getSongBad(song.id); return n === null ? -1e9 : -n; }
     if (goal.kind === 'medal') return (MEDAL_TYPES[clearRecords[song.id] || ''] || { rank: -1 }).rank * 1000000 + (parseInt(scoreRecords[song.id], 10) || 0);
     return parseInt(scoreRecords[song.id], 10) || 0;
 }
@@ -449,11 +565,12 @@ function goalSongRowHtml(goal, song, done) {
         ? `<img src="${escapeHtml(bannerSrc)}" alt="${escapeHtml(song.title)}" loading="lazy">`
         : `<span class="gd-banner-text">${escapeHtml(song.title)}</span>`;
     // 目標に足りない数（スコアの目標のときだけ）
-    const short = !done && goal.kind === 'score' ? `<span class="gd-short">あと ${(goal.score || 0) - score}</span>` : '';
+    const short = !done && goal.kind === 'score' ? `<span class="gd-short">あと ${(goal.score || 0) - score}</span>`
+        : goal.kind === 'bad' ? `<span class="gd-short">BAD ${getSongBad(song.id) ?? '-'}</span>` : '';
     return `
         <div class="gd-row${done ? ' is-done' : ''}">
             <button type="button" class="gd-medal${medalKey === '' ? ' is-empty' : ''}" onclick="openMedalModal('${safeId}')" title="${escapeHtml(medalLabel || '未プレイ')}（押すとメダルを変更）">${buildGridMedalInner(medalKey) || '<span class="gd-medal-none">−</span>'}</button>
-            <a class="gd-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（攻略wikiを開く）">${bannerInner}${buildMemoMarkHtml(song.id)}</a>
+            <a class="gd-banner" data-sid="${escapeHtml(song.id)}" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（攻略wikiを開く）">${bannerInner}${buildMemoMarkHtml(song.id)}</a>
             <div class="gd-info">
                 <div class="gd-title">${escapeHtml(song.title)}</div>
                 <div class="gd-sub"><span class="level-badge">${escapeHtml(song.level)}</span> ${escapeHtml(song.diffRaw || '未分類')} ・ ${escapeHtml(medalLabel || '未プレイ')}</div>
