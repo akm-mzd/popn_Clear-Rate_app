@@ -556,34 +556,40 @@ function pickHistoryImportSong(k, id) {
 }
 
 // バナーの色を、64×16 に縮めて明るさをそろえた数の並びにする（読めなければ null）
-function loadBannerVector(src) {
+//   cropW：左から何割を使うか（フルコン難易度表の画像はバナーの右側が白くぼけているので、左だけで比べる）
+function loadBannerVector(src, cropW = 1) {
     return new Promise(resolve => {
         const img = new Image();
         if (/^https?:/i.test(src)) img.crossOrigin = 'anonymous';
         const timer = setTimeout(() => { img.src = ''; resolve(null); }, 15000);
         img.onload = () => {
             clearTimeout(timer);
-            try {
-                const cv = document.createElement('canvas');
-                cv.width = BANNER_W; cv.height = BANNER_H;
-                const ctx = cv.getContext('2d');
-                ctx.drawImage(img, 0, 0, BANNER_W, BANNER_H);
-                const d = ctx.getImageData(0, 0, BANNER_W, BANNER_H).data;
-                const v = new Float32Array(BANNER_W * BANNER_H * 3);
-                let sum = 0;
-                for (let i = 0, j = 0; i < d.length; i += 4) { v[j++] = d[i]; v[j++] = d[i + 1]; v[j++] = d[i + 2]; }
-                v.forEach(x => { sum += x; });
-                const mean = sum / v.length;
-                let sq = 0;
-                for (let i = 0; i < v.length; i++) { v[i] -= mean; sq += v[i] * v[i]; }
-                const norm = Math.sqrt(sq) || 1;
-                for (let i = 0; i < v.length; i++) v[i] /= norm;
-                resolve(v);
-            } catch (e) { resolve(null); }
+            resolve(imageToBannerVector(img, 0, 0, img.naturalWidth * cropW, img.naturalHeight));
         };
         img.onerror = () => { clearTimeout(timer); resolve(null); };
         img.src = src;
     });
+}
+
+// 画像（img・canvas）の一部を、loadBannerVector と同じ数の並びにする
+function imageToBannerVector(source, sx, sy, sw, sh) {
+    try {
+        const cv = document.createElement('canvas');
+        cv.width = BANNER_W; cv.height = BANNER_H;
+        const ctx = cv.getContext('2d');
+        ctx.drawImage(source, sx, sy, sw, sh, 0, 0, BANNER_W, BANNER_H);
+        const d = ctx.getImageData(0, 0, BANNER_W, BANNER_H).data;
+        const v = new Float32Array(BANNER_W * BANNER_H * 3);
+        let sum = 0;
+        for (let i = 0, j = 0; i < d.length; i += 4) { v[j++] = d[i]; v[j++] = d[i + 1]; v[j++] = d[i + 2]; }
+        v.forEach(x => { sum += x; });
+        const mean = sum / v.length;
+        let sq = 0;
+        for (let i = 0; i < v.length; i++) { v[i] -= mean; sq += v[i] * v[i]; }
+        const norm = Math.sqrt(sq) || 1;
+        for (let i = 0; i < v.length; i++) v[i] /= norm;
+        return v;
+    } catch (e) { return null; }
 }
 
 function bannerSimilarity(a, b) {

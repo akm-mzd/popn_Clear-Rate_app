@@ -432,6 +432,7 @@ function openAddModal() {
     document.getElementById('edit-title').value = "";
     document.getElementById('edit-level').value = document.getElementById('import-level').value || "48";
     document.getElementById('edit-pokkura-level').value = "";
+    setEditFcSelect(null);
     document.getElementById('edit-version').value = "";
     document.getElementById('edit-bpm').value = "";
     document.getElementById('edit-notes').value = "";
@@ -457,6 +458,7 @@ function openEditModal(id) {
     document.getElementById('edit-title').value = song.title;
     document.getElementById('edit-level').value = song.level || "";
     document.getElementById('edit-pokkura-level').value = song.pokkuraLevel || "";
+    setEditFcSelect(getSongFc(song));
     document.getElementById('edit-version').value = song.version || "";
     document.getElementById('edit-bpm').value = song.bpm || "";
     document.getElementById('edit-notes').value = song.notes || 0;
@@ -552,6 +554,7 @@ async function saveEditModal() {
             originalOrder: songs.length
         });
         applyPokkuraLevel(songs[songs.length - 1]);
+        applyEditFc(songs[songs.length - 1]);
         setSongAttrs(songs[songs.length - 1], parseAttrText(document.getElementById('edit-attrs').value));
         alert("楽曲を新規追加しました！");
     } else {
@@ -591,6 +594,7 @@ async function saveEditModal() {
         songs[songIndex].diffClass = parsed.diffClass;
         songs[songIndex].diffIndex = parsed.diffIndex;
         applyPokkuraLevel(songs[songIndex]);
+        applyEditFc(songs[songIndex]);
         setSongAttrs(songs[songIndex], parseAttrText(document.getElementById('edit-attrs').value));
     }
 
@@ -599,6 +603,23 @@ async function saveEditModal() {
     closeEditModal();
     // 楽曲リストもクラウドに保存する（しないと、読み込み直したときに元に戻る）
     await saveToCloud(true);
+}
+
+// 楽曲編集の「フルコン難易度」：値を変えたら、その値の中の一番最後（一番弱い）に入れる
+function setEditFcSelect(fc) {
+    const sel = document.getElementById('edit-fc');
+    sel.innerHTML = '<option value="">なし（未定）</option>' + FC_VALUES.map(v => `<option value="${v}">${v > 1.05 ? '別格 ' : ''}${formatFcValue(v)}</option>`).join('');
+    sel.value = fc ? String(fc.v) : '';
+}
+
+function applyEditFc(song) {
+    const raw = document.getElementById('edit-fc').value;
+    const cur = getSongFc(song);
+    if (raw === '') { delete song.fc; return; }
+    const v = Math.round(parseFloat(raw) * 10) / 10;
+    if (cur && Math.abs(cur.v - v) < 0.001) return;
+    const last = songs.reduce((m, s) => { const f = s !== song && String(s.level) === String(song.level) ? getSongFc(s) : null; return f && Math.abs(f.v - v) < 0.001 ? Math.max(m, f.o) : m; }, -1);
+    song.fc = { v, o: last + 1 };
 }
 
 function handleBannerFileUpload(event) {
