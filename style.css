@@ -1829,3 +1829,24 @@ button.bs-edit.bs-cancel { margin-left: 0; border-color: #bbb; color: #666; }
 #goal-quick { width: 100%; box-sizing: border-box; height: 36px; padding: 0 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; }
 .goal-quick-result { margin-top: 4px; font-size: 12px; color: #2e7d32; min-height: 1em; }
 .goal-quick-result.is-none { color: #999; }
+
+/* フルコン難易度表（表示と、画像の取り込み） */
+.fc-label-dark { color: #333 !important; text-shadow: none !important; }
+.fc-label-dark .sg-count { color: #555; }
+.fc-note { margin: 4px 0 8px; padding: 8px 10px; border-radius: 8px; background: #fff8e1; color: #6d4c00; font-size: 12px; }
+.fc-import-content { max-width: 980px; width: 96vw; max-height: 90vh; overflow-y: auto; }
+.fc-progress { padding: 20px; text-align: center; color: #555; }
+.fc-img { margin-top: 12px; border-top: 2px solid #eee; padding-top: 8px; }
+.fc-img-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 13px; margin-bottom: 6px; }
+.fc-img-name { font-weight: bold; }
+.fc-img-stat { color: #666; font-size: 12px; }
+.fc-img-stat b { color: #c62828; }
+.fc-row { display: flex; gap: 6px; padding: 4px 0; border-bottom: 1px solid #f2f2f2; }
+.fc-row-head { flex-shrink: 0; width: 72px; }
+.fc-row-head select { width: 100%; font-size: 13px; }
+.fc-row-cells { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; }
+.fc-cell { display: flex; flex-direction: column; gap: 2px; padding: 3px; border-radius: 6px; background: #fafafa; }
+.fc-cell-unsure { background: #ffebee; outline: 1px solid #ef9a9a; }
+.fc-cell-thumb, .fc-cell-song { width: 100%; height: auto; display: block; border-radius: 3px; }
+.fc-cell-song { opacity: 0.85; }
+.fc-cell select { width: 100%; font-size: 11px; min-height: 26px; }

@@ -1568,13 +1568,13 @@ function setLevelButtonPlacement(onMain) {
 // ==========================================
 // ★ 表示方法（リスト / 難易度表 / スコア表）
 // ==========================================
-const VIEW_MODES = ['list', 'grid', 'medal', 'bad', 'score', 'pokkura', 'oldpokkura'];
+const VIEW_MODES = ['list', 'grid', 'fc', 'medal', 'bad', 'score', 'pokkura', 'oldpokkura'];
 
 // ---------- 表の向き（強い曲を右に置くか左に置くか。表ごとに、この端末に保存） ----------
 //   'right' = 右が強い（強い順に1行ずつ区切って各行を左右反転。右上が最強）
 //   'left'  = 左が強い（強い順に左上から並べる）
-const GRID_DIR_DEFAULTS = { grid: 'right', medal: 'right', bad: 'right', score: 'left', pokkura: 'left' };
-const GRID_DIR_WORDS = { grid: ['弱', '強'], medal: ['弱', '強'], bad: ['弱', '強'], score: ['低', '高'], pokkura: ['低', '高'] };
+const GRID_DIR_DEFAULTS = { grid: 'right', fc: 'right', medal: 'right', bad: 'right', score: 'left', pokkura: 'left' };
+const GRID_DIR_WORDS = { grid: ['弱', '強'], fc: ['弱', '強'], medal: ['弱', '強'], bad: ['弱', '強'], score: ['低', '高'], pokkura: ['低', '高'] };
 
 function getGridDirection(mode) {
     const saved = storageGet('popn_dir_' + mode);
@@ -1582,7 +1582,7 @@ function getGridDirection(mode) {
 }
 
 // 上下の向き（'top' = 上が強い / 'bottom' = 下が強い。最初はどれも上が強い）。ポックラは上下を変えない
-const GRID_VDIR_MODES = ['grid', 'medal', 'bad', 'score'];
+const GRID_VDIR_MODES = ['grid', 'fc', 'medal', 'bad', 'score'];
 
 function getGridVertical(mode) {
     if (!GRID_VDIR_MODES.includes(mode)) return 'top';
@@ -1697,6 +1697,8 @@ function updateViewModeButtons() {
     document.querySelectorAll('#view-mode-switch button').forEach(btn => {
         // BAD表・旧ポックラはメダル表・ポックラのボタンをダブルクリックして出すので、そのボタンを選ばれた見た目にして文字を変える
         btn.classList.toggle('active', btn.dataset.mode === viewMode || VIEW_TAP_ALT[btn.dataset.mode] === viewMode);
+        const gridLabel = btn.dataset.mode === 'grid' ? btn.querySelector('.vm-grid-label') : null;
+        if (gridLabel) gridLabel.textContent = viewMode === 'fc' ? 'フルコン表' : '難易度表';
         const medalLabel = btn.dataset.mode === 'medal' ? btn.querySelector('.vm-medal-label') : null;
         if (medalLabel) medalLabel.textContent = viewMode === 'bad' ? 'BAD表' : 'メダル表';
         const pkLabel = btn.dataset.mode === 'pokkura' ? btn.querySelector('.vm-pokkura-label') : null;
@@ -1725,6 +1727,7 @@ function applyViewMode(displaySongs) {
     if (specialGrid && currentViewLevel === 'UPDATED') renderUpdatedGrid(displaySongs);
     else if (specialGrid && currentViewLevel === 'RECENT') renderRecentGrid(displaySongs);
     else if (viewMode === 'grid') renderDiffGrid(displaySongs);
+    else if (viewMode === 'fc') renderFcGrid(displaySongs);
     else if (viewMode === 'medal') renderMedalGrid(displaySongs);
     else if (viewMode === 'bad') renderBadGrid(displaySongs);
     else if (viewMode === 'score') renderScoreGrid(displaySongs);
@@ -1782,6 +1785,84 @@ function renderDiffGrid(targetSongs) {
         html += `
             <div class="dg-row">
                 <div class="dg-label${lightLabel}" style="background: ${getDiffTableLabelColor(g)};">${labelHtml}</div>
+                <div class="dg-cells" style="grid-template-columns: repeat(${COLS}, minmax(0, 1fr));">${cells}</div>
+            </div>`;
+    });
+    grid.innerHTML = html;
+}
+
+// ---------- フルコン難易度表（難易度表のボタンをダブルクリック。Lv46〜48 だけ） ----------
+// 曲データの fc = { v: 値（1.1＝別格 〜 -1.0）, o: 同じ値の中の順番（小さいほど強い） }。管理者が画像から取り込む（fc-import.js）
+const FC_LEVELS = ['46', '47', '48'];
+const FC_VALUES = [1.1, 1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0, -0.1, -0.2, -0.3, -0.4, -0.5, -0.6, -0.7, -0.8, -0.9, -1.0];
+
+function getSongFc(song) {
+    const fc = song && song.fc;
+    if (!fc || typeof fc.v !== 'number' || !FC_VALUES.some(v => Math.abs(v - fc.v) < 0.001)) return null;
+    return { v: Math.round(fc.v * 10) / 10, o: typeof fc.o === 'number' ? fc.o : 0 };
+}
+
+function formatFcValue(v) {
+    return (v > 0 ? '' : v < 0 ? '-' : '') + Math.abs(v).toFixed(1);
+}
+
+// 行の見出し：別格は黒、難しいほど濃い赤、0 の近くは白、易しいほど濃い青
+function getFcLabelColor(v) {
+    if (v > 1.05) return '#1a1a1a';
+    const mix = (a, b, t) => '#' + [0, 1, 2].map(i => Math.round(a[i] + (b[i] - a[i]) * t).toString(16).padStart(2, '0')).join('');
+    if (v >= 0.15) return mix([248, 200, 204], [150, 0, 30], (v - 0.2) / 0.8);
+    if (v <= -0.15) return mix([200, 240, 248], [20, 70, 130], (-v - 0.2) / 0.8);
+    return '#f5f5f5';
+}
+
+function renderFcGrid(targetSongs) {
+    const grid = document.getElementById('diff-grid-view');
+    const showScore = document.getElementById('show-score-col').checked;
+    const narrow = isNarrowScreen();
+    const COLS = narrow ? 2 : 5;
+    lastGridNarrow = narrow;
+    if (!FC_LEVELS.includes(String(currentViewLevel)) || isSearching()) {
+        grid.innerHTML = '<div class="dg-empty">フルコン難易度表は Lv46〜48 だけです。上のレベルで 46・47・48 を選んでください</div>';
+        return;
+    }
+    if (targetSongs.length === 0) {
+        grid.innerHTML = '<div class="dg-empty">表示する曲がありません</div>';
+        return;
+    }
+    const rows = FC_VALUES.map(v => ({ v, songs: [] }));
+    const none = { v: null, songs: [] };
+    targetSongs.forEach(song => {
+        const fc = getSongFc(song);
+        const row = fc ? rows.find(r => Math.abs(r.v - fc.v) < 0.001) : null;
+        (row || none).songs.push(song);
+    });
+    const orderOf = song => (getSongFc(song) || { o: 0 }).o;
+    let html = '';
+    if (none.songs.length === targetSongs.length) {
+        html += '<div class="fc-note">この レベルのフルコン難易度はまだありません。管理者の「データの追加・管理」→「曲の情報をまとめて設定する」→「フルコン難易度表の画像を取り込む」で入れてください。</div>';
+    }
+    html += buildDirectionBar('fc');
+    const vertical = getGridVertical('fc');
+    orderRowsForVertical([...rows, none], vertical).forEach(row => {
+        if (row.songs.length === 0) return;
+        if (row === none) row.songs.sort((a, b) => (getDiffSortValue(b) - getDiffSortValue(a)) || (a.originalOrder - b.originalOrder));
+        else row.songs.sort((a, b) => (orderOf(a) - orderOf(b)) || (a.originalOrder - b.originalOrder));
+        const ordered = orderForDirection(row.songs, COLS, getGridDirection('fc'), vertical);
+        let cells = '';
+        ordered.forEach(song => { cells += buildDiffGridCellHtml(song, showScore); });
+        let labelHtml, color = '#9e9e9e', light = '';
+        if (row === none) {
+            labelHtml = '<span class="dg-label-cls">未定</span>';
+        } else {
+            const word = row.v > 1.05 ? '別格' : Math.abs(row.v - 1) < 0.001 ? '難' : Math.abs(row.v) < 0.001 ? '中' : Math.abs(row.v + 1) < 0.001 ? '易' : '';
+            labelHtml = `${word ? `<span class="dg-label-cls">${word}</span>` : ''}<span class="dg-label-idx">${formatFcValue(row.v)}</span>`;
+            color = getFcLabelColor(row.v);
+            if (Math.abs(row.v) < 0.35) light = ' fc-label-dark';
+            else if (Math.abs(row.v) < 0.65) light = ' dg-label-light';
+        }
+        html += `
+            <div class="dg-row">
+                <div class="dg-label${light}" style="background: ${color};">${labelHtml}<span class="sg-count">${row.songs.length}曲</span></div>
                 <div class="dg-cells" style="grid-template-columns: repeat(${COLS}, minmax(0, 1fr));">${cells}</div>
             </div>`;
     });
@@ -1960,7 +2041,7 @@ function renderRecentGrid(targetSongs) {
 //   メダル表のボタン：ダブルクリックでメダル表⇔BAD表。ポックラのボタン：ダブルクリックで新ポックラ⇔旧ポックラ。
 //   1回押しは、ほかの表示のときだけメダル表・新ポックラにする（BAD表・旧ポックラのときは何もしない）
 const VIEW_TAP_DOUBLE_MS = 350;
-const VIEW_TAP_ALT = { medal: 'bad', pokkura: 'oldpokkura' };
+const VIEW_TAP_ALT = { grid: 'fc', medal: 'bad', pokkura: 'oldpokkura' };
 let viewTapTimer = null;
 let viewTapMode = null;
 
