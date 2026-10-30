@@ -26,16 +26,105 @@ function initMedalGrid() {
     grid.innerHTML = html;
 }
 
+// メダルを選ぶ画面（メダルの一覧と、イージーの曲の裏メダルだけ）
 function openMedalModal(id) {
     currentMedalEditId = id;
+    const song = songs.find(s => s.id === id);
+    document.getElementById('medal-modal-title').textContent = song ? `メダルを選択：${song.title}` : 'メダルを選択';
     renderUraMedalBox();
+    document.getElementById('medal-modal').style.display = 'flex';
+}
+
+// ---------- 曲の詳細ページ（バナーを長押し）：曲の情報・今のメダル・最高スコア・最小BAD・メモ・この曲の記録 ----------
+function openSongDetail(id) {
+    const song = songs.find(s => s.id === id);
+    if (!song) return;
+    flushMemoText();
+    currentDetailSongId = id;
+    badBoxEditing = false;
+    renderSongDetailHead();
     renderBadBox();
     renderMemoEditor('memo-editor-medal', id);
     // メモは最初は畳んでおく
     document.getElementById('memo-fold-medal').open = false;
     updateMemoFoldMark();
     renderSongHistoryBox(id, false);
-    document.getElementById('medal-modal').style.display = 'flex';
+    document.getElementById('song-detail-modal').style.display = 'flex';
+    const content = document.querySelector('#song-detail-modal .modal-content');
+    if (content) content.scrollTop = 0;
+}
+
+function closeSongDetail() {
+    flushMemoText();
+    currentDetailSongId = null;
+    document.getElementById('song-detail-modal').style.display = 'none';
+}
+
+// バナーの長押し（0.5秒）で曲の詳細ページを開く。普通に押したときは今まで通り（攻略wiki など）
+const BANNER_LONG_PRESS_MS = 500;
+let bannerPress = null; // { sid, x, y, timer }
+let bannerPressFired = false;
+function cancelBannerPress() {
+    if (bannerPress) clearTimeout(bannerPress.timer);
+    bannerPress = null;
+}
+document.addEventListener('pointerdown', e => {
+    cancelBannerPress();
+    bannerPressFired = false;
+    if (e.button !== undefined && e.button !== 0) return;
+    const el = e.target.closest && e.target.closest('[data-sid]');
+    if (!el) return;
+    const sid = el.dataset.sid;
+    bannerPress = {
+        sid, x: e.clientX, y: e.clientY,
+        timer: setTimeout(() => {
+            bannerPress = null;
+            if (!songs.find(s => s.id === sid)) return;
+            bannerPressFired = true;
+            openSongDetail(sid);
+        }, BANNER_LONG_PRESS_MS)
+    };
+});
+document.addEventListener('pointermove', e => {
+    if (bannerPress && Math.hypot(e.clientX - bannerPress.x, e.clientY - bannerPress.y) > 10) cancelBannerPress();
+});
+['pointerup', 'pointercancel'].forEach(t => document.addEventListener(t, cancelBannerPress));
+window.addEventListener('scroll', cancelBannerPress, true);
+// 長押しのあとのクリック（攻略wiki を開くなど）と、長押しで出るメニューを止める
+document.addEventListener('click', e => {
+    if (!bannerPressFired) return;
+    bannerPressFired = false;
+    e.preventDefault();
+    e.stopPropagation();
+}, true);
+document.addEventListener('contextmenu', e => {
+    // PC の右クリックのメニューは残す（長押しの途中か、長押しが決まったときだけ止める）
+    if ((bannerPress || bannerPressFired) && e.target.closest && e.target.closest('[data-sid]')) e.preventDefault();
+});
+
+function renderSongDetailHead() {
+    const id = currentDetailSongId;
+    const song = songs.find(s => s.id === id);
+    const box = document.getElementById('sd-head');
+    if (!song || !box) return;
+    const safeId = jsStringAttr(id);
+    const medalKey = clearRecords[id] || '';
+    const medal = MEDAL_TYPES[medalKey] || MEDAL_TYPES[''];
+    const bannerSrc = safeUrl(song.bannerUrl, true);
+    const diffStyle = getDifficultyColor(song.diffClass, song.diffIndex);
+    box.innerHTML = `
+        ${bannerSrc ? `<img class="sd-banner" src="${escapeHtml(bannerSrc)}" alt="${escapeHtml(song.title)}">` : ''}
+        <div class="sd-main">
+            <button type="button" class="sd-medal${medalKey === '' ? ' is-empty' : ''}" onclick="openMedalModal('${safeId}')" title="押すとメダルを変更">${buildGridMedalInner(medalKey) || '<span>−</span>'}</button>
+            <div class="sd-text">
+                <div class="sd-genre">${escapeHtml(song.genre || '')}</div>
+                <div class="sd-title">${escapeHtml(song.title)}</div>
+                <div class="sd-meta"><span class="level-badge">${escapeHtml(song.level)}</span>
+                    ${song.diffRaw ? `<span style="color: ${diffStyle.color}; text-shadow: ${diffStyle.shadow}; font-weight: bold;">${escapeHtml(song.diffRaw)}</span>` : ''}
+                    <span class="sd-medal-name">${escapeHtml(medal.label)}</span>
+                    <a href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" class="sd-wiki">攻略wiki</a></div>
+            </div>
+        </div>`;
 }
 
 // イージーの曲だけ：裏メダル（黒星・黒菱・黒丸）と旧筐体EC（ポックラは裏メダルで計算）
@@ -58,29 +147,69 @@ function renderUraMedalBox() {
     box.style.display = '';
 }
 
-// BAD の数（クリアしたときの一番少ない BAD）。フルコンボ以上で記録が無ければ 0 と出す
+// 最小BAD（最高スコアと同じ形）：履歴（変更前・変更後）と今の記録の中で一番少ない数と、その日。「変更」でその場に入力欄
+//   フルコンボ以上で記録が無ければ「0（フルコン）」。超EX のクリアしていない曲は「最高到達点BAD」（多いほど良い）
+let badBoxEditing = false;
+
 function renderBadBox() {
     const box = document.getElementById('bad-box');
     if (!box) return;
-    const id = currentMedalEditId;
+    const id = currentDetailSongId;
     if (!id) { box.innerHTML = ''; return; }
+    const safeId = jsStringAttr(id);
     const song = songs.find(s => s.id === id);
     const medalInfo = MEDAL_TYPES[clearRecords[id] || ''] || MEDAL_TYPES[''];
-    // 超EX の曲は、クリアするまで「最高到達点BAD」（落ちるまでに出した BAD。多いほど遠くまで行けた）
-    if (isSuperExSong(song) && !medalInfo.isNormalClear) {
-        const reach = toBadNum(getBadReachRecords()[id]);
-        box.innerHTML = `
-        <label class="bad-label" for="bad-input">最高到達点BAD</label>
-        <input type="number" id="bad-input" class="bad-input" inputmode="numeric" min="0" max="9999" placeholder="未記録" value="${reach === null ? '' : reach}"
-            onchange="setBadReachFromModal('${jsStringAttr(id)}', this.value)" onkeydown="if (event.key === 'Enter') this.blur()">`;
+    const reachMode = isSuperExSong(song) && !medalInfo.isNormalClear;
+    const label = reachMode ? '最高到達点BAD' : '最小BAD';
+    const cur = toBadNum((reachMode ? getBadReachRecords() : getBadRecords())[id]);
+    if (badBoxEditing) {
+        box.innerHTML = `<span class="bs-label">${label}</span>
+            <input type="number" id="bad-input" class="bad-input" inputmode="numeric" min="0" max="9999" placeholder="未記録" value="${cur === null ? '' : cur}" onkeydown="if (event.key === 'Enter') saveBadBox('${safeId}')">
+            <button type="button" class="bs-edit" onclick="saveBadBox('${safeId}')">保存</button>
+            <button type="button" class="bs-edit bs-cancel" onclick="setBadBoxEditing(false)">やめる</button>`;
+        const input = document.getElementById('bad-input');
+        if (input) input.focus();
         return;
     }
-    const rec = toBadNum(getBadRecords()[id]);
-    const shown = getSongBad(id);
-    box.innerHTML = `
-        <label class="bad-label" for="bad-input">最小BAD</label>
-        <input type="number" id="bad-input" class="bad-input" inputmode="numeric" min="0" max="9999" placeholder="${shown === 0 && rec === null ? '0（フルコン）' : '未記録'}" value="${rec === null ? '' : rec}"
-            onchange="setBadFromModal('${jsStringAttr(id)}', this.value)" onkeydown="if (event.key === 'Enter') this.blur()">`;
+    const editBtn = `<button type="button" class="bs-edit" onclick="setBadBoxEditing(true)">変更</button>`;
+    let best = null; // { n, t（null は今の記録） }
+    if (reachMode) {
+        if (cur !== null) best = { n: cur, t: null };
+    } else {
+        getSongHistory(id).forEach(e => {
+            if (!('nb' in e)) return;
+            [toBadNum(e.nb), toBadNum(e.ob)].forEach(n => {
+                if (n !== null && (!best || n < best.n || (n === best.n && e.t < best.t))) best = { n, t: e.t };
+            });
+        });
+        if (cur !== null && (!best || cur < best.n)) best = { n: cur, t: null };
+    }
+    let valueHtml;
+    if (best) {
+        const d = best.t === null ? null : new Date(best.t);
+        valueHtml = `<b class="bs-score">${best.n}</b><span class="bs-date">${d ? `（${d.getFullYear() % 100}/${d.getMonth() + 1}/${d.getDate()}）` : '（今の記録）'}</span>`;
+    } else if (!reachMode && getSongBad(id) === 0) {
+        valueHtml = '<b class="bs-score">0</b><span class="bs-date">（フルコン）</span>';
+    } else {
+        valueHtml = '<span class="bs-none">記録なし</span>';
+    }
+    box.innerHTML = `<span class="bs-label">${label}</span>${valueHtml}${editBtn}`;
+}
+
+function setBadBoxEditing(on) {
+    badBoxEditing = !!on;
+    renderBadBox();
+}
+
+function saveBadBox(id) {
+    const input = document.getElementById('bad-input');
+    const value = input ? input.value : '';
+    const song = songs.find(s => s.id === id);
+    const medalInfo = MEDAL_TYPES[clearRecords[id] || ''] || MEDAL_TYPES[''];
+    badBoxEditing = false;
+    if (isSuperExSong(song) && !medalInfo.isNormalClear) setBadReachFromModal(id, value);
+    else setBadFromModal(id, value);
+    renderBadBox();
 }
 
 function setBadReachFromModal(id, value) {
@@ -109,8 +238,7 @@ function setBadFromModal(id, value) {
     if (!setSongBad(id, value.trim() === '' ? null : value, 'm')) return;
     scheduleAutoSave();
     renderTable();
-    renderBadBox();
-    renderSongHistoryBox(id);
+    refreshSongHistoryViews(id);
 }
 
 function setUraMedalFromModal(id, ura) {
@@ -143,7 +271,10 @@ async function selectMedal(medalKey) {
         allUsersData[currentUser].clearRecords = clearRecords;
         scheduleAutoSave();   // ←追加
         renderTable();
+        const id = currentMedalEditId;
         closeMedalModal();
+        // 詳細ページから開いたときは、詳細も描き直す
+        refreshSongHistoryViews(id);
     }
 }
 

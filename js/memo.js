@@ -158,7 +158,7 @@ function refreshMemoEditors() {
 // メダルを選ぶ画面の畳んだメモの見出しに、中身の印（★・タグの色・📝）を出す
 function updateMemoFoldMark() {
     const el = document.getElementById('memo-fold-mark');
-    if (el) el.innerHTML = currentMedalEditId ? buildMemoMarkHtml(currentMedalEditId) : '';
+    if (el) el.innerHTML = currentDetailSongId ? buildMemoMarkHtml(currentDetailSongId) : '';
 }
 
 function readMemoTextFields(songId) {

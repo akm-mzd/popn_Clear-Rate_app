@@ -1785,9 +1785,6 @@ details.memo-fold #memo-editor-medal { padding: 0 10px 10px; }
 details.memo-fold .me-title { display: none; }
 .edit-superex { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 13px; color: #6a1b9a; font-weight: bold; }
 .edit-superex input { width: auto; margin: 0; }
-.pk-old-head { font-size: 13px; color: #444; margin: 2px 0 2px; }
-.pk-old-head b { font-size: 15px; color: #d82f66; }
-.pk-old-note { font-size: 11px; color: #888; margin-bottom: 6px; }
 .pk-old-rest .dg-cells { opacity: 0.6; }
 .pk-tabs button { white-space: nowrap; min-width: 0; }
 @media (max-width: 600px) {
@@ -1805,6 +1802,29 @@ body.view-pokkura #extended-stats-display { display: none !important; }
 button.bs-edit { width: auto; margin: 0 0 0 auto; padding: 3px 12px; border: 1px solid #1565c0; border-radius: 12px; background: #fff; color: #1565c0; font-size: 12px; font-weight: bold; font-family: inherit; cursor: pointer; align-self: center; }
 .eagate-history-opt { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; font-size: 14px; font-weight: bold; color: #333; }
 .eagate-history-opt input { width: auto; margin: 0; }
-.vm-medal-btn { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
+.vm-tap-btn { -webkit-user-select: none; user-select: none; touch-action: manipulation; }
 .dg-medal .bg-bad { position: absolute; right: 1px; bottom: 1px; min-width: 14px; padding: 0 3px; border-radius: 7px; background: rgba(0,0,0,0.72); color: #fff; font-size: 10px; font-weight: bold; line-height: 14px; text-align: center; pointer-events: none; }
 .bg-label { font-size: 12px; line-height: 1.15; text-align: center; }
+
+/* 曲の詳細ページ（バナーの長押しで開く） */
+[data-sid] { -webkit-touch-callout: none; }
+.song-detail-content { max-width: 460px; }
+.sd-head { display: flex; flex-direction: column; gap: 8px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+.sd-banner { display: block; width: 100%; max-width: 320px; margin: 0 auto; border-radius: 6px; }
+.sd-main { display: flex; align-items: center; gap: 10px; }
+button.sd-medal { flex-shrink: 0; width: 52px; height: 52px; margin: 0; padding: 4px; border: 1px solid #ddd; border-radius: 10px; background: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+button.sd-medal img { max-width: 100%; max-height: 100%; }
+button.sd-medal.is-empty { color: #bbb; font-size: 20px; }
+.sd-text { flex: 1; min-width: 0; }
+.sd-genre { font-size: 11px; color: #888; }
+.sd-title { font-size: 16px; font-weight: bold; color: #333; word-break: break-word; }
+.sd-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 2px; font-size: 12px; }
+.sd-medal-name { color: #555; }
+.sd-wiki { margin-left: auto; color: #1565c0; font-size: 12px; }
+.best-score-box.bad-box { align-items: baseline; gap: 8px; }
+.best-score-box.bad-box .bad-input { width: 6em; height: 30px; font-size: 15px; align-self: center; }
+button.bs-edit.bs-cancel { margin-left: 0; border-color: #bbb; color: #666; }
+.sh-legend { margin: 2px 0 6px; }
+#goal-quick { width: 100%; box-sizing: border-box; height: 36px; padding: 0 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; }
+.goal-quick-result { margin-top: 4px; font-size: 12px; color: #2e7d32; min-height: 1em; }
+.goal-quick-result.is-none { color: #999; }

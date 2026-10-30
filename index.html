@@ -6,7 +6,7 @@
     <title>Pop’n Clear Rate app</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
-    <link rel="stylesheet" href="style.css?v=3.36.0.0">
+    <link rel="stylesheet" href="style.css?v=3.37.0.0">
 </head>
 <body>
     <!-- 新しいデザイン（ver 3）の上部バーとナビ。以前の見た目では隠れる（js/ui-new.js） -->
@@ -76,9 +76,9 @@
                         <div id="view-mode-switch" role="group" aria-label="表示方法">
                             <button type="button" data-mode="list" onclick="setViewMode('list')"><svg class="nu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg><span>リスト</span></button>
                             <button type="button" data-mode="grid" onclick="setViewMode('grid')"><svg class="nu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>難易度表</span></button>
-                            <button type="button" data-mode="medal" class="vm-medal-btn" onclick="onMedalModeClick()" onpointerdown="startMedalLongPress(event)" onpointerup="cancelMedalLongPress()" onpointerleave="cancelMedalLongPress()" onpointercancel="cancelMedalLongPress()" oncontextmenu="return false;" title="長押しで BAD表"><svg class="nu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3l4 6 4-6"/><circle cx="12" cy="15" r="6"/><path d="M12 12.5l.9 1.8 2 .3-1.45 1.4.35 2-1.8-.95-1.8.95.35-2-1.45-1.4 2-.3z"/></svg><span class="vm-medal-label">メダル表</span></button>
+                            <button type="button" data-mode="medal" class="vm-tap-btn" onclick="onViewModeTap('medal')" title="ダブルクリックで BAD表"><svg class="nu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3l4 6 4-6"/><circle cx="12" cy="15" r="6"/><path d="M12 12.5l.9 1.8 2 .3-1.45 1.4.35 2-1.8-.95-1.8.95.35-2-1.45-1.4 2-.3z"/></svg><span class="vm-medal-label">メダル表</span></button>
                             <button type="button" data-mode="score" onclick="setViewMode('score')" style="display: none;"><svg class="nu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span>スコア表</span></button>
-                            <button type="button" data-mode="pokkura" onclick="setViewMode('pokkura')" style="display: none;"><svg class="nu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/></svg><span>ポックラ</span></button>
+                            <button type="button" data-mode="pokkura" class="vm-tap-btn" onclick="onViewModeTap('pokkura')" title="ダブルクリックで旧ポックラ" style="display: none;"><svg class="nu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/></svg><span class="vm-pokkura-label">ポックラ</span></button>
                         </div>
                         </div>
                     </div>
@@ -586,18 +586,28 @@
         </div>
     </div>
 
-    <div id="medal-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-content" style="max-width: 400px;">
-            <h3 style="text-align: center; color: #555; border-bottom: 1px solid #eee; padding-bottom: 10px;">メダルを選択</h3>
-            <div id="medal-grid" class="medal-grid"></div>
-            <div id="ura-medal-box" class="ura-medal-box" style="display: none;"></div>
+    <!-- 曲の詳細ページ（バナーを長押し）。メダルを選ぶ画面より前に置き、メダルの画面が上に重なるようにする -->
+    <div id="song-detail-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content song-detail-content">
+            <div id="sd-head" class="sd-head"></div>
             <div id="best-score-box" class="best-score-box"></div>
-            <div id="bad-box" class="bad-box"></div>
+            <div id="bad-box" class="best-score-box bad-box"></div>
             <details id="memo-fold-medal" class="memo-fold">
                 <summary onclick="flushMemoText()"><span class="memo-fold-title">メモ</span><span id="memo-fold-mark" class="memo-fold-mark"></span></summary>
                 <div id="memo-editor-medal"></div>
             </details>
             <div id="song-history-box" class="song-history-box"></div>
+            <div class="modal-actions" style="justify-content: center; margin-top: 16px;">
+                <button onclick="closeSongDetail()" style="border: 1px solid #ccc; background: #eee; padding: 8px 30px;">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="medal-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 400px;">
+            <h3 id="medal-modal-title" style="text-align: center; color: #555; border-bottom: 1px solid #eee; padding-bottom: 10px;">メダルを選択</h3>
+            <div id="medal-grid" class="medal-grid"></div>
+            <div id="ura-medal-box" class="ura-medal-box" style="display: none;"></div>
             <div class="modal-actions" style="justify-content: center; margin-top: 20px;">
                 <button onclick="closeMedalModal()" style="border: 1px solid #ccc; background: #eee; padding: 8px 30px;">閉じる</button>
             </div>
@@ -800,23 +810,23 @@
     <button id="back-to-top" onclick="scrollToTop()" title="トップに戻る">↑</button>
 
     <!-- 読み込み順に意味があります（config が最初、app が最後） -->
-    <script src="js/config.js?v=3.36.0.0"></script>
-    <script src="js/utils.js?v=3.36.0.0"></script>
-    <script src="js/cloud.js?v=3.36.0.0"></script>
-    <script src="js/users.js?v=3.36.0.0"></script>
-    <script src="js/table.js?v=3.36.0.0"></script>
-    <script src="js/modals.js?v=3.36.0.0"></script>
-    <script src="js/memo.js?v=3.36.0.0"></script>
-    <script src="js/history.js?v=3.36.0.0"></script>
-    <script src="js/growth.js?v=3.36.0.0"></script>
-    <script src="js/goals.js?v=3.36.0.0"></script>
-    <script src="js/admin.js?v=3.36.0.0"></script>
-    <script src="js/image-export.js?v=3.36.0.0"></script>
-    <script src="js/eagate-import.js?v=3.36.0.0"></script>
-    <script src="js/wiki-import.js?v=3.36.0.0"></script>
-    <script src="js/menu.js?v=3.36.0.0"></script>
-    <script src="js/ui-new.js?v=3.36.0.0"></script>
-    <script src="js/app.js?v=3.36.0.0"></script>
+    <script src="js/config.js?v=3.37.0.0"></script>
+    <script src="js/utils.js?v=3.37.0.0"></script>
+    <script src="js/cloud.js?v=3.37.0.0"></script>
+    <script src="js/users.js?v=3.37.0.0"></script>
+    <script src="js/table.js?v=3.37.0.0"></script>
+    <script src="js/modals.js?v=3.37.0.0"></script>
+    <script src="js/memo.js?v=3.37.0.0"></script>
+    <script src="js/history.js?v=3.37.0.0"></script>
+    <script src="js/growth.js?v=3.37.0.0"></script>
+    <script src="js/goals.js?v=3.37.0.0"></script>
+    <script src="js/admin.js?v=3.37.0.0"></script>
+    <script src="js/image-export.js?v=3.37.0.0"></script>
+    <script src="js/eagate-import.js?v=3.37.0.0"></script>
+    <script src="js/wiki-import.js?v=3.37.0.0"></script>
+    <script src="js/menu.js?v=3.37.0.0"></script>
+    <script src="js/ui-new.js?v=3.37.0.0"></script>
+    <script src="js/app.js?v=3.37.0.0"></script>
 
 </body>
 </html>

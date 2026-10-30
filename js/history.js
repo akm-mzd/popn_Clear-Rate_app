@@ -815,7 +815,7 @@ function addManualHistoryEntry(id, prefix) {
     else {
         songHistoryFormOpen = false;
         renderSongHistoryBox(id);
-        if (apply && currentMedalEditId === id) { renderUraMedalBox(); renderBadBox(); }
+        if (apply) refreshSongHistoryViews(id);
     }
     showToast('toast-eagate', `「${song.title}」の過去の記録を足しました${apply ? '（今の記録も変えました）' : ''}`, '#4caf50', 2000);
 }
@@ -917,6 +917,6 @@ function applyHistoryBads() {
     list.forEach(x => { recs[x.song.id] = x.to; });
     scheduleAutoSave();
     renderTable();
-    if (currentMedalEditId) refreshSongHistoryViews(currentMedalEditId);
+    if (currentDetailSongId) refreshSongHistoryViews(currentDetailSongId);
     showToast('toast-eagate', `${list.length}曲の BAD を反映しました`, '#4caf50', 3000);
 }

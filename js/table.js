@@ -585,7 +585,7 @@ function changeViewLevel(level, keepMenu = false) {
     if (!keepMenu) toggleMenu(false); // レベルを選んだらメニューを閉じる（統計シートのスライドからは閉じない）
     // ポックラはレベルに関係なく全体を出すので、レベルを選んだら難易度表に切り替える
     //   「更新」「最近」は難易度表の形で見るものなので、いつも難易度表にする
-    if (viewMode === 'pokkura' || isSpecialViewLevel(level)) viewMode = 'grid';
+    if (viewMode === 'pokkura' || viewMode === 'oldpokkura' || isSpecialViewLevel(level)) viewMode = 'grid';
     document.getElementById('search-input').value = '';
     currentViewLevel = level;
     // 絞り込みのレベルも、選んだレベルだけにする（「すべて」「更新」「最近」なら外す）
@@ -1070,7 +1070,7 @@ function renderTable() {
             <td class="col-compare" style="text-align: center; background-color: #f0f8ff; ${compareDisplay}">${compareHtml}</td>
             <td class="col-level" style="text-align: center;"><span class="level-badge">${escapeHtml(song.level || '-')}</span></td>
             <td class="col-version" style="text-align: center;"><span class="ver-badge">${escapeHtml(song.version || '-')}</span></td>
-            <td class="col-banner" style="text-align: center; transition: background-color 0.2s;" ondragover="event.preventDefault(); this.style.backgroundColor='#e3f2fd';" ondragleave="event.preventDefault(); this.style.backgroundColor='';" ondrop="handleSingleBannerDrop(event, '${safeId}', this)">${bannerHtml}</td>
+            <td class="col-banner" data-sid="${escapeHtml(song.id)}" style="text-align: center; transition: background-color 0.2s;" ondragover="event.preventDefault(); this.style.backgroundColor='#e3f2fd';" ondragleave="event.preventDefault(); this.style.backgroundColor='';" ondrop="handleSingleBannerDrop(event, '${safeId}', this)">${bannerHtml}</td>
             <td class="col-title">
                 <div style="flex: 1; min-width: 0;">
                     <div style="font-size: 0.85em; color: #666; display: flex; align-items: center; flex-wrap: wrap;">
@@ -1568,7 +1568,7 @@ function setLevelButtonPlacement(onMain) {
 // ==========================================
 // ★ 表示方法（リスト / 難易度表 / スコア表）
 // ==========================================
-const VIEW_MODES = ['list', 'grid', 'medal', 'bad', 'score', 'pokkura'];
+const VIEW_MODES = ['list', 'grid', 'medal', 'bad', 'score', 'pokkura', 'oldpokkura'];
 
 // ---------- 表の向き（強い曲を右に置くか左に置くか。表ごとに、この端末に保存） ----------
 //   'right' = 右が強い（強い順に1行ずつ区切って各行を左右反転。右上が最強）
@@ -1691,14 +1691,16 @@ function saveStartupSettings() {
 }
 
 // スコアを使う表示（スコア表・ポックラ）のボタンは、スコアを登録している人にだけ出す
-const SCORE_VIEW_MODES = ['score', 'pokkura'];
+const SCORE_VIEW_MODES = ['score', 'pokkura', 'oldpokkura'];
 function updateViewModeButtons() {
     const scoreOk = hasAnyScore();
     document.querySelectorAll('#view-mode-switch button').forEach(btn => {
-        // BAD表はメダル表のボタンを長押しして出すので、メダル表のボタンを選ばれた見た目にして文字を変える
-        btn.classList.toggle('active', btn.dataset.mode === viewMode || (btn.dataset.mode === 'medal' && viewMode === 'bad'));
-        const label = btn.dataset.mode === 'medal' ? btn.querySelector('.vm-medal-label') : null;
-        if (label) label.textContent = viewMode === 'bad' ? 'BAD表' : 'メダル表';
+        // BAD表・旧ポックラはメダル表・ポックラのボタンをダブルクリックして出すので、そのボタンを選ばれた見た目にして文字を変える
+        btn.classList.toggle('active', btn.dataset.mode === viewMode || VIEW_TAP_ALT[btn.dataset.mode] === viewMode);
+        const medalLabel = btn.dataset.mode === 'medal' ? btn.querySelector('.vm-medal-label') : null;
+        if (medalLabel) medalLabel.textContent = viewMode === 'bad' ? 'BAD表' : 'メダル表';
+        const pkLabel = btn.dataset.mode === 'pokkura' ? btn.querySelector('.vm-pokkura-label') : null;
+        if (pkLabel) pkLabel.textContent = viewMode === 'oldpokkura' ? '旧ポックラ' : 'ポックラ';
         if (SCORE_VIEW_MODES.includes(btn.dataset.mode)) btn.style.display = scoreOk ? '' : 'none';
     });
     const pkImageBtn = document.getElementById('btn-pokkura-image');
@@ -1716,7 +1718,7 @@ function applyViewMode(displaySongs) {
     if (!capture || !grid) return;
     const isGrid = viewMode !== 'list';
     // ポックラ画面では、絞り込みとクリア率の表示を隠す（CSS の body.view-pokkura）
-    document.body.classList.toggle('view-pokkura', viewMode === 'pokkura');
+    document.body.classList.toggle('view-pokkura', viewMode === 'pokkura' || viewMode === 'oldpokkura');
     capture.style.display = isGrid ? 'none' : '';
     grid.style.display = isGrid ? '' : 'none';
     const specialGrid = viewMode === 'grid' && !(document.getElementById('search-input').value.trim()) && isSpecialViewLevel(currentViewLevel);
@@ -1727,6 +1729,7 @@ function applyViewMode(displaySongs) {
     else if (viewMode === 'bad') renderBadGrid(displaySongs);
     else if (viewMode === 'score') renderScoreGrid(displaySongs);
     else if (viewMode === 'pokkura') renderPokkuraGrid();
+    else if (viewMode === 'oldpokkura') renderOldPokkuraGrid();
     else grid.innerHTML = '';
 }
 
@@ -1795,7 +1798,7 @@ function buildDiffGridCellHtml(song, showScore, extraHtml = '') {
     const bannerInner = bannerSrc
         ? `<img src="${escapeHtml(bannerSrc)}" alt="${escapeHtml(song.title)}" loading="lazy">`
         : `<span class="dg-banner-text">${escapeHtml(song.title)}</span>`;
-    const banner = `<a class="dg-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（攻略wikiを開く）">${bannerInner}${buildMemoMarkHtml(song.id)}</a>`;
+    const banner = `<a class="dg-banner" data-sid="${escapeHtml(song.id)}" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（攻略wikiを開く）">${bannerInner}${buildMemoMarkHtml(song.id)}</a>`;
     return `
                 <div class="dg-cell">
                     <button type="button" class="dg-medal${medalClass}" onclick="openMedalModal('${jsStringAttr(song.id)}')" title="メダルを変更">${buildGridMedalInner(medalKey)}${rankHtml}${buildUraBadgeHtml(song.id, medalKey)}</button>
@@ -1953,33 +1956,30 @@ function renderRecentGrid(targetSongs) {
 }
 
 // ---------- メダル表 ----------
-// ---------- BAD表（メダル表のボタンを長押し）：最小BAD の少ない順の行 ----------
-const MEDAL_LONG_PRESS_MS = 500;
-let medalLongPressTimer = null;
-let medalLongPressed = false;
+// ---------- 表示方法のボタンのダブルクリック ----------
+//   メダル表のボタン：1回でメダル表、ダブルクリックで BAD表。ポックラのボタン：1回で新ポックラ、ダブルクリックで旧ポックラ
+const VIEW_TAP_DOUBLE_MS = 350;
+const VIEW_TAP_ALT = { medal: 'bad', pokkura: 'oldpokkura' };
+let viewTapTimer = null;
+let viewTapMode = null;
 
-function startMedalLongPress(e) {
-    if (e && e.button !== undefined && e.button !== 0) return;
-    medalLongPressed = false;
-    clearTimeout(medalLongPressTimer);
-    medalLongPressTimer = setTimeout(() => {
-        medalLongPressed = true;
-        setViewMode('bad');
-    }, MEDAL_LONG_PRESS_MS);
+function onViewModeTap(mode) {
+    if (viewTapTimer && viewTapMode === mode) {
+        // 2回目：もう片方へ
+        clearTimeout(viewTapTimer);
+        viewTapTimer = null;
+        setViewMode(VIEW_TAP_ALT[mode]);
+        return;
+    }
+    clearTimeout(viewTapTimer);
+    viewTapMode = mode;
+    viewTapTimer = setTimeout(() => {
+        viewTapTimer = null;
+        setViewMode(mode);
+    }, VIEW_TAP_DOUBLE_MS);
 }
 
-function cancelMedalLongPress() {
-    clearTimeout(medalLongPressTimer);
-    medalLongPressTimer = null;
-}
-
-// 長押しのあとに来るクリックは無視する。ふつうに押したらメダル表
-function onMedalModeClick() {
-    cancelMedalLongPress();
-    if (medalLongPressed) { medalLongPressed = false; return; }
-    setViewMode('medal');
-}
-
+// ---------- BAD表（メダル表のボタンをダブルクリック）：最小BAD の少ない順の行 ----------
 // 行の分け方（上から強い順）。max まで（null は上限なし）
 const BAD_GRID_ROWS = [
     { label: '0', max: 0, color: '#1b5e20' }, { label: '1〜5', max: 5, color: '#2e7d32' }, { label: '6〜9', max: 9, color: '#43a047' },
@@ -2032,7 +2032,7 @@ function renderBadGrid(targetSongs) {
             cells += `
                 <div class="dg-cell">
                     <button type="button" class="dg-medal${k === '' ? ' dg-medal-empty' : ''}" onclick="openMedalModal('${jsStringAttr(song.id)}')" title="メダル・BAD を変更">${buildGridMedalInner(k)}${rankHtml}${buildUraBadgeHtml(song.id, k)}${badHtml}</button>
-                    <a class="dg-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（Lv${escapeHtml(song.level)}・攻略wikiを開く）">${bannerInner}${buildMemoMarkHtml(song.id)}</a>
+                    <a class="dg-banner" data-sid="${escapeHtml(song.id)}" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（Lv${escapeHtml(song.level)}・攻略wikiを開く）">${bannerInner}${buildMemoMarkHtml(song.id)}</a>
                 </div>`;
         });
         html += `
@@ -2089,7 +2089,7 @@ function renderMedalGrid(targetSongs) {
             cells += `
                 <div class="dg-cell">
                     <button type="button" class="dg-medal${k === '' ? ' dg-medal-empty' : ''}" onclick="openMedalModal('${jsStringAttr(song.id)}')" title="メダルを変更">${buildGridMedalInner(k)}${rankHtml}${buildUraBadgeHtml(song.id, k)}</button>
-                    <a class="dg-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（Lv${escapeHtml(song.level)}${escapeHtml(diffText)}・攻略wikiを開く）">${bannerInner}${buildMemoMarkHtml(song.id)}</a>
+                    <a class="dg-banner" data-sid="${escapeHtml(song.id)}" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（Lv${escapeHtml(song.level)}${escapeHtml(diffText)}・攻略wikiを開く）">${bannerInner}${buildMemoMarkHtml(song.id)}</a>
                 </div>`;
         });
 
@@ -2155,7 +2155,7 @@ function renderScoreGrid(targetSongs) {
                 <div class="dg-cell">
                     <button type="button" class="dg-medal${medalClass}" onclick="openMedalModal('${safeId}')" title="メダルを変更">${buildGridMedalInner(medalKey)}${buildUraBadgeHtml(song.id, medalKey)}</button>
                     <div class="dg-banner-wrap">
-                        <a class="dg-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（攻略wikiを開く）">${bannerInner}${buildMemoMarkHtml(song.id)}</a>
+                        <a class="dg-banner" data-sid="${escapeHtml(song.id)}" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（攻略wikiを開く）">${bannerInner}${buildMemoMarkHtml(song.id)}</a>
                         <button type="button" class="dg-score${score ? '' : ' dg-score-none'}" onclick="openScoreModal('${safeId}')" title="スコアを変更">${score ? score : '-'}</button>
                     </div>
                 </div>`;
@@ -2465,7 +2465,7 @@ function buildPokkuraRecHtml(pk) {
         return `
             <div class="pk-rec-row">
                 <span class="pk-rec-rank">${i + 1}</span>
-                <a class="pk-rec-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（攻略wikiを開く）">${bannerInner}</a>
+                <a class="pk-rec-banner" data-sid="${escapeHtml(song.id)}" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（攻略wikiを開く）">${bannerInner}</a>
                 <div class="pk-rec-body">
                     <div class="pk-rec-meta"><span class="pk-rec-group pk-rec-group-${r.group}">${r.group === 'new' ? '新曲' : '旧曲'}</span>Lv${escapeHtml(pkLevel)}${song.diffClass ? ` ${escapeHtml(song.diffClass)}` : ''}</div>
                     ${action}
@@ -2481,11 +2481,11 @@ function formatPokkuraDate(iso) {
     return isNaN(d) ? '' : `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-// 旧ポックラのタブに、上位50曲の下に薄く出す曲の数
+// 旧ポックラの画面で、上位50曲の下に薄く出す曲の数
 const OLD_POKKURA_LIST_EXTRA = 10;
 
-// ポックラ画面のタブ（'top' = 対象曲 / 'rest' = 圏外 / 'up' = おすすめ / 'old' = 旧ポックラ）。描き直しても選んだタブのまま
-const POKKURA_TABS = ['top', 'rest', 'up', 'old'];
+// ポックラ画面のタブ（'top' = 対象曲 / 'rest' = 圏外 / 'up' = おすすめ）。描き直しても選んだタブのまま
+const POKKURA_TABS = ['top', 'rest', 'up'];
 let pokkuraTab = 'top';
 
 // 次の 0.01 まで、対象曲のスコアをあと何点（合計）伸ばせばよいか（レベルごと）。
@@ -2556,6 +2556,87 @@ function buildPokkuraExplainHtml(pk) {
         </details>`;
 }
 
+// ポックラの表の1行（新曲・旧曲・旧ポックラ）。pointText：ポイントの出し方（旧ポックラは1曲の点をそのまま出す）
+function buildPokkuraSectionHtml(label, sub, color, list, COLS, pointText) {
+    if (list.length === 0) return '';
+    // ポイントの高い順に、表の向き（最初は左上が1位）に合わせて並べる
+    const ordered = orderForDirection(list, COLS, getGridDirection('pokkura'));
+    let cells = '';
+    ordered.forEach(({ song, extra, point, score, isVersion, easySelectable, calcMedal }) => {
+        const pointHtml = `<span class="pk-point" title="ポイント ${point.toFixed(2)}">${pointText ? pointText(point) : pkFloor(point / 60, 3).toFixed(3)}</span>`;
+        if (extra) {
+            // Lv45 以下の新曲：アプリの曲ではないので、バナーなし・変更なし（表示だけ）
+            cells += `
+            <div class="dg-cell">
+                <span class="dg-medal pk-medal-static${extra.medal ? '' : ' dg-medal-empty'}">${buildGridMedalInner(extra.medal)}</span>
+                <div class="dg-banner-wrap">
+                    <div class="dg-banner pk-extra" title="${escapeHtml(extra.title)}（Lv${escapeHtml(extra.level)}）"><span class="pk-extra-title">${escapeHtml(extra.title)}</span><span class="pk-extra-genre">${escapeHtml(extra.genre)}</span></div>
+                    <span class="pk-lv">${escapeHtml(extra.level)}</span>
+                    <span class="dg-score pk-score">${score}</span>
+                    ${pointHtml}
+                </div>
+            </div>`;
+            return;
+        }
+        // 歴代イージー・今作黒星の曲は、計算に使っているメダル（イージー／選んだ黒）を出す
+        const medalKey = easySelectable ? calcMedal : (clearRecords[song.id] || '');
+        const medalTitle = easySelectable ? `ポックラは${calcMedal}として計算（押すと歴代メダルを変更）` : 'メダルを変更';
+        const medalClass = medalKey === '' ? ' dg-medal-empty' : '';
+        const bannerSrc = safeUrl(song.bannerUrl, true);
+        const bannerInner = bannerSrc
+            ? `<img src="${escapeHtml(bannerSrc)}" alt="${escapeHtml(song.title)}" loading="lazy">`
+            : `<span class="dg-banner-text">${escapeHtml(song.title)}</span>`;
+        const safeId = jsStringAttr(song.id);
+        const easySelectHtml = easySelectable
+            ? `<select class="pk-oldeasy${calcMedal !== 'イージー' ? ' is-black' : ''}" onchange="setPokkuraOldEasyMedal('${safeId}', this.value)" aria-label="${escapeHtml(song.title)}のポックラでのメダル" title="イージーの曲です。旧筐体でつけたイージー（旧筐体EC）なら、黒（星・菱・丸）を選ぶとポックラはそのメダルで計算します">${POKKURA_OLD_EASY_CHOICES.map(m => `<option value="${m}"${m === calcMedal ? ' selected' : ''}>${m}</option>`).join('')}</select>`
+            : '';
+        // ポックラ反映時のレベルが Lv と違う曲は、印を付けて両方を見せる
+        const pkLevel = getPokkuraLevel(song);
+        const lvHtml = pkLevel !== song.level
+            ? `<span class="pk-lv pk-lv-custom" title="ポックラはLv${escapeHtml(pkLevel)}で計算（今のLvは${escapeHtml(song.level)}）">${escapeHtml(pkLevel)}</span>`
+            : `<span class="pk-lv">${escapeHtml(song.level)}</span>`;
+        cells += `
+            <div class="dg-cell">
+                <button type="button" class="dg-medal${medalClass}" onclick="openMedalModal('${safeId}')" title="${escapeHtml(medalTitle)}">${buildGridMedalInner(medalKey)}${buildUraBadgeHtml(song.id, medalKey)}</button>
+                <div class="dg-banner-wrap">
+                    <a class="dg-banner" data-sid="${escapeHtml(song.id)}" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（Lv${escapeHtml(song.level)}・攻略wikiを開く）">${bannerInner}${buildMemoMarkHtml(song.id)}</a>
+                    ${lvHtml}
+                    ${easySelectHtml}
+                    <button type="button" class="dg-score pk-score${isVersion ? ' pk-score-version' : ''}" onclick="openScoreModal('${safeId}')" title="${isVersion ? `今作のスコア（歴代ベスト ${escapeHtml(scoreRecords[song.id] || '-')}）。押すと歴代ベストを変更` : 'スコアを変更'}">${score}</button>
+                    ${pointHtml}
+                </div>
+            </div>`;
+    });
+    return `
+        <div class="dg-row">
+            <div class="dg-label pk-label" style="background: ${color};"><span class="dg-label-cls">${label}</span><span class="pk-label-sub">${sub}</span></div>
+            <div class="dg-cells" style="grid-template-columns: repeat(${COLS}, minmax(0, 1fr));">${cells}</div>
+        </div>`;
+}
+
+// 旧ポックラ（ポックラのボタンをダブルクリック）：大きな枠に値と +0.01まで、その下に上位50曲と圏外10曲の表
+function renderOldPokkuraGrid() {
+    const grid = document.getElementById('diff-grid-view');
+    const narrow = isNarrowScreen();
+    const COLS = narrow ? 2 : 5;
+    lastGridNarrow = narrow;
+    const old = calcOldPokkura();
+    const items = old.entries.map(e => ({ song: e.song, point: e.point, score: e.score }));
+    const pointText = p => p.toFixed(2);
+    let html = `
+        <div class="pk-summary pk-summary-old">
+            <div class="pk-total"><span class="pk-total-label">旧ポックラ</span><span class="pk-total-value">${old.total.toFixed(2)}</span></div>
+            <div class="pk-parts">${old.count > 0 ? `+0.01まで：約${old.toNext.toLocaleString('ja-JP')}点` : '-'}</div>
+        </div>
+        <div id="pk-goal-slot" class="goal-strip" style="display: none;"></div>`;
+    html += items.length > 0
+        ? buildDirectionBar('pokkura')
+            + buildPokkuraSectionHtml('旧', `上位${OLD_POKKURA_COUNT}`, '#5d4037', items.slice(0, OLD_POKKURA_COUNT), COLS, pointText)
+            + `<div class="pk-old-rest">${buildPokkuraSectionHtml('旧', '圏外', '#a1887f', items.slice(OLD_POKKURA_COUNT, OLD_POKKURA_COUNT + OLD_POKKURA_LIST_EXTRA), COLS, pointText)}</div>`
+        : '<div class="dg-empty">Lv48〜50 でスコアのある曲がありません</div>';
+    grid.innerHTML = html;
+}
+
 function renderPokkuraGrid() {
     const grid = document.getElementById('diff-grid-view');
     const narrow = isNarrowScreen();
@@ -2606,66 +2687,9 @@ function renderPokkuraGrid() {
             <button type="button" role="tab" id="pk-tab-top" aria-controls="pk-panel-top" onclick="setPokkuraTab('top', true)">対象曲<span class="pk-tab-count">${topCount}</span></button>
             <button type="button" role="tab" id="pk-tab-rest" aria-controls="pk-panel-rest" onclick="setPokkuraTab('rest', true)">圏外<span class="pk-tab-count">${restCount}</span></button>
             <button type="button" role="tab" id="pk-tab-up" aria-controls="pk-panel-up" onclick="setPokkuraTab('up', true)">おすすめ</button>
-            <button type="button" role="tab" id="pk-tab-old" aria-controls="pk-panel-old" onclick="setPokkuraTab('old', true)">旧ポックラ</button>
         </div>`;
 
-    // pointText：ポイントの出し方（旧ポックラは1曲の点をそのまま出す）
-    const section = (label, sub, color, list, pointText) => {
-        if (list.length === 0) return '';
-        // ポイントの高い順に、表の向き（最初は左上が1位）に合わせて並べる
-        const ordered = orderForDirection(list, COLS, getGridDirection('pokkura'));
-        let cells = '';
-        ordered.forEach(({ song, extra, point, score, isVersion, easySelectable, calcMedal }) => {
-            const pointHtml = `<span class="pk-point" title="ポイント ${point.toFixed(2)}">${pointText ? pointText(point) : pkFloor(point / 60, 3).toFixed(3)}</span>`;
-            if (extra) {
-                // Lv45 以下の新曲：アプリの曲ではないので、バナーなし・変更なし（表示だけ）
-                cells += `
-                <div class="dg-cell">
-                    <span class="dg-medal pk-medal-static${extra.medal ? '' : ' dg-medal-empty'}">${buildGridMedalInner(extra.medal)}</span>
-                    <div class="dg-banner-wrap">
-                        <div class="dg-banner pk-extra" title="${escapeHtml(extra.title)}（Lv${escapeHtml(extra.level)}）"><span class="pk-extra-title">${escapeHtml(extra.title)}</span><span class="pk-extra-genre">${escapeHtml(extra.genre)}</span></div>
-                        <span class="pk-lv">${escapeHtml(extra.level)}</span>
-                        <span class="dg-score pk-score">${score}</span>
-                        ${pointHtml}
-                    </div>
-                </div>`;
-                return;
-            }
-            // 歴代イージー・今作黒星の曲は、計算に使っているメダル（イージー／選んだ黒）を出す
-            const medalKey = easySelectable ? calcMedal : (clearRecords[song.id] || '');
-            const medalTitle = easySelectable ? `ポックラは${calcMedal}として計算（押すと歴代メダルを変更）` : 'メダルを変更';
-            const medalClass = medalKey === '' ? ' dg-medal-empty' : '';
-            const bannerSrc = safeUrl(song.bannerUrl, true);
-            const bannerInner = bannerSrc
-                ? `<img src="${escapeHtml(bannerSrc)}" alt="${escapeHtml(song.title)}" loading="lazy">`
-                : `<span class="dg-banner-text">${escapeHtml(song.title)}</span>`;
-            const safeId = jsStringAttr(song.id);
-            const easySelectHtml = easySelectable
-                ? `<select class="pk-oldeasy${calcMedal !== 'イージー' ? ' is-black' : ''}" onchange="setPokkuraOldEasyMedal('${safeId}', this.value)" aria-label="${escapeHtml(song.title)}のポックラでのメダル" title="イージーの曲です。旧筐体でつけたイージー（旧筐体EC）なら、黒（星・菱・丸）を選ぶとポックラはそのメダルで計算します">${POKKURA_OLD_EASY_CHOICES.map(m => `<option value="${m}"${m === calcMedal ? ' selected' : ''}>${m}</option>`).join('')}</select>`
-                : '';
-            // ポックラ反映時のレベルが Lv と違う曲は、印を付けて両方を見せる
-            const pkLevel = getPokkuraLevel(song);
-            const lvHtml = pkLevel !== song.level
-                ? `<span class="pk-lv pk-lv-custom" title="ポックラはLv${escapeHtml(pkLevel)}で計算（今のLvは${escapeHtml(song.level)}）">${escapeHtml(pkLevel)}</span>`
-                : `<span class="pk-lv">${escapeHtml(song.level)}</span>`;
-            cells += `
-                <div class="dg-cell">
-                    <button type="button" class="dg-medal${medalClass}" onclick="openMedalModal('${safeId}')" title="${escapeHtml(medalTitle)}">${buildGridMedalInner(medalKey)}${buildUraBadgeHtml(song.id, medalKey)}</button>
-                    <div class="dg-banner-wrap">
-                        <a class="dg-banner" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（Lv${escapeHtml(song.level)}・攻略wikiを開く）">${bannerInner}${buildMemoMarkHtml(song.id)}</a>
-                        ${lvHtml}
-                        ${easySelectHtml}
-                        <button type="button" class="dg-score pk-score${isVersion ? ' pk-score-version' : ''}" onclick="openScoreModal('${safeId}')" title="${isVersion ? `今作のスコア（歴代ベスト ${escapeHtml(scoreRecords[song.id] || '-')}）。押すと歴代ベストを変更` : 'スコアを変更'}">${score}</button>
-                        ${pointHtml}
-                    </div>
-                </div>`;
-        });
-        return `
-            <div class="dg-row">
-                <div class="dg-label pk-label" style="background: ${color};"><span class="dg-label-cls">${label}</span><span class="pk-label-sub">${sub}</span></div>
-                <div class="dg-cells" style="grid-template-columns: repeat(${COLS}, minmax(0, 1fr));">${cells}</div>
-            </div>`;
-    };
+    const section = (label, sub, color, list) => buildPokkuraSectionHtml(label, sub, color, list, COLS);
 
     // 対象曲と圏外を横に並べ、タブか横スライドで切り替える
     const topHtml = topCount > 0
@@ -2674,23 +2698,12 @@ function renderPokkuraGrid() {
     const restHtml = restCount > 0
         ? section('新曲', '圏外', '#c48a9b', pk.restNew) + section('旧曲', '圏外', '#a58bb3', pk.restOld)
         : '<div class="dg-empty">圏外の曲はありません</div>';
-    // 旧ポックラ：上位50曲と、その下の10曲（数えない）を、対象曲と同じ表で出す
-    const oldPkList = calcOldPokkura();
-    const oldItems = oldPkList.entries.map(e => ({ song: e.song, point: e.point, score: e.score }));
-    const oldPoint = p => p.toFixed(2);
-    const oldHtml = oldItems.length > 0
-        ? `<div class="pk-old-head">上位${OLD_POKKURA_COUNT}曲の平均 <b>${oldPkList.raw.toFixed(4)}</b>（表示は ${oldPkList.total.toFixed(2)}）・+0.01まで約${oldPkList.toNext.toLocaleString('ja-JP')}点</div>
-            <div class="pk-old-note">1曲の点 ＝（10000×Lv＋スコア−50000＋メダルのボーナス）÷ 5440 を小数第2位で切り捨て。popn-class の表と見比べて、違う曲を探せます。</div>`
-            + section('旧', `上位${OLD_POKKURA_COUNT}`, '#5d4037', oldItems.slice(0, OLD_POKKURA_COUNT), oldPoint)
-            + `<div class="pk-old-rest">${section('旧', '圏外', '#a1887f', oldItems.slice(OLD_POKKURA_COUNT, OLD_POKKURA_COUNT + OLD_POKKURA_LIST_EXTRA), oldPoint)}</div>`
-        : '<div class="dg-empty">Lv48〜50 でスコアのある曲がありません</div>';
     html += `
         ${buildDirectionBar('pokkura')}
         <div class="pk-slider" id="pk-slider">
             <div class="pk-panel" id="pk-panel-top" role="tabpanel" aria-labelledby="pk-tab-top">${topHtml}</div>
             <div class="pk-panel pk-panel-rest" id="pk-panel-rest" role="tabpanel" aria-labelledby="pk-tab-rest">${restHtml}</div>
             <div class="pk-panel pk-panel-up" id="pk-panel-up" role="tabpanel" aria-labelledby="pk-tab-up">${buildPokkuraRecHtml(pk)}</div>
-            <div class="pk-panel" id="pk-panel-old" role="tabpanel" aria-labelledby="pk-tab-old">${oldHtml}</div>
         </div>
         ${buildPokkuraExplainHtml(pk)}`;
     grid.innerHTML = html;
