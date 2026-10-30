@@ -1957,7 +1957,8 @@ function renderRecentGrid(targetSongs) {
 
 // ---------- メダル表 ----------
 // ---------- 表示方法のボタンのダブルクリック ----------
-//   メダル表のボタン：1回でメダル表、ダブルクリックで BAD表。ポックラのボタン：1回で新ポックラ、ダブルクリックで旧ポックラ
+//   メダル表のボタン：ダブルクリックでメダル表⇔BAD表。ポックラのボタン：ダブルクリックで新ポックラ⇔旧ポックラ。
+//   1回押しは、ほかの表示のときだけメダル表・新ポックラにする（BAD表・旧ポックラのときは何もしない）
 const VIEW_TAP_DOUBLE_MS = 350;
 const VIEW_TAP_ALT = { medal: 'bad', pokkura: 'oldpokkura' };
 let viewTapTimer = null;
@@ -1965,17 +1966,17 @@ let viewTapMode = null;
 
 function onViewModeTap(mode) {
     if (viewTapTimer && viewTapMode === mode) {
-        // 2回目：もう片方へ
+        // 2回目：今の側と反対へ（ペアの外からは裏側へ）
         clearTimeout(viewTapTimer);
         viewTapTimer = null;
-        setViewMode(VIEW_TAP_ALT[mode]);
+        setViewMode(viewMode === VIEW_TAP_ALT[mode] ? mode : VIEW_TAP_ALT[mode]);
         return;
     }
     clearTimeout(viewTapTimer);
     viewTapMode = mode;
     viewTapTimer = setTimeout(() => {
         viewTapTimer = null;
-        setViewMode(mode);
+        if (viewMode !== mode && viewMode !== VIEW_TAP_ALT[mode]) setViewMode(mode);
     }, VIEW_TAP_DOUBLE_MS);
 }
 

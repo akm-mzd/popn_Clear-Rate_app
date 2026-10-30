@@ -109,7 +109,6 @@ function renderSongDetailHead() {
     if (!song || !box) return;
     const safeId = jsStringAttr(id);
     const medalKey = clearRecords[id] || '';
-    const medal = MEDAL_TYPES[medalKey] || MEDAL_TYPES[''];
     const bannerSrc = safeUrl(song.bannerUrl, true);
     const diffStyle = getDifficultyColor(song.diffClass, song.diffIndex);
     box.innerHTML = `
@@ -121,8 +120,8 @@ function renderSongDetailHead() {
                 <div class="sd-title">${escapeHtml(song.title)}</div>
                 <div class="sd-meta"><span class="level-badge">${escapeHtml(song.level)}</span>
                     ${song.diffRaw ? `<span style="color: ${diffStyle.color}; text-shadow: ${diffStyle.shadow}; font-weight: bold;">${escapeHtml(song.diffRaw)}</span>` : ''}
-                    <span class="sd-medal-name">${escapeHtml(medal.label)}</span>
                     <a href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" class="sd-wiki">攻略wiki</a></div>
+                ${getSongAttrs(song).length ? `<div class="song-attrs">${getSongAttrs(song).map(a => `<span>${escapeHtml(a)}</span>`).join('')}</div>` : ''}
             </div>
         </div>`;
 }
