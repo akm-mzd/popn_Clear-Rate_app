@@ -1850,3 +1850,9 @@ button.bs-edit.bs-cancel { margin-left: 0; border-color: #bbb; color: #666; }
 .fc-cell-thumb, .fc-cell-song { width: 100%; height: auto; display: block; border-radius: 3px; }
 .fc-cell-song { opacity: 0.85; }
 .fc-cell select { width: 100%; font-size: 11px; min-height: 26px; }
+.fc-redo { display: flex; align-items: center; gap: 6px; margin: 8px 0 4px; font-size: 13px; color: #555; }
+.fc-row-done { display: block; margin-top: 4px; font-size: 10px; color: #2e7d32; }
+.fc-notin { margin: 0 0 6px; font-size: 12px; color: #555; }
+.fc-notin summary { cursor: pointer; color: #1565c0; }
+.fc-notin div { padding: 4px 0; line-height: 1.6; }
+.fc-all-done { padding: 10px; color: #2e7d32; font-size: 13px; }

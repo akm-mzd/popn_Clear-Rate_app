@@ -274,6 +274,15 @@ function matchFcImage(im) {
         c.pick = p.id; c.sim = p.sim; used.add(p.id);
         if (!c.cands.some(x => x.id === p.id)) c.cands.push({ id: p.id, sim: p.sim });
     });
+    // 合わせた曲にもうフルコン難易度が入っていれば「登録済み」（確認の画面に出さない。「最初から入れ直す」のときは出す）
+    const songById = new Map(songs.map(s => [s.id, s]));
+    cells.forEach(c => { c.done = !!(c.pick && getSongFc(songById.get(c.pick))); });
+}
+
+function setFcRedo(on) {
+    if (!fcImport) return;
+    fcImport.redo = !!on;
+    renderFcImport();
 }
 
 function setFcImageLevel(i, level) {
@@ -321,71 +330,107 @@ function renderFcImport() {
     const valueOptions = sel => FC_VALUES.map(v => `<option value="${v}"${Math.abs(v - sel) < 0.001 ? ' selected' : ''}>${v > 1.05 ? '別格 ' : ''}${formatFcValue(v)}</option>`).join('');
     const levelCount = {};
     state.images.forEach(im => { if (im.level) levelCount[im.level] = (levelCount[im.level] || 0) + 1; });
-    box.innerHTML = state.images.map((im, i) => {
+    const redo = !!state.redo;
+    const head = `<label class="fc-redo"><input type="checkbox" onchange="setFcRedo(this.checked)"${redo ? ' checked' : ''}> 今の登録を消して、最初から入れ直す（表が新しくなったときなど）</label>`;
+    box.innerHTML = head + state.images.map((im, i) => {
         if (!im.rows) return `<div class="fc-img"><div class="fc-img-head">${escapeHtml(im.name)}：${escapeHtml(im.error || '')}</div></div>`;
         const cells = fcCellsOf(im);
+        const shown = c => redo || !c.done;
         const picked = new Set(cells.map(c => c.pick).filter(Boolean));
-        const unsure = cells.filter(c => !c.pick).length;
-        const notIn = songs.filter(s => String(s.level) === String(im.level) && !picked.has(s.id)).length;
+        const nDone = redo ? 0 : cells.filter(c => c.done).length;
+        const nAdd = cells.filter(c => shown(c) && c.pick).length;
+        const unsure = cells.filter(c => shown(c) && !c.pick).length;
+        const levelSongs = songs.filter(s => String(s.level) === String(im.level));
+        const notInSongs = levelSongs.filter(s => !picked.has(s.id) && (redo || !getSongFc(s)));
+        // 「ほかの曲」の一覧（画像ごとに1回だけ作る）：まだの曲を先に、曲名順
+        const others = levelSongs.slice().sort((a, b) => (!!getSongFc(a) - !!getSongFc(b)) || String(a.title).localeCompare(String(b.title), 'ja'));
+        const optLabel = (sg, extra) => `${escapeHtml(sg.title)}${extra}${picked.has(sg.id) ? '（ほかで使用中）' : (!redo && getSongFc(sg)) ? '（登録済み）' : ''}`;
+        const othersHtml = others.map(sg => `<option value="${escapeHtml(sg.id)}">${optLabel(sg, '')}</option>`).join('');
         const rowsHtml = im.rows.map((row, r) => {
-            const cellHtml = row.cells.map((c, ci) => {
+            const visible = row.cells.map((c, ci) => ({ c, ci })).filter(x => shown(x.c));
+            const doneCount = row.cells.length - visible.length;
+            if (visible.length === 0) return '';
+            const cellHtml = visible.map(({ c, ci }) => {
                 const song = c.pick ? songById.get(c.pick) : null;
-                const opts = c.cands.map(x => {
-                    const s = songById.get(x.id);
-                    return s ? `<option value="${escapeHtml(x.id)}"${x.id === c.pick ? ' selected' : ''}>${escapeHtml(s.title)}（${Math.round(x.sim * 100)}）</option>` : '';
+                const candIds = new Set(c.cands.map(x => x.id));
+                const cands = c.cands.map(x => {
+                    const sg = songById.get(x.id);
+                    return sg ? `<option value="${escapeHtml(x.id)}">${optLabel(sg, `（${Math.round(x.sim * 100)}）`).replace('（ほかで使用中）', x.id === c.pick ? '' : '（ほかで使用中）')}</option>` : '';
                 }).join('');
+                // 候補に出した曲は除く。このバナーで選んでいる曲には「ほかで使用中」を付けない
+                const pickAttr = escapeHtml(c.pick || '');
+                const rest = othersHtml.replace(/<option value="([^"]*)">(.*?)<\/option>/g, (m, id, label) =>
+                    candIds.has(id) ? '' : (id === pickAttr ? `<option value="${id}">${label.replace('（ほかで使用中）', '')}</option>` : m));
                 const songBanner = song && safeUrl(song.bannerUrl, true) ? `<img class="fc-cell-song" src="${escapeHtml(safeUrl(song.bannerUrl, true))}" alt="${escapeHtml(song.title)}">` : '';
                 return `<div class="fc-cell${c.pick ? '' : ' fc-cell-unsure'}">
                     <img class="fc-cell-thumb" src="${escapeHtml(c.thumb)}" alt="">
                     ${songBanner}
-                    <select onchange="setFcCellPick(${i}, ${r}, ${ci}, this.value)"><option value="">${c.pick ? '合わない（入れない）' : '要確認：曲を選ぶ'}</option>${opts}</select>
+                    <select data-pick="${escapeHtml(c.pick || '')}" onchange="setFcCellPick(${i}, ${r}, ${ci}, this.value)"><option value="">${c.pick ? '合わない（入れない）' : '要確認：曲を選ぶ'}</option><optgroup label="候補">${cands}</optgroup><optgroup label="ほかの曲（曲名順）">${rest}</optgroup></select>
                 </div>`;
             }).join('');
             return `<div class="fc-row">
-                <div class="fc-row-head"><select onchange="setFcRowValue(${i}, ${r}, this.value)" aria-label="値">${valueOptions(row.v)}</select></div>
+                <div class="fc-row-head"><select onchange="setFcRowValue(${i}, ${r}, this.value)" aria-label="値">${valueOptions(row.v)}</select>${doneCount ? `<span class="fc-row-done">登録済み ${doneCount}曲</span>` : ''}</div>
                 <div class="fc-row-cells">${cellHtml}</div>
             </div>`;
         }).join('');
+        const notInHtml = notInSongs.length
+            ? `<details class="fc-notin"><summary>このレベルで表に載らない曲 ${notInSongs.length}</summary><div>${notInSongs.map(sg => escapeHtml(sg.title)).join('、')}</div></details>`
+            : '';
         return `<div class="fc-img">
             <div class="fc-img-head">
                 <span class="fc-img-name">${escapeHtml(im.name)}</span>
                 <label>レベル <select onchange="setFcImageLevel(${i}, this.value)">${FC_LEVELS.map(lv => `<option value="${lv}"${lv === String(im.level) ? ' selected' : ''}>${lv}</option>`).join('')}</select></label>
-                <span class="fc-img-stat">${im.rows.length}段・${cells.length}曲${unsure ? `・<b>要確認 ${unsure}</b>` : ''}・このレベルで表に載らない曲 ${notIn}${levelCount[im.level] > 1 ? '・<b>同じレベルの画像が2枚以上あります（後の画像が使われます）</b>' : ''}</span>
+                <span class="fc-img-stat">${im.rows.length}段・${cells.length}曲${nDone ? `・登録済み ${nDone}` : ''}・これから入れる ${nAdd}${unsure ? `・<b>要確認 ${unsure}</b>` : ''}${levelCount[im.level] > 1 ? '・<b>同じレベルの画像が2枚以上あります（後の画像が使われます）</b>' : ''}</span>
             </div>
-            ${rowsHtml}
+            ${notInHtml}
+            ${rowsHtml || '<div class="fc-all-done">この画像の曲は、全部登録済みです。</div>'}
         </div>`;
     }).join('');
+    // 選んでいる曲を選択欄に当てる（「ほかの曲」から選んだときも）
+    box.querySelectorAll('select[data-pick]').forEach(sel => { sel.value = sel.dataset.pick; });
 }
 
-// 保存：取り込んだレベルの曲は fc を付け直す（表に載らない曲からは消す）
+// 保存：ふつうは足すだけ（まだの曲に入れる。登録済みの曲は値はそのまま、順番だけ画像の位置に直す。載らない曲は変えない）
+//   「最初から入れ直す」のときは、取り込んだレベルの曲の fc を付け直す（載らない曲からは消す）
+//   順番 o は画像の中の位置（同じ値の段を上から、段の中は左から数えた何番目か。曲を選ばなかったバナーも数える）
 async function saveFcImport() {
     const state = fcImport;
     if (!state) return;
+    const redo = !!state.redo;
     const byLevel = {};
     state.images.forEach(im => { if (im.rows && im.level) byLevel[im.level] = im; });
     const levels = Object.keys(byLevel);
     if (levels.length === 0) return;
-    if (!confirm(`Lv${levels.join('・')} のフルコン難易度を、この内容で入れ直します。よろしいですか？`)) return;
-    let n = 0;
+    if (!confirm(redo
+        ? `Lv${levels.join('・')} のフルコン難易度を、今の登録を消して入れ直します。よろしいですか？`
+        : `Lv${levels.join('・')} のフルコン難易度を足します（登録済みの曲の値は変えません）。よろしいですか？`)) return;
+    let nAdd = 0;
     levels.forEach(lv => {
         const im = byLevel[lv];
         const assigned = new Map();
-        const counter = {};
+        const pos = {};
         im.rows.forEach(row => {
             const key = String(row.v);
             row.cells.forEach(c => {
-                if (!c.pick || assigned.has(c.pick)) return;
-                counter[key] = (counter[key] || 0);
-                assigned.set(c.pick, { v: row.v, o: counter[key]++ });
+                const o = pos[key] = (pos[key] === undefined ? 0 : pos[key] + 1);
+                if (c.pick && !assigned.has(c.pick)) assigned.set(c.pick, { v: row.v, o });
             });
         });
         songs.forEach(s => {
             if (String(s.level) !== lv) return;
-            if (assigned.has(s.id)) { s.fc = assigned.get(s.id); n++; } else delete s.fc;
+            const a = assigned.get(s.id);
+            const cur = getSongFc(s);
+            if (redo) {
+                if (a) { s.fc = a; nAdd++; } else delete s.fc;
+            } else if (a && !cur) {
+                s.fc = a; nAdd++;
+            } else if (a && cur && Math.abs(cur.v - a.v) < 0.001) {
+                s.fc = { v: cur.v, o: a.o };
+            }
         });
     });
     closeFcImport();
     renderTable();
-    showToast('toast-eagate', `フルコン難易度を入れました（${n}曲）`, '#4caf50', 3000);
+    showToast('toast-eagate', redo ? `フルコン難易度を入れ直しました（${nAdd}曲）` : `フルコン難易度を足しました（${nAdd}曲）`, '#4caf50', 3000);
     await saveToCloud(true);
 }
