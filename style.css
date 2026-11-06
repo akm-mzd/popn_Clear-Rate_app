@@ -1864,3 +1864,4 @@ button.bs-edit.bs-cancel { margin-left: 0; border-color: #bbb; color: #666; }
 .fc-all-done { padding: 10px; color: #2e7d32; font-size: 13px; }
 
 button.sd-medal { position: relative; overflow: visible; }
+.filter-medal-extra { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 0.85em; color: #555; cursor: pointer; }

@@ -10,14 +10,26 @@
 //   同じ項目の中は「どれか」（OR）、違う項目どうしは「すべて」（AND）で絞り込む。
 //   ほかに、スコアの範囲（#filter-score-min / max）。選択肢の横には、選ぶと出る曲の数を出す。
 // ==========================================
-// 並びは絞り込みの欄の並びと同じ（レベル・メダル・難易度・属性・バージョン・スコア・BAD・タグ・メモ・最後に更新した日）
-const FILTER_IDS = ['filter-level', 'filter-medal', 'filter-diff', 'filter-attr', 'filter-version', 'filter-rank', 'filter-bad', 'filter-affinity', 'filter-updated'];
+// 並びは絞り込みの欄の並びと同じ（レベル・メダル・裏メダル・旧筐体・難易度・属性・バージョン・スコア・BAD・タグ・メモ・最後に更新した日）
+const FILTER_IDS = ['filter-level', 'filter-medal', 'filter-extra', 'filter-diff', 'filter-attr', 'filter-version', 'filter-rank', 'filter-bad', 'filter-affinity', 'filter-updated'];
 
 // 項目の短い名前（今の条件のチップに使う）
 const FILTER_GROUP_NAMES = {
     'filter-bad': 'BAD', 'filter-level': 'レベル', 'filter-medal': 'メダル', 'filter-rank': 'ランク', 'filter-diff': '難易度', 'filter-updated': '更新',
-    'filter-affinity': 'タグ', 'filter-attr': '属性', 'filter-version': 'バージョン'
+    'filter-affinity': 'タグ', 'filter-attr': '属性', 'filter-version': 'バージョン', 'filter-extra': '裏メダル・旧筐体'
 };
+
+// 裏メダル・旧筐体のメダルが付いているか（表の左上・右上に印が出る曲）
+const EXTRA_MEDAL_FILTER_ITEMS = [
+    { value: 'ura', label: '裏メダルあり', test: s => !!getShownUraMedal(s.id) },
+    { value: 'old', label: '旧筐体のメダルあり', test: s => !!getShownOldMedal(s.id) }
+];
+
+// メダルで絞るときに、表に出している裏メダル・旧筐体のメダルも見るか（メダルの項目の下のチェック）
+function isMedalExtraIncluded() {
+    const cb = document.getElementById('filter-medal-extra');
+    return !!(cb && cb.checked);
+}
 
 // BAD の数（クリアしたときの一番少ない BAD。フルコンボ以上は 0：getSongBad）
 const BAD_FILTER_ITEMS = [
@@ -112,6 +124,8 @@ function onScoreRangeInput() {
 function clearAllFilters() {
     FILTER_IDS.forEach(id => setFilterValues(id, []));
     setScoreRange(null, null);
+    const extra = document.getElementById('filter-medal-extra');
+    if (extra) extra.checked = false;
 }
 
 // ---------- レベル（絞り込みの欄と、上のレベルボタンをそろえる） ----------
@@ -168,6 +182,7 @@ function getActiveFilterItems() {
     });
     const range = getScoreRange();
     if (range) items.push({ text: `スコア：${formatScoreRange(range)}`, remove: () => { setScoreRange(null, null); renderTable(); } });
+    if (isMedalExtraActive()) items.push({ text: 'メダル：裏・旧も含める', remove: () => { document.getElementById('filter-medal-extra').checked = false; renderTable(); } });
     return items;
 }
 
@@ -193,7 +208,12 @@ function buildFilterChecks(id, items) {
 }
 
 function countActiveFilters() {
-    return FILTER_IDS.reduce((n, id) => n + getActiveFilterValues(id).length, 0) + (getScoreRange() ? 1 : 0);
+    return FILTER_IDS.reduce((n, id) => n + getActiveFilterValues(id).length, 0) + (getScoreRange() ? 1 : 0) + (isMedalExtraActive() ? 1 : 0);
+}
+
+// 「裏メダル・旧筐体のメダルも含める」が効いているか（チェックが入っていて、メダルを選んでいるとき）
+function isMedalExtraActive() {
+    return isMedalExtraIncluded() && getActiveFilterValues('filter-medal').length > 0;
 }
 
 // 「さらに条件で絞り込む」と、各項目の見出しに、選んでいる数を出す（shown：今出ている曲数）
@@ -284,6 +304,7 @@ function initFilters() {
 
     buildFilterChecks('filter-updated', UPDATED_FILTER_ITEMS.map(({ value, label }) => ({ value, label })));
     buildFilterChecks('filter-bad', BAD_FILTER_ITEMS.map(({ value, label }) => ({ value, label })));
+    buildFilterChecks('filter-extra', EXTRA_MEDAL_FILTER_ITEMS.map(({ value, label }) => ({ value, label })));
     // 難易度は index.html に書いてあるので、表示名だけ付ける
     document.querySelectorAll('#filter-diff input[type="checkbox"]').forEach(cb => { cb.dataset.label = cb.value; });
 
@@ -727,10 +748,15 @@ function getSongDiffFilterClass(s) {
 
 const FILTER_GROUP_TESTS = {
     'filter-level': (s, values) => values.includes(String(s.level)),
-    'filter-medal': (s, values) => {
+    'filter-medal': (s, values, ctx) => {
         const medalKey = clearRecords[s.id] || '';
-        return values.includes(medalKey === '' ? 'unplayed' : medalKey);
+        if (values.includes(medalKey === '' ? 'unplayed' : medalKey)) return true;
+        // 「裏メダル・旧筐体のメダルも含める」：表に出している裏メダル・旧筐体のメダルでも当てる
+        if (!(ctx && ctx.medalExtra)) return false;
+        const ura = getShownUraMedal(s.id), old = getShownOldMedal(s.id);
+        return (!!ura && values.includes(ura)) || (!!old && values.includes(old));
     },
+    'filter-extra': (s, values) => values.some(v => { const item = EXTRA_MEDAL_FILTER_ITEMS.find(x => x.value === v); return !!item && item.test(s); }),
     'filter-version': (s, values) => values.includes(s.version),
     'filter-diff': (s, values) => values.includes(getSongDiffFilterClass(s)),
     // タグ・メモ：タグ・★練習したい・コメントあり・タグなし
@@ -763,7 +789,7 @@ function makeFilterContext() {
     Object.values(getHistoryRecords()).forEach(e => {
         if (e && typeof e.t === 'number' && !(lastUpdate.get(e.id) >= e.t)) lastUpdate.set(e.id, e.t);
     });
-    return { lastUpdate, now: Date.now() };
+    return { lastUpdate, now: Date.now(), medalExtra: isMedalExtraIncluded() };
 }
 
 // 絞り込み（メダル・バージョン・難易度・タグ・属性・スコアランク・更新日・スコアの範囲）を当てる関数。何も選んでいない項目は「すべて」
@@ -1748,18 +1774,31 @@ function buildGridMedalInner(medalKey) {
 
 // 裏メダルの小さな表示（表示しているメダルがイージーで、裏メダルがある曲だけ。メダル枠の左上に重ねる）
 // 旧筐体のメダル：今のメダルより良いときだけ、メダル枠の右上に小さく重ねる（表示だけ。統計などには数えない）
-function buildOldMedalBadgeHtml(songId, shownMedal) {
+// 表に出す旧筐体のメダル（今のメダルより良いときだけ。それ以外は ''）。表示と絞り込みで同じものを使う
+function getShownOldMedal(songId, shownMedal = clearRecords[songId] || '') {
     if (typeof getOldMedalRecords !== 'function') return '';
     const old = getOldMedalRecords()[songId];
     const m = old ? MEDAL_TYPES[old] : null;
     const cur = MEDAL_TYPES[shownMedal] || MEDAL_TYPES[''];
-    if (!m || !m.imgUrl || m.rank <= cur.rank) return '';
+    return m && m.rank > cur.rank ? old : '';
+}
+
+// 表に出す裏メダル（今のメダルがイージーで、裏メダルがあるときだけ。それ以外は ''）
+function getShownUraMedal(songId, shownMedal = clearRecords[songId] || '') {
+    if (shownMedal !== 'イージー' || typeof getUraMedalInfo !== 'function') return '';
+    return getUraMedalInfo(songId).ura || '';
+}
+
+function buildOldMedalBadgeHtml(songId, shownMedal) {
+    const old = getShownOldMedal(songId, shownMedal);
+    const m = old ? MEDAL_TYPES[old] : null;
+    if (!m || !m.imgUrl) return '';
     const title = `旧筐体：${m.label}`;
     return `<img class="dg-oldm" src="${escapeHtml(m.imgUrl)}" alt="${escapeHtml(title)}" title="${escapeHtml(title)}" loading="lazy">`;
 }
 
 function buildUraBadgeHtml(songId, shownMedal) {
-    if (shownMedal !== 'イージー' || typeof getUraMedalInfo !== 'function') return '';
+    if (!getShownUraMedal(songId, shownMedal)) return '';
     const info = getUraMedalInfo(songId);
     const m = info.ura ? MEDAL_TYPES[info.ura] : null;
     if (!m || !m.imgUrl) return '';
