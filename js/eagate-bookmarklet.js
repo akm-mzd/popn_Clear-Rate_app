@@ -15,6 +15,8 @@
     const MAX_PAGES = 200;
     const PAGE_INTERVAL_MS = 300; // 公式サーバーに負担をかけないよう、1ページごとに少し待つ
     const PANEL_ID = 'popn-eagate-panel';
+    // 旧筐体用のブックマークレット（window.__popnEagateMode = 'old'）：Lv46〜50 のメダルだけを読んで送る
+    const OLD_MODE = window.__popnEagateMode === 'old';
 
     // メダル画像のファイル名（meda_○.png の ○）→ アプリのメダル名。'' は未プレイ
     // ※ 公式の画像名が変わったときは、ここだけ直す
@@ -48,7 +50,7 @@
             'background:#fff;color:#333;border:2px solid #e91e63;border-radius:10px;padding:14px;' +
             'box-shadow:0 6px 24px rgba(0,0,0,.35);font:14px/1.5 sans-serif;text-align:left;';
         const title = document.createElement('div');
-        title.textContent = "Pop'n Clear Rate app 取り込み";
+        title.textContent = OLD_MODE ? "Pop'n Clear Rate app 取り込み（旧筐体のメダル）" : "Pop'n Clear Rate app 取り込み";
         title.style.cssText = 'font-weight:bold;color:#c2185b;margin-bottom:6px;';
         statusEl = document.createElement('div');
         bodyEl = document.createElement('div');
@@ -102,8 +104,8 @@
     }
 
     // ---------- ページの取得 ----------
-    // pop'n のバージョンのフォルダ（popn29 など）は今のページのパスから取る。番号（29）は今作の新曲一覧に使う
-    const VER_DIR = (location.pathname.match(/\/game\/popn\/(popn\d+)\//) || [])[1] || 'popn29';
+    // pop'n のバージョンのフォルダ（popn29・旧筐体の jamfizz など）は今のページのパスから取る。番号（29）は今作の新曲一覧に使う
+    const VER_DIR = (location.pathname.match(/\/game\/popn\/([A-Za-z0-9_-]+)\//) || [])[1] || 'popn29';
     const VER_NUM = parseInt(VER_DIR.replace(/\D/g, ''), 10) || 29;
     const playdataUrl = path => new URL(`/game/popn/${VER_DIR}/playdata/${path}`, location.origin).href;
 
@@ -681,6 +683,8 @@
             return finish();
         }
 
+        if (OLD_MODE) return finishOldMode(charts, pages, levelCounts, diag, firstDoc, firstUrl);
+
         // ポックラ用に、旧曲の今作スコアを調べる（失敗しても、メダル・スコアの取り込みはできる）
         //   あわせて、Lv46 以上の新曲が少ないときは Lv45 以下の新曲も読む
         let versionChecked = 0, versionError = '';
@@ -753,6 +757,32 @@
             showDiag(buildDiag(firstDoc, firstUrl, Object.assign({}, diag, { badDetail: badDiag }), 'no bad count'), 'BAD の数を読み取れませんでした。直すために、この診断データを送ってもらえると助かります。');
         } else if (officialPokkura === null) {
             showDiag(buildDiag(firstDoc, firstUrl, diag, 'no official pokkura'), '公式のポックラを読み取れませんでした。直すために、この診断データを送ってもらえると助かります。');
+        }
+        addCloseButton();
+        finish();
+    }
+
+    // 旧筐体：メダルだけを送る（スコア・BAD・ポックラ・最近の曲は読まない）
+    function finishOldMode(charts, pages, levelCounts, diag, firstDoc, firstUrl) {
+        const medalCharts = charts.filter(c => c.m).map(c => ({ t: c.t, g: c.g, d: c.d, l: c.l, m: c.m }));
+        const counts = {};
+        medalCharts.forEach(c => { counts[c.m] = (counts[c.m] || 0) + 1; });
+        const order = ['金星', '銀星', '銀菱', '銀丸', '銅星', '銅菱', '銅丸', 'イージー', '黒星', '黒菱', '黒丸'];
+        const summary = Object.keys(counts).sort((a, b) => order.indexOf(a) - order.indexOf(b)).map(k => `${k} ${counts[k]}`).join(' / ');
+        const json = JSON.stringify({ type: 'popn-eagate', v: 1, mode: 'old', dir: VER_DIR, at: new Date().toISOString(), pages, charts: medalCharts });
+        setStatus(`旧筐体（${VER_DIR}）の Lv${MIN_LEVEL}〜${MAX_LEVEL} の ${pages}ページから、メダルのある ${medalCharts.length}譜面を読み取りました。`);
+        addNote('レベル別（プレー済み / 全曲）：' + Object.keys(levelCounts).map(lv => `Lv${lv} ${levelCounts[lv].played}/${levelCounts[lv].rows}`).join('　'));
+        addNote('内訳：' + (summary || 'なし'));
+        addButton('アプリに送る（新しいタブで開く）', '#e91e63', () => sendToApp(json));
+        const box = addTextBox(json);
+        addButton('コピー（アプリで「クリップボードから取り込む」）', '#2196F3', async () => {
+            setStatus((await copyText(json, box)) ? 'コピーしました。アプリのメニュー「公式データ取り込み」で取り込んでください。' : 'コピーできませんでした。上の欄を長押しして全部コピーしてください。');
+        });
+        const unknown = Object.keys(diag.unknownMedals);
+        if (diag.badRows > 0) {
+            showDiag(buildDiag(firstDoc, firstUrl, diag, 'old: bad rows'), `読めなかった行が ${diag.badRows} 行ありました。その曲は取り込みません。`);
+        } else if (unknown.length) {
+            showDiag(buildDiag(firstDoc, firstUrl, diag, 'old: unknown medals'), `知らないメダル画像がありました（${unknown.join(', ')}）。その譜面は取り込みません。`);
         }
         addCloseButton();
         finish();

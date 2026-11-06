@@ -114,7 +114,7 @@ function renderSongDetailHead() {
     box.innerHTML = `
         ${bannerSrc ? `<img class="sd-banner" src="${escapeHtml(bannerSrc)}" alt="${escapeHtml(song.title)}">` : ''}
         <div class="sd-main">
-            <button type="button" class="sd-medal${medalKey === '' ? ' is-empty' : ''}" onclick="openMedalModal('${safeId}')" title="押すとメダルを変更">${buildGridMedalInner(medalKey) || '<span>−</span>'}</button>
+            <button type="button" class="sd-medal${medalKey === '' ? ' is-empty' : ''}" onclick="openMedalModal('${safeId}')" title="押すとメダルを変更">${buildGridMedalInner(medalKey) || '<span>−</span>'}${buildOldMedalBadgeHtml(id, medalKey)}</button>
             <div class="sd-text">
                 <div class="sd-genre">${escapeHtml(song.genre || '')}</div>
                 <div class="sd-title">${escapeHtml(song.title)}</div>

@@ -608,6 +608,11 @@ body.exporting-image #back-to-top { display: none !important; }
     position: absolute; left: -7px; top: -7px; width: 15px; height: 15px; padding: 1px;
     background: #fff; border-radius: 50%; box-shadow: 0 0 0 1px #9e9e9e; pointer-events: auto;
 }
+/* 旧筐体のメダル（今のメダルより良いときだけ）：メダルの右上に小さく重ねる */
+#diff-grid-view .dg-medal img.dg-oldm, .sd-medal img.dg-oldm {
+    position: absolute; right: -7px; top: -7px; width: 15px; height: 15px; padding: 1px;
+    background: #fff; border-radius: 50%; box-shadow: 0 0 0 1px #8d6e63; pointer-events: auto;
+}
 #diff-grid-view .dg-medal:hover { border-color: #2196F3; box-shadow: 0 0 0 2px rgba(33,150,243,0.25); }
 .dg-medal img { width: 30px; height: 30px; object-fit: contain; display: block; }
 .dg-lock { font-size: 14px; line-height: 1; }
@@ -763,6 +768,7 @@ body.exporting-image #back-to-top { display: none !important; }
     .dg-medal img { width: 24px; height: 24px; }
     #diff-grid-view .dg-medal img.dg-rank { height: 15px; max-width: 28px; right: -7px; bottom: -5px; }
     #diff-grid-view .dg-medal img.dg-ura { width: 12px; height: 12px; left: -6px; top: -6px; }
+    #diff-grid-view .dg-medal img.dg-oldm { width: 12px; height: 12px; right: -6px; top: -6px; }
     .dg-banner-text { font-size: 10px; }
     #diff-grid-view .dg-score { font-size: 10px; padding: 0 4px; }
     .sg-rank-img { max-width: 40px; max-height: 20px; }
@@ -1856,3 +1862,5 @@ button.bs-edit.bs-cancel { margin-left: 0; border-color: #bbb; color: #666; }
 .fc-notin summary { cursor: pointer; color: #1565c0; }
 .fc-notin div { padding: 4px 0; line-height: 1.6; }
 .fc-all-done { padding: 10px; color: #2e7d32; font-size: 13px; }
+
+button.sd-medal { position: relative; overflow: visible; }
