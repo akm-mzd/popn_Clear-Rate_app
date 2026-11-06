@@ -17,9 +17,10 @@ const EAGATE_HOW_LABELS = { guess: '(推定)', fuzzy: '(似た曲名)' };
 let pendingEagateImport = null; // 確認画面で表示中の変更 { user, changes }
 
 // ---------- ブックマークレット ----------
-function getBookmarkletCode() {
+//   old：旧筐体用（メダルだけを読む。window.__popnEagateMode に 'old' を入れてから本体を読み込む）
+function getBookmarkletCode(old) {
     const src = new URL('js/eagate-bookmarklet.js', location.href).href;
-    return `javascript:(function(){var s=document.createElement('script');s.charset='UTF-8';s.src=${JSON.stringify(src)}+'?t='+Date.now();document.body.appendChild(s);})();`;
+    return `javascript:(function(){window.__popnEagateMode=${old ? "'old'" : "''"};var s=document.createElement('script');s.charset='UTF-8';s.src=${JSON.stringify(src)}+'?t='+Date.now();document.body.appendChild(s);})();`;
 }
 
 function openEagateHelpModal() {
@@ -28,6 +29,9 @@ function openEagateHelpModal() {
     const link = document.getElementById('eagate-bookmarklet-link');
     link.setAttribute('href', code);
     document.getElementById('eagate-bookmarklet-code').value = code;
+    const oldCode = getBookmarkletCode(true);
+    document.getElementById('eagate-old-bookmarklet-link').setAttribute('href', oldCode);
+    document.getElementById('eagate-old-bookmarklet-code').value = oldCode;
     document.getElementById('eagate-help-modal').style.display = 'flex';
 }
 
@@ -35,8 +39,8 @@ function closeEagateHelpModal() {
     document.getElementById('eagate-help-modal').style.display = 'none';
 }
 
-async function copyBookmarkletCode() {
-    const box = document.getElementById('eagate-bookmarklet-code');
+async function copyBookmarkletCode(boxId) {
+    const box = document.getElementById(boxId || 'eagate-bookmarklet-code');
     let ok = false;
     try {
         await navigator.clipboard.writeText(box.value);
@@ -145,7 +149,9 @@ function parseEagatePayload(text) {
         recent.push({ t: c.t.slice(0, 300), g: typeof c.g === 'string' ? c.g.slice(0, 300) : '' });
     });
     const rt = typeof data.rt === 'string' ? data.rt.slice(0, 40) : '';
-    return { charts, extraNew, pc, recent, rt, at: typeof data.at === 'string' ? data.at : '' };
+    // 旧筐体用のブックマークレットで読んだデータ（メダルだけを使う）
+    const mode = data.mode === 'old' ? 'old' : '';
+    return { charts, extraNew, pc, recent, rt, mode, at: typeof data.at === 'string' ? data.at : '' };
 }
 
 // ---------- 曲の突き合わせ ----------
@@ -323,6 +329,7 @@ function openEagateImportPreview(text) {
         return false;
     }
 
+    if (parsed.mode === 'old') return openOldMedalImportPreview(parsed);
     const { pairs, unmatchedSongs, unmatchedCharts } = matchEagateCharts(parsed.charts);
     const changes = buildEagateChanges(pairs);
     // ポックラ用の今作スコア（旧曲）。曲IDごとに { s: スコア, m: メダル }
@@ -399,6 +406,7 @@ function applyEagateImport() {
         closeEagateImportModal();
         return;
     }
+    if (pending.mode === 'old') { applyOldMedalImport(pending); return; }
     const cb = document.getElementById('eagate-record-history');
     const recordHistory = !cb || cb.checked;
     pending.changes.forEach(c => {
@@ -543,4 +551,69 @@ function migrateLocalPokkuraRecords() {
             dirtyUsers.add(user);
         }
     }
+}
+
+// ---------- 旧筐体のメダル：ユーザーごとにクラウドに保存（oldMedalRecords = { 曲ID: メダル }） ----------
+//   旧筐体用のブックマークレットで読んだメダルのうち、今のメダルより良いものだけを入れる。表示だけに使う（メダル枠の右上）
+//   取り込むたびに丸ごと置き換える（旧筐体のメダルは下がらないので、最新の読み取りがいつも一番良い）
+function getOldMedalRecords(user = currentUser) {
+    if (!allUsersData[user]) allUsersData[user] = emptyUser();
+    if (!allUsersData[user].oldMedalRecords) allUsersData[user].oldMedalRecords = {};
+    return allUsersData[user].oldMedalRecords;
+}
+
+function openOldMedalImportPreview(parsed) {
+    const { pairs, unmatchedCharts } = matchEagateCharts(parsed.charts);
+    const rankOf = k => (MEDAL_TYPES[k] || MEDAL_TYPES['']).rank;
+    const records = {};
+    const list = [];
+    pairs.forEach(({ song, chart }) => {
+        if (!chart.medal || records[song.id]) return;
+        const cur = clearRecords[song.id] || '';
+        if (rankOf(chart.medal) <= rankOf(cur)) return;
+        records[song.id] = chart.medal;
+        list.push({ song, cur, old: chart.medal });
+    });
+    const before = getOldMedalRecords();
+    const added = list.filter(x => before[x.song.id] !== x.old).length;
+    pendingEagateImport = { user: currentUser, mode: 'old', records };
+    list.sort((a, b) => (parseInt(b.song.level, 10) - parseInt(a.song.level, 10)) || (rankOf(b.old) - rankOf(a.old)));
+    const when = parsed.at ? new Date(parsed.at) : null;
+    const whenText = when && !isNaN(when) ? `${when.getMonth() + 1}/${when.getDate()} ${when.getHours()}:${String(when.getMinutes()).padStart(2, '0')} に読み取った旧筐体のデータ` : '旧筐体のデータ';
+    let html = `<div class="eagate-summary">
+        <div>${escapeHtml(whenText)}</div>
+        <div>旧筐体の譜面 <b>${parsed.charts.length}</b> 件のうち、アプリの曲と合ったもの <b>${pairs.length}</b> 件</div>
+        <div>今のメダルより旧筐体のメダルの方が良い曲 <b>${list.length}</b> 曲（前回から変わった曲 ${added} 曲）</div>
+        <div style="font-size:0.85em;color:#666;">※ 旧筐体のメダルは、メダル枠の右上に小さく出すだけです。今のメダル・統計・クリア率・目標・ポックラは変わりません。前回取り込んだ旧筐体のメダルは、この内容で置き換えます。</div>
+    </div>`;
+    if (list.length > 0) {
+        const rows = list.map(x => `<tr>
+            <td><span class="level-badge">${escapeHtml(x.song.level)}</span> ${escapeHtml(x.song.title)}</td>
+            <td>${medalLabelHtml(x.cur)}</td>
+            <td>${medalLabelHtml(x.old)}</td>
+        </tr>`).join('');
+        html += `<div class="eagate-change-list"><table><thead><tr><th>曲</th><th>今のメダル</th><th>旧筐体</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    } else {
+        html += '<div style="margin:10px 0;color:#666;">旧筐体の方が良い曲はありません。</div>';
+    }
+    if (unmatchedCharts.length > 0) {
+        const items = unmatchedCharts.map(c => `<li>${c.level !== null ? `<span class="level-badge">${c.level}</span> ` : ''}${escapeHtml(c.title)} <span style="color:#888;">(${escapeHtml(c.genre)})</span></li>`).join('');
+        html += `<details class="eagate-unmatched"><summary>アプリの曲と合わなかった旧筐体の譜面（${unmatchedCharts.length}件）</summary>
+            <div style="font-size:0.8em;color:#666;">アプリにない曲か、曲名・ジャンルの書き方が違う曲です。</div><ul>${items}</ul></details>`;
+    }
+    document.getElementById('eagate-import-body').innerHTML = html;
+    const applyBtn = document.getElementById('eagate-import-apply');
+    applyBtn.textContent = `${currentUser} さんに旧筐体のメダルを反映`;
+    applyBtn.disabled = list.length === 0 && Object.keys(before).length === 0;
+    document.getElementById('eagate-import-modal').style.display = 'flex';
+    return true;
+}
+
+function applyOldMedalImport(pending) {
+    if (!allUsersData[currentUser]) allUsersData[currentUser] = emptyUser();
+    allUsersData[currentUser].oldMedalRecords = pending.records;
+    closeEagateImportModal();
+    scheduleAutoSave();
+    renderTable();
+    showToast('toast-eagate', `旧筐体のメダルを反映しました（${Object.keys(pending.records).length}曲）`, '#4caf50', 3000);
 }

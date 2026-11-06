@@ -6,7 +6,7 @@
     <title>Pop’n Clear Rate app</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
-    <link rel="stylesheet" href="style.css?v=3.38.1.0">
+    <link rel="stylesheet" href="style.css?v=3.39.0.0">
 </head>
 <body>
     <!-- 新しいデザイン（ver 3）の上部バーとナビ。以前の見た目では隠れる（js/ui-new.js） -->
@@ -775,6 +775,11 @@
             </div>
             <textarea id="eagate-bookmarklet-code" readonly></textarea>
             <button onclick="copyBookmarkletCode()" class="btn-eagate">コードをコピー</button>
+            <div class="eagate-help-title">旧筐体のメダル（旧筐体用のブックマークレット）</div>
+            <div>旧筐体（Jam&amp;Fizz）のプレーデータのページ（<code>/game/popn/jamfizz/playdata/</code>）で使う、別のブックマークレットです。登録のしかたは上と同じです。Lv46〜50 のメダルだけを読み、今のメダルより良い曲だけを、メダル枠の右上に小さく出します（今のメダル・統計は変わりません）。
+                <a id="eagate-old-bookmarklet-link" class="eagate-bookmarklet-link" href="#" onclick="onBookmarkletLinkClick(event)">ポップン旧筐体</a></div>
+            <textarea id="eagate-old-bookmarklet-code" readonly></textarea>
+            <button onclick="copyBookmarkletCode('eagate-old-bookmarklet-code')" class="btn-eagate">旧筐体用のコードをコピー</button>
             <div style="font-size: 0.8em; color: #666; margin-top: 8px;">うまく読めなかったときは、公式サイトの上に「診断データをコピー」が出ます。それを作者に送ってください。</div>
             <div class="modal-actions" style="justify-content: flex-end;">
                 <button onclick="closeEagateHelpModal()" style="border: 1px solid #ccc; background: #eee;">閉じる</button>
@@ -832,24 +837,24 @@
     <button id="back-to-top" onclick="scrollToTop()" title="トップに戻る">↑</button>
 
     <!-- 読み込み順に意味があります（config が最初、app が最後） -->
-    <script src="js/config.js?v=3.38.1.0"></script>
-    <script src="js/utils.js?v=3.38.1.0"></script>
-    <script src="js/cloud.js?v=3.38.1.0"></script>
-    <script src="js/users.js?v=3.38.1.0"></script>
-    <script src="js/table.js?v=3.38.1.0"></script>
-    <script src="js/modals.js?v=3.38.1.0"></script>
-    <script src="js/memo.js?v=3.38.1.0"></script>
-    <script src="js/history.js?v=3.38.1.0"></script>
-    <script src="js/growth.js?v=3.38.1.0"></script>
-    <script src="js/goals.js?v=3.38.1.0"></script>
-    <script src="js/admin.js?v=3.38.1.0"></script>
-    <script src="js/image-export.js?v=3.38.1.0"></script>
-    <script src="js/eagate-import.js?v=3.38.1.0"></script>
-    <script src="js/wiki-import.js?v=3.38.1.0"></script>
-    <script src="js/fc-import.js?v=3.38.1.0"></script>
-    <script src="js/menu.js?v=3.38.1.0"></script>
-    <script src="js/ui-new.js?v=3.38.1.0"></script>
-    <script src="js/app.js?v=3.38.1.0"></script>
+    <script src="js/config.js?v=3.39.0.0"></script>
+    <script src="js/utils.js?v=3.39.0.0"></script>
+    <script src="js/cloud.js?v=3.39.0.0"></script>
+    <script src="js/users.js?v=3.39.0.0"></script>
+    <script src="js/table.js?v=3.39.0.0"></script>
+    <script src="js/modals.js?v=3.39.0.0"></script>
+    <script src="js/memo.js?v=3.39.0.0"></script>
+    <script src="js/history.js?v=3.39.0.0"></script>
+    <script src="js/growth.js?v=3.39.0.0"></script>
+    <script src="js/goals.js?v=3.39.0.0"></script>
+    <script src="js/admin.js?v=3.39.0.0"></script>
+    <script src="js/image-export.js?v=3.39.0.0"></script>
+    <script src="js/eagate-import.js?v=3.39.0.0"></script>
+    <script src="js/wiki-import.js?v=3.39.0.0"></script>
+    <script src="js/fc-import.js?v=3.39.0.0"></script>
+    <script src="js/menu.js?v=3.39.0.0"></script>
+    <script src="js/ui-new.js?v=3.39.0.0"></script>
+    <script src="js/app.js?v=3.39.0.0"></script>
 
 </body>
 </html>

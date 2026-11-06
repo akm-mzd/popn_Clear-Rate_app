@@ -1747,6 +1747,17 @@ function buildGridMedalInner(medalKey) {
 }
 
 // 裏メダルの小さな表示（表示しているメダルがイージーで、裏メダルがある曲だけ。メダル枠の左上に重ねる）
+// 旧筐体のメダル：今のメダルより良いときだけ、メダル枠の右上に小さく重ねる（表示だけ。統計などには数えない）
+function buildOldMedalBadgeHtml(songId, shownMedal) {
+    if (typeof getOldMedalRecords !== 'function') return '';
+    const old = getOldMedalRecords()[songId];
+    const m = old ? MEDAL_TYPES[old] : null;
+    const cur = MEDAL_TYPES[shownMedal] || MEDAL_TYPES[''];
+    if (!m || !m.imgUrl || m.rank <= cur.rank) return '';
+    const title = `旧筐体：${m.label}`;
+    return `<img class="dg-oldm" src="${escapeHtml(m.imgUrl)}" alt="${escapeHtml(title)}" title="${escapeHtml(title)}" loading="lazy">`;
+}
+
 function buildUraBadgeHtml(songId, shownMedal) {
     if (shownMedal !== 'イージー' || typeof getUraMedalInfo !== 'function') return '';
     const info = getUraMedalInfo(songId);
@@ -1882,7 +1893,7 @@ function buildDiffGridCellHtml(song, showScore, extraHtml = '') {
     const banner = `<a class="dg-banner" data-sid="${escapeHtml(song.id)}" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（攻略wikiを開く）">${bannerInner}${buildMemoMarkHtml(song.id)}</a>`;
     return `
                 <div class="dg-cell">
-                    <button type="button" class="dg-medal${medalClass}" onclick="openMedalModal('${jsStringAttr(song.id)}')" title="メダルを変更">${buildGridMedalInner(medalKey)}${rankHtml}${buildUraBadgeHtml(song.id, medalKey)}</button>
+                    <button type="button" class="dg-medal${medalClass}" onclick="openMedalModal('${jsStringAttr(song.id)}')" title="メダルを変更">${buildGridMedalInner(medalKey)}${rankHtml}${buildUraBadgeHtml(song.id, medalKey)}${buildOldMedalBadgeHtml(song.id, medalKey)}</button>
                     ${extraHtml ? `<div class="dg-banner-wrap sv-wrap">${banner}${extraHtml}</div>` : banner}
                 </div>`;
 }
@@ -2113,7 +2124,7 @@ function renderBadGrid(targetSongs) {
                 : `<span class="dg-banner-text">${escapeHtml(song.title)}</span>`;
             cells += `
                 <div class="dg-cell">
-                    <button type="button" class="dg-medal${k === '' ? ' dg-medal-empty' : ''}" onclick="openMedalModal('${jsStringAttr(song.id)}')" title="メダル・BAD を変更">${buildGridMedalInner(k)}${rankHtml}${buildUraBadgeHtml(song.id, k)}${badHtml}</button>
+                    <button type="button" class="dg-medal${k === '' ? ' dg-medal-empty' : ''}" onclick="openMedalModal('${jsStringAttr(song.id)}')" title="メダル・BAD を変更">${buildGridMedalInner(k)}${rankHtml}${buildUraBadgeHtml(song.id, k)}${buildOldMedalBadgeHtml(song.id, k)}${badHtml}</button>
                     <a class="dg-banner" data-sid="${escapeHtml(song.id)}" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（Lv${escapeHtml(song.level)}・攻略wikiを開く）">${bannerInner}${buildMemoMarkHtml(song.id)}</a>
                 </div>`;
         });
@@ -2170,7 +2181,7 @@ function renderMedalGrid(targetSongs) {
             const diffText = song.diffRaw ? `・${song.diffRaw}` : '';
             cells += `
                 <div class="dg-cell">
-                    <button type="button" class="dg-medal${k === '' ? ' dg-medal-empty' : ''}" onclick="openMedalModal('${jsStringAttr(song.id)}')" title="メダルを変更">${buildGridMedalInner(k)}${rankHtml}${buildUraBadgeHtml(song.id, k)}</button>
+                    <button type="button" class="dg-medal${k === '' ? ' dg-medal-empty' : ''}" onclick="openMedalModal('${jsStringAttr(song.id)}')" title="メダルを変更">${buildGridMedalInner(k)}${rankHtml}${buildUraBadgeHtml(song.id, k)}${buildOldMedalBadgeHtml(song.id, k)}</button>
                     <a class="dg-banner" data-sid="${escapeHtml(song.id)}" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（Lv${escapeHtml(song.level)}${escapeHtml(diffText)}・攻略wikiを開く）">${bannerInner}${buildMemoMarkHtml(song.id)}</a>
                 </div>`;
         });
@@ -2235,7 +2246,7 @@ function renderScoreGrid(targetSongs) {
             const safeId = jsStringAttr(song.id);
             cells += `
                 <div class="dg-cell">
-                    <button type="button" class="dg-medal${medalClass}" onclick="openMedalModal('${safeId}')" title="メダルを変更">${buildGridMedalInner(medalKey)}${buildUraBadgeHtml(song.id, medalKey)}</button>
+                    <button type="button" class="dg-medal${medalClass}" onclick="openMedalModal('${safeId}')" title="メダルを変更">${buildGridMedalInner(medalKey)}${buildUraBadgeHtml(song.id, medalKey)}${buildOldMedalBadgeHtml(song.id, medalKey)}</button>
                     <div class="dg-banner-wrap">
                         <a class="dg-banner" data-sid="${escapeHtml(song.id)}" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（攻略wikiを開く）">${bannerInner}${buildMemoMarkHtml(song.id)}</a>
                         <button type="button" class="dg-score${score ? '' : ' dg-score-none'}" onclick="openScoreModal('${safeId}')" title="スコアを変更">${score ? score : '-'}</button>
@@ -2679,7 +2690,7 @@ function buildPokkuraSectionHtml(label, sub, color, list, COLS, pointText) {
             : `<span class="pk-lv">${escapeHtml(song.level)}</span>`;
         cells += `
             <div class="dg-cell">
-                <button type="button" class="dg-medal${medalClass}" onclick="openMedalModal('${safeId}')" title="${escapeHtml(medalTitle)}">${buildGridMedalInner(medalKey)}${buildUraBadgeHtml(song.id, medalKey)}</button>
+                <button type="button" class="dg-medal${medalClass}" onclick="openMedalModal('${safeId}')" title="${escapeHtml(medalTitle)}">${buildGridMedalInner(medalKey)}${buildUraBadgeHtml(song.id, medalKey)}${buildOldMedalBadgeHtml(song.id, medalKey)}</button>
                 <div class="dg-banner-wrap">
                     <a class="dg-banner" data-sid="${escapeHtml(song.id)}" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(song.title)}（Lv${escapeHtml(song.level)}・攻略wikiを開く）">${bannerInner}${buildMemoMarkHtml(song.id)}</a>
                     ${lvHtml}
