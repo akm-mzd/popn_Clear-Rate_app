@@ -12,7 +12,7 @@ const EAGATE_MAX_LEVEL = 50;
 const EAGATE_MAX_TEXT_LENGTH = 3000000;
 const EAGATE_DIFF_ORDER = { E: 0, N: 1, H: 2, EX: 3, '': 3 };
 
-const EAGATE_HOW_LABELS = { guess: '(推定)', fuzzy: '(似た曲名)' };
+const EAGATE_HOW_LABELS = { guess: '(推定)', fuzzy: '(似た曲名)', lv: '(レベル違い)' };
 
 let pendingEagateImport = null; // 確認画面で表示中の変更 { user, changes }
 
@@ -204,8 +204,9 @@ function editDistance(a, b) {
 
 // 公式の譜面を、アプリの曲に割り当てる。
 // 返り値 { pairs: [{ song, chart, how }], unmatchedSongs, unmatchedCharts }
-//   how：'' = 曲名で一致 / 'guess' = 同じ曲名が複数あり推定（UPPERはノーツの多い方） / 'fuzzy' = 似た曲名
-function matchEagateCharts(charts) {
+//   how：'' = 曲名で一致 / 'guess' = 同じ曲名が複数あり推定（UPPERはノーツの多い方） / 'fuzzy' = 似た曲名 / 'lv' = レベル違い
+//   anyLevel：旧筐体のデータ。今作でレベルが変わった曲があるので、最後にレベルを見ずに曲名で合わせる
+function matchEagateCharts(charts, anyLevel) {
     const targets = songs.filter(isEagateTargetSong);
     const assigned = new Map(); // 曲ID → { chart, how }
     const used = new Set();     // 割り当て済みの公式の譜面
@@ -279,6 +280,25 @@ function matchEagateCharts(charts) {
         const offset = left.length - use.length;
         use.forEach((c, i) => assign(left[offset + i], c, left.length > 1 ? 'guess' : ''));
     });
+
+    // ④ 旧筐体だけ：まだ合っていない譜面を、レベルを見ずに同じ曲名の曲（まだ合っていないもの）と合わせる
+    //    同じ曲名が複数あれば、ジャンルが同じ曲 → 旧筐体の曲名に UPPER とあれば UPPER の曲 → 今のレベルが一番近い曲
+    //    （旧筐体の一覧は UPPER と書いていないことがある。近さが同じなら、レベルの高い方＝UPPER の方にする）
+    if (anyLevel) {
+        charts.filter(c => !used.has(c) && c.level !== null).forEach(c => {
+            const t = normalizeSongText(c.title);
+            if (!t) return;
+            let cands = targets.filter(s => !assigned.has(s.id) && normalizeSongText(s.title) === t);
+            const narrow = test => { const hit = cands.filter(test); if (hit.length > 0) cands = hit; };
+            if (cands.length > 1) narrow(s => normalizeSongText(s.genre) === normalizeSongText(c.genre));
+            if (cands.length > 1 && isUpperText(c.title)) narrow(s => songSaysUpper(s));
+            if (cands.length > 1) {
+                cands.sort((a, b) => (Math.abs(songLv(a) - c.level) - Math.abs(songLv(b) - c.level)) || (songLv(b) - songLv(a)) || (songSaysUpper(b) - songSaysUpper(a)));
+                cands = [cands[0]];
+            }
+            if (cands.length === 1) assign(cands[0], c, 'lv');
+        });
+    }
 
     const pairs = [];
     targets.forEach(s => { if (assigned.has(s.id)) pairs.push({ song: s, chart: assigned.get(s.id).chart, how: assigned.get(s.id).how }); });
@@ -563,16 +583,16 @@ function getOldMedalRecords(user = currentUser) {
 }
 
 function openOldMedalImportPreview(parsed) {
-    const { pairs, unmatchedCharts } = matchEagateCharts(parsed.charts);
+    const { pairs, unmatchedCharts } = matchEagateCharts(parsed.charts, true);
     const rankOf = k => (MEDAL_TYPES[k] || MEDAL_TYPES['']).rank;
     const records = {};
     const list = [];
-    pairs.forEach(({ song, chart }) => {
+    pairs.forEach(({ song, chart, how }) => {
         if (!chart.medal || records[song.id]) return;
         const cur = clearRecords[song.id] || '';
         if (rankOf(chart.medal) <= rankOf(cur)) return;
         records[song.id] = chart.medal;
-        list.push({ song, cur, old: chart.medal });
+        list.push({ song, cur, old: chart.medal, how, oldLv: chart.level });
     });
     const before = getOldMedalRecords();
     const added = list.filter(x => before[x.song.id] !== x.old).length;
@@ -588,7 +608,7 @@ function openOldMedalImportPreview(parsed) {
     </div>`;
     if (list.length > 0) {
         const rows = list.map(x => `<tr>
-            <td><span class="level-badge">${escapeHtml(x.song.level)}</span> ${escapeHtml(x.song.title)}</td>
+            <td><span class="level-badge">${escapeHtml(x.song.level)}</span> ${escapeHtml(x.song.title)}${x.how === 'lv' ? ` <span class="eagate-how">(旧筐体では Lv${escapeHtml(x.oldLv)})</span>` : EAGATE_HOW_LABELS[x.how] ? ` <span class="eagate-how">${EAGATE_HOW_LABELS[x.how]}</span>` : ''}</td>
             <td>${medalLabelHtml(x.cur)}</td>
             <td>${medalLabelHtml(x.old)}</td>
         </tr>`).join('');
