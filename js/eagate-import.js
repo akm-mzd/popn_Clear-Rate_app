@@ -282,14 +282,20 @@ function matchEagateCharts(charts, anyLevel) {
     });
 
     // ④ 旧筐体だけ：まだ合っていない譜面を、レベルを見ずに同じ曲名の曲（まだ合っていないもの）と合わせる
-    //    同じ曲名が複数あればジャンルで決め、それでも1曲に決まらなければ合わせない
+    //    同じ曲名が複数あれば、ジャンルが同じ曲 → 旧筐体の曲名に UPPER とあれば UPPER の曲 → 今のレベルが一番近い曲
+    //    （旧筐体の一覧は UPPER と書いていないことがある。近さが同じなら、レベルの高い方＝UPPER の方にする）
     if (anyLevel) {
-        charts.filter(c => !used.has(c)).forEach(c => {
+        charts.filter(c => !used.has(c) && c.level !== null).forEach(c => {
             const t = normalizeSongText(c.title);
             if (!t) return;
             let cands = targets.filter(s => !assigned.has(s.id) && normalizeSongText(s.title) === t);
-            if (cands.length > 1) cands = cands.filter(s => normalizeSongText(s.genre) === normalizeSongText(c.genre));
-            if (cands.length > 1) cands = cands.filter(s => songSaysUpper(s) === isUpperText(c.title));
+            const narrow = test => { const hit = cands.filter(test); if (hit.length > 0) cands = hit; };
+            if (cands.length > 1) narrow(s => normalizeSongText(s.genre) === normalizeSongText(c.genre));
+            if (cands.length > 1 && isUpperText(c.title)) narrow(s => songSaysUpper(s));
+            if (cands.length > 1) {
+                cands.sort((a, b) => (Math.abs(songLv(a) - c.level) - Math.abs(songLv(b) - c.level)) || (songLv(b) - songLv(a)) || (songSaysUpper(b) - songSaysUpper(a)));
+                cands = [cands[0]];
+            }
             if (cands.length === 1) assign(cands[0], c, 'lv');
         });
     }
