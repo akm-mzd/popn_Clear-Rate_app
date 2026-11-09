@@ -25,6 +25,7 @@ function applyFetchedData(data) {
         if (!allUsersData[u].oldMedalRecords) allUsersData[u].oldMedalRecords = {};
         if (!allUsersData[u].nextRecords) allUsersData[u].nextRecords = {};
         if (!allUsersData[u].knockRecords) allUsersData[u].knockRecords = {};
+        if (!allUsersData[u].knockBannerRecords) allUsersData[u].knockBannerRecords = {};
     }
     if (!allUsersData[currentUser]) {
         currentUser = "Guest";
@@ -79,7 +80,7 @@ const SYNC_INTERVAL_MS = 10000;   // 他端末の変更を確認する間隔（1
 const AUTOSAVE_DELAY_MS = 800;    // 変更してから保存を始めるまでの時間（0.8秒）
 // pokkuraRecords = ポックラ用の公式データ（旧曲の今作スコアなど。eagate-import.js）
 // goalRecords = 目標（goals.js）、pokkuraFlagRecords = 旧筐体でつけたイージーの扱い（table.js）
-const RECORD_TYPES = ['clearRecords', 'scoreRecords', 'memoRecords', 'historyRecords', 'pokkuraRecords', 'goalRecords', 'pokkuraFlagRecords', 'recentRecords', 'memoConfigRecords', 'attrConfigRecords', 'pokkuraHistRecords', 'badRecords', 'badReachRecords', 'oldMedalRecords', 'nextRecords', 'knockRecords'];
+const RECORD_TYPES = ['clearRecords', 'scoreRecords', 'memoRecords', 'historyRecords', 'pokkuraRecords', 'goalRecords', 'pokkuraFlagRecords', 'recentRecords', 'memoConfigRecords', 'attrConfigRecords', 'pokkuraHistRecords', 'badRecords', 'badReachRecords', 'oldMedalRecords', 'nextRecords', 'knockRecords', 'knockBannerRecords'];
 
 let cloudReady = false;          // 最初のクラウド読み込みが成功したか
 const dirtyUsers = new Set();    // 未保存の変更があるユーザー
@@ -421,7 +422,8 @@ async function saveToCloud(isSongUpdate = false, targetUserName = currentUser, c
             badReachRecords: allUsersData[targetUserName]?.badReachRecords || {},
             oldMedalRecords: allUsersData[targetUserName]?.oldMedalRecords || {},
             nextRecords: allUsersData[targetUserName]?.nextRecords || {},
-            knockRecords: allUsersData[targetUserName]?.knockRecords || {}
+            knockRecords: allUsersData[targetUserName]?.knockRecords || {},
+            knockBannerRecords: allUsersData[targetUserName]?.knockBannerRecords || {}
         };
 
         if (isSongUpdate) {

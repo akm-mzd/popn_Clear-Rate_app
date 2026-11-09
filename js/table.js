@@ -3109,7 +3109,7 @@ function buildKnockCellHtml(c) {
                     ${markBtn}
                     ${isKnockLinkable(c)
                         ? `<button type="button" class="dg-banner kn-noapp kn-linkable" onclick="openKnockLinkModal('${jsStringAttr(c.key)}')" title="${escapeHtml(c.item.t)}（押してアプリの曲につなぐ）"><span class="kn-name">${escapeHtml(c.item.t)}</span><span class="kn-lv">${c.item.bpm !== undefined ? `Lv${escapeHtml(c.item.lv)}・` : ''}🔗 曲につなぐ</span></button>`
-                        : `<div class="dg-banner kn-noapp" title="${escapeHtml(c.item.t)}（アプリに無い譜面）"><span class="kn-name">${escapeHtml(c.item.t)}</span>${c.item.bpm !== undefined ? `<span class="kn-lv">Lv${escapeHtml(c.item.lv)}</span>` : ''}</div>`}
+                        : buildKnockNoAppHtml(c)}
                 </div>`;
     }
     const bannerSrc = safeUrl(song.bannerUrl, true);
@@ -3227,4 +3227,81 @@ async function linkKnockToSong(songId) {
     renderTable();
     showToast('toast-eagate', song ? `「${song.title}」につなぎました` : 'つなぎを外しました', '#4caf50', 2500);
     await saveToCloud(true);
+}
+
+// ---------- アプリに無い譜面のバナー（バナー用のブックマークレットで公式の楽曲一覧から集め、クラウドに上げた画像の URL） ----------
+//   knockBannerRecords = { 'ran:表の書き方' / 'sran:表の書き方': 画像の URL }。取り込んだユーザーの記録に入れ、表示は全ユーザーの記録から探す（全員共通）
+function getKnockBannerUrl(key) {
+    const own = allUsersData[currentUser] && allUsersData[currentUser].knockBannerRecords;
+    if (own && own[key]) return own[key];
+    for (const u in allUsersData) {
+        const recs = allUsersData[u] && allUsersData[u].knockBannerRecords;
+        if (recs && recs[key]) return recs[key];
+    }
+    return '';
+}
+
+function getKnockBannerRecords(user = currentUser) {
+    if (!allUsersData[user]) allUsersData[user] = emptyUser();
+    if (!allUsersData[user].knockBannerRecords) allUsersData[user].knockBannerRecords = {};
+    return allUsersData[user].knockBannerRecords;
+}
+
+// アプリに無い譜面の枠（つなげない枠）。バナーがあれば画像を出す
+function buildKnockNoAppHtml(c) {
+    const src = safeUrl(getKnockBannerUrl(c.key), true);
+    const lv = c.item.bpm !== undefined ? `<span class="kn-lv">Lv${escapeHtml(c.item.lv)}</span>` : '';
+    if (src) {
+        return `<div class="dg-banner kn-noapp kn-hasimg${c.item.d === 'H' ? ' kn-h' : ''}" title="${escapeHtml(c.item.t)}（アプリに無い譜面）"><img src="${escapeHtml(src)}" alt="${escapeHtml(c.item.t)}" loading="lazy">${lv ? `<span class="kn-lv-badge">Lv${escapeHtml(c.item.lv)}</span>` : ''}</div>`;
+    }
+    return `<div class="dg-banner kn-noapp" title="${escapeHtml(c.item.t)}（アプリに無い譜面）"><span class="kn-name">${escapeHtml(c.item.t)}</span>${lv}</div>`;
+}
+
+// 受け取ったバナーの確認（公式データ取り込みと同じ画面）
+const KNOCK_BANNER_MAX_BYTES = 300000;
+function openKnockBannerImport(data) {
+    const validKeys = new Set();
+    Object.values(KNOCK_TABLES).forEach(tb => tb.levels.forEach(l => l.items.forEach(it => validKeys.add(`${tb.prefix}:${it.t}`))));
+    const images = (Array.isArray(data.images) ? data.images : []).map(x => ({
+        k: (Array.isArray(x && x.k) ? x.k : []).filter(k => typeof k === 'string' && validKeys.has(k)),
+        d: x && typeof x.d === 'string' && /^data:image\/(png|webp|jpeg);base64,[A-Za-z0-9+/=]+$/.test(x.d) && x.d.length < KNOCK_BANNER_MAX_BYTES ? x.d : ''
+    })).filter(x => x.k.length && x.d);
+    if (images.length === 0) { alert('バナーのデータが読めませんでした。'); return false; }
+    const todo = images.filter(x => x.k.some(k => !getKnockBannerUrl(k)));
+    const keyCount = images.reduce((n, x) => n + x.k.length, 0);
+    pendingEagateImport = { user: currentUser, mode: 'knockBanner', images: todo };
+    document.getElementById('eagate-import-body').innerHTML = `<div class="eagate-summary">
+        <div>ノック表の <b>${keyCount}</b> 譜面ぶんのバナー <b>${images.length}</b> 枚を受け取りました。</div>
+        <div>まだ保存していないもの <b>${todo.length}</b> 枚をクラウドに上げて、ノック表のアプリに無い譜面の枠に出します（全ユーザー共通）。</div>
+        <div style="font-size:0.85em;color:#666;">※ 1枚ずつクラウドに上げるので、数分かかります。終わるまでこのページを開いたままにしてください。途中で止まっても、もう一度取り込めば残りから続きます。</div>
+    </div>
+    <div class="kb-preview">${todo.slice(0, 12).map(x => `<img src="${escapeHtml(x.d)}" alt="">`).join('')}</div>`;
+    const applyBtn = document.getElementById('eagate-import-apply');
+    applyBtn.textContent = `${todo.length}枚をクラウドに保存`;
+    applyBtn.disabled = todo.length === 0;
+    document.getElementById('eagate-import-modal').style.display = 'flex';
+    return true;
+}
+
+async function applyKnockBannerImport(pending) {
+    closeEagateImportModal();
+    const recs = getKnockBannerRecords();
+    const list = pending.images.slice();
+    let done = 0, failed = 0, next = 0;
+    const total = list.length;
+    const nameOf = x => 'knock_' + x.k[0].replace(/^[a-z]+:/, '').replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 60);
+    const worker = async () => {
+        while (next < list.length) {
+            const x = list[next++];
+            const url = await uploadImageToCloud(x.d, nameOf(x));
+            if (url) x.k.forEach(k => { recs[k] = url; }); else failed++;
+            done++;
+            showToast('toast-eagate', `バナーをクラウドに保存中… ${done}/${total}`, '#1565c0', 0);
+            if (done % 10 === 0) { scheduleAutoSave(); renderTable(); }
+        }
+    };
+    await Promise.all([worker(), worker(), worker()]);
+    scheduleAutoSave();
+    renderTable();
+    showToast('toast-eagate', failed ? `バナーを ${total - failed}枚保存しました（${failed}枚は失敗。もう一度取り込むと続きから保存します）` : `バナーを ${total}枚保存しました`, failed ? '#e65100' : '#4caf50', 5000);
 }
