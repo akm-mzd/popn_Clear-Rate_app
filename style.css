@@ -1801,6 +1801,10 @@ body.view-pokkura #nu-filterbar,
 body.view-pokkura #nu-stat-card,
 body.view-pokkura #stats-display,
 body.view-pokkura #extended-stats-display { display: none !important; }
+body.view-knock #nu-filterbar,
+body.view-knock #nu-stat-card,
+body.view-knock #stats-display,
+body.view-knock #extended-stats-display { display: none !important; }
 .sv-month-bar { justify-content: center; gap: 12px; flex-wrap: nowrap; }
 #diff-grid-view .sv-month-btn { width: 36px; height: 32px; margin: 0; padding: 0; border: 1px solid #ddd; border-radius: 8px; background: #fff; color: #6a3fb0; font-size: 20px; font-weight: bold; line-height: 1; cursor: pointer; font-family: inherit; }
 #diff-grid-view .sv-month-btn:disabled { color: #ccc; cursor: default; }
@@ -1865,3 +1869,49 @@ button.bs-edit.bs-cancel { margin-left: 0; border-color: #bbb; color: #666; }
 
 button.sd-medal { position: relative; overflow: visible; }
 .filter-medal-extra { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 0.85em; color: #555; cursor: pointer; }
+
+/* 次にやる（目標のシートの一番上） */
+.next-box { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--nu-line, #eee); }
+.next-box:empty { display: none; }
+.nx-head { display: flex; align-items: center; gap: 8px; }
+.nx-heading { font-weight: bold; font-size: 14px; color: #333; }
+.nx-count { font-size: 12px; color: #888; }
+.nx-search-wrap { position: relative; }
+#menu-panel #next-search, #next-search { width: 100%; box-sizing: border-box; height: 34px; padding: 0 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; }
+.nx-suggest { margin-top: 4px; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; background: #fff; }
+#menu-panel button.nx-suggest-item, button.nx-suggest-item { display: flex; align-items: center; gap: 8px; width: 100%; margin: 0; padding: 6px 8px; border: none; border-bottom: 1px solid #f0f0f0; background: #fff; text-align: left; cursor: pointer; font-family: inherit; min-height: 0; color: #333; }
+button.nx-suggest-item.on { background: #f1f8e9; }
+.nx-suggest-none { padding: 6px 8px; font-size: 12px; color: #888; }
+.nx-add { margin-left: auto; font-size: 12px; color: #2e7d32; font-weight: bold; white-space: nowrap; }
+.nx-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid #f5f5f5; }
+#menu-panel button.nx-medal, button.nx-medal { flex-shrink: 0; width: 34px; height: 34px; margin: 0; padding: 2px; border: 1px solid #ddd; border-radius: 6px; background: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; min-height: 0; }
+.nx-medal img { max-width: 100%; max-height: 100%; }
+.nx-medal { font-size: 9px; line-height: 1.1; color: #888; overflow: hidden; }
+.nx-banner { flex-shrink: 0; width: 96px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 4px; overflow: hidden; background: #eceff1; -webkit-touch-callout: none; }
+.nx-banner img { width: 100%; height: 100%; object-fit: cover; }
+.nx-banner-text { font-size: 10px; color: #555; padding: 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nx-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.nx-title { font-size: 13px; font-weight: bold; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nx-genre { font-size: 11px; color: #888; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#menu-panel button.nx-remove, button.nx-remove { flex-shrink: 0; width: 30px; height: 30px; margin: 0; padding: 0; border: 1px solid #ddd; border-radius: 50%; background: #fff; color: #999; cursor: pointer; min-height: 0; font-size: 13px; }
+.nx-empty { font-size: 12px; color: #999; padding: 4px 0; }
+.memo-editor button.me-star.me-next.on { background: #e8f5e9; border-color: #43a047; color: #2e7d32; }
+.memo-mark-next { color: #2e7d32; font-weight: bold; font-size: 10px; }
+
+/* 乱・S乱ノック表 */
+.kn-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 2px 0 6px; font-size: 13px; color: #444; }
+.kn-summary img { width: 18px; height: 18px; vertical-align: middle; margin-right: 3px; border-radius: 50%; }
+.kn-total { color: #888; }
+#diff-grid-view .dg-medal.kn-mark { padding: 0; overflow: visible; }
+#diff-grid-view .dg-medal.kn-mark > img { width: 100%; height: 100%; object-fit: contain; border-radius: 4px; }
+.kn-medal { position: absolute; right: -6px; bottom: -6px; width: 16px; height: 16px; padding: 1px; background: #fff; border-radius: 50%; box-shadow: 0 0 0 1px #bdbdbd; pointer-events: none; }
+#diff-grid-view .kn-medal img { width: 100%; height: 100%; }
+.dg-banner.kn-noapp { display: flex; flex-direction: column; justify-content: center; align-items: stretch; padding: 0 6px; background: #f5f5f5; border: 1px dashed #ccc; box-sizing: border-box; overflow: hidden; }
+.kn-name { display: block; width: 100%; text-align: center; font-size: 11px; font-weight: bold; color: #555; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kn-lv { display: block; text-align: center; }
+.kn-lv { font-size: 10px; color: #999; }
+.knock-mark-content { max-width: 340px; }
+.kn-choices { display: flex; justify-content: center; gap: 10px; }
+button.kn-choice { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 90px; margin: 0; padding: 8px 4px; border: 2px solid #e0e0e0; border-radius: 10px; background: #fff; cursor: pointer; font-family: inherit; font-size: 12px; color: #444; }
+button.kn-choice img { width: 56px; height: 56px; object-fit: contain; }
+button.kn-choice.on { border-color: #6a3fb0; background: #f3e5f5; font-weight: bold; }

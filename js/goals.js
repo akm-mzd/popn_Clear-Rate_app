@@ -773,6 +773,7 @@ function shufflePractice() {
 }
 
 function renderPracticeBox(forceNew) {
+    if (typeof renderNextBox === 'function') renderNextBox(); // 上の「次にやる」も一緒に描く
     const box = document.getElementById('practice-box');
     if (!box || songs.length === 0) return;
     const items = loadPracticeMenu(!!forceNew);

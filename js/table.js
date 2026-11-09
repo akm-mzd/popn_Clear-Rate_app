@@ -606,7 +606,7 @@ function changeViewLevel(level, keepMenu = false) {
     if (!keepMenu) toggleMenu(false); // レベルを選んだらメニューを閉じる（統計シートのスライドからは閉じない）
     // ポックラはレベルに関係なく全体を出すので、レベルを選んだら難易度表に切り替える
     //   「更新」「最近」は難易度表の形で見るものなので、いつも難易度表にする
-    if (viewMode === 'pokkura' || viewMode === 'oldpokkura' || isSpecialViewLevel(level)) viewMode = 'grid';
+    if (viewMode === 'pokkura' || viewMode === 'oldpokkura' || isKnockView() || isSpecialViewLevel(level)) viewMode = 'grid';
     document.getElementById('search-input').value = '';
     currentViewLevel = level;
     // 絞り込みのレベルも、選んだレベルだけにする（「すべて」「更新」「最近」なら外す）
@@ -1594,13 +1594,13 @@ function setLevelButtonPlacement(onMain) {
 // ==========================================
 // ★ 表示方法（リスト / 難易度表 / スコア表）
 // ==========================================
-const VIEW_MODES = ['list', 'grid', 'fc', 'medal', 'bad', 'score', 'pokkura', 'oldpokkura'];
+const VIEW_MODES = ['list', 'grid', 'fc', 'medal', 'bad', 'score', 'pokkura', 'oldpokkura', 'knock', 'sknock'];
 
 // ---------- 表の向き（強い曲を右に置くか左に置くか。表ごとに、この端末に保存） ----------
 //   'right' = 右が強い（強い順に1行ずつ区切って各行を左右反転。右上が最強）
 //   'left'  = 左が強い（強い順に左上から並べる）
-const GRID_DIR_DEFAULTS = { grid: 'right', fc: 'right', medal: 'right', bad: 'right', score: 'left', pokkura: 'left' };
-const GRID_DIR_WORDS = { grid: ['弱', '強'], fc: ['弱', '強'], medal: ['弱', '強'], bad: ['弱', '強'], score: ['低', '高'], pokkura: ['低', '高'] };
+const GRID_DIR_DEFAULTS = { knock: 'right', sknock: 'right', grid: 'right', fc: 'right', medal: 'right', bad: 'right', score: 'left', pokkura: 'left' };
+const GRID_DIR_WORDS = { knock: ['弱', '強'], sknock: ['弱', '強'], grid: ['弱', '強'], fc: ['弱', '強'], medal: ['弱', '強'], bad: ['弱', '強'], score: ['低', '高'], pokkura: ['低', '高'] };
 
 function getGridDirection(mode) {
     const saved = storageGet('popn_dir_' + mode);
@@ -1608,7 +1608,7 @@ function getGridDirection(mode) {
 }
 
 // 上下の向き（'top' = 上が強い / 'bottom' = 下が強い。最初はどれも上が強い）。ポックラは上下を変えない
-const GRID_VDIR_MODES = ['grid', 'fc', 'medal', 'bad', 'score'];
+const GRID_VDIR_MODES = ['knock', 'sknock', 'grid', 'fc', 'medal', 'bad', 'score'];
 
 function getGridVertical(mode) {
     if (!GRID_VDIR_MODES.includes(mode)) return 'top';
@@ -1729,6 +1729,8 @@ function updateViewModeButtons() {
         if (medalLabel) medalLabel.textContent = viewMode === 'bad' ? 'BAD表' : 'メダル表';
         const pkLabel = btn.dataset.mode === 'pokkura' ? btn.querySelector('.vm-pokkura-label') : null;
         if (pkLabel) pkLabel.textContent = viewMode === 'oldpokkura' ? '旧ポックラ' : 'ポックラ';
+        const knockLabel = btn.dataset.mode === 'knock' ? btn.querySelector('.vm-knock-label') : null;
+        if (knockLabel) knockLabel.textContent = viewMode === 'sknock' ? 'S乱ノック' : '乱ノック';
         if (SCORE_VIEW_MODES.includes(btn.dataset.mode)) btn.style.display = scoreOk ? '' : 'none';
     });
     const pkImageBtn = document.getElementById('btn-pokkura-image');
@@ -1747,6 +1749,8 @@ function applyViewMode(displaySongs) {
     const isGrid = viewMode !== 'list';
     // ポックラ画面では、絞り込みとクリア率の表示を隠す（CSS の body.view-pokkura）
     document.body.classList.toggle('view-pokkura', viewMode === 'pokkura' || viewMode === 'oldpokkura');
+    // ノック表も表の全部を出すので、絞り込み・クリア率の表示を隠す
+    document.body.classList.toggle('view-knock', isKnockView());
     capture.style.display = isGrid ? 'none' : '';
     grid.style.display = isGrid ? '' : 'none';
     const specialGrid = viewMode === 'grid' && !(document.getElementById('search-input').value.trim()) && isSpecialViewLevel(currentViewLevel);
@@ -1759,6 +1763,7 @@ function applyViewMode(displaySongs) {
     else if (viewMode === 'score') renderScoreGrid(displaySongs);
     else if (viewMode === 'pokkura') renderPokkuraGrid();
     else if (viewMode === 'oldpokkura') renderOldPokkuraGrid();
+    else if (isKnockView()) renderKnockGrid(viewMode === 'sknock' ? 'sran' : 'ran');
     else grid.innerHTML = '';
 }
 
@@ -2091,7 +2096,7 @@ function renderRecentGrid(targetSongs) {
 //   メダル表のボタン：ダブルクリックでメダル表⇔BAD表。ポックラのボタン：ダブルクリックで新ポックラ⇔旧ポックラ。
 //   1回押しは、ほかの表示のときだけメダル表・新ポックラにする（BAD表・旧ポックラのときは何もしない）
 const VIEW_TAP_DOUBLE_MS = 350;
-const VIEW_TAP_ALT = { grid: 'fc', medal: 'bad', pokkura: 'oldpokkura' };
+const VIEW_TAP_ALT = { grid: 'fc', medal: 'bad', pokkura: 'oldpokkura', knock: 'sknock' };
 let viewTapTimer = null;
 let viewTapMode = null;
 
@@ -2903,3 +2908,148 @@ window.addEventListener('resize', () => {
         if (lastGridNarrow !== null && lastGridNarrow !== isNarrowScreen()) renderTable();
     }, 200);
 });
+
+// ---------- 乱ノック表・S乱ノック表（ノック表のボタン。ダブルクリックで乱⇔S乱） ----------
+// データは knock-data.js の KNOCK_TABLES（強い段が先）。表示レベルに関係なく全部を出す。
+// マークは knockRecords（ユーザーごと・クラウド保存）{ 'ran:表の書き方' | 'sran:表の書き方': 'c'（クリア）| 'e'（イージークリア） }。未クリアは記録なし
+const KNOCK_MARKS = {
+    c: { label: 'クリア', img: 'images/knock/clear.jpg' },
+    e: { label: 'イージークリア', img: 'images/knock/Easyclear.jpg' },
+    '': { label: '未クリア', img: 'images/knock/fail.jpg' }
+};
+const KNOCK_LABEL_COLORS = { ran: [[49, 27, 146], [179, 157, 219]], sran: [[0, 77, 64], [128, 203, 196]] };
+
+function isKnockView() {
+    return viewMode === 'knock' || viewMode === 'sknock';
+}
+
+function getKnockRecords(user = currentUser) {
+    if (!allUsersData[user]) allUsersData[user] = emptyUser();
+    if (!allUsersData[user].knockRecords) allUsersData[user].knockRecords = {};
+    return allUsersData[user].knockRecords;
+}
+
+function getKnockKey(tableKey, item) {
+    return `${KNOCK_TABLES[tableKey].prefix}:${item.t}`;
+}
+
+function getKnockMark(key) {
+    const v = getKnockRecords()[key];
+    return v === 'c' || v === 'e' ? v : '';
+}
+
+// アプリの曲を、ジャンル名と曲名の両方で引けるようにする（normalizeSongText でそろえる）
+function buildKnockSongIndex() {
+    const index = new Map();
+    const add = (k, s) => { if (!k) return; if (!index.has(k)) index.set(k, []); if (!index.get(k).includes(s)) index.get(k).push(s); };
+    songs.forEach(s => { add(normalizeSongText(s.genre), s); add(normalizeSongText(s.title), s); });
+    return index;
+}
+
+// ノック表の1譜面を、アプリの曲に合わせる（無ければ null）
+//   H 譜面はアプリに無い。S乱の lv は譜面の正規Lv なので、46 未満もアプリに無い（乱の lv は「乱を掛けた正規相当」なので使わない）
+//   UPPER かどうかをそろえ、候補が複数なら lv に一番近い曲
+function matchKnockSong(item, index, realLevel) {
+    if (item.d === 'H' || (realLevel && !(item.lv >= 46))) return null;
+    let cands = index.get(normalizeSongText(item.n)) || [];
+    const wantUpper = isUpperText(item.n);
+    cands = cands.filter(s => songSaysUpper(s) === wantUpper);
+    if (cands.length === 0) return null;
+    return cands.slice().sort((a, b) => Math.abs((parseInt(a.level, 10) || 0) - item.lv) - Math.abs((parseInt(b.level, 10) || 0) - item.lv))[0];
+}
+
+function renderKnockGrid(tableKey) {
+    const grid = document.getElementById('diff-grid-view');
+    const table = KNOCK_TABLES[tableKey];
+    const narrow = isNarrowScreen();
+    const COLS = narrow ? 2 : 5;
+    lastGridNarrow = narrow;
+    const mode = tableKey === 'sran' ? 'sknock' : 'knock';
+    const index = buildKnockSongIndex();
+    const vertical = getGridVertical(mode);
+    const total = { c: 0, e: 0, '': 0 };
+    const rows = table.levels.map((lvl, i) => {
+        const cells = lvl.items.map(item => {
+            const key = getKnockKey(tableKey, item);
+            const mark = getKnockMark(key);
+            total[mark]++;
+            return { item, key, mark, song: matchKnockSong(item, index, tableKey === 'sran') };
+        });
+        return { lvl, cells, i };
+    });
+    const n = rows.length;
+    const [dark, light] = KNOCK_LABEL_COLORS[tableKey];
+    const colorOf = i => '#' + [0, 1, 2].map(c => Math.round(dark[c] + (light[c] - dark[c]) * (n > 1 ? i / (n - 1) : 0)).toString(16).padStart(2, '0')).join('');
+    const all = total.c + total.e + total[''];
+    let html = `<div class="kn-summary"><b>${escapeHtml(table.name)}</b>
+        <span><img src="${KNOCK_MARKS.c.img}" alt="">クリア ${total.c}</span>
+        <span><img src="${KNOCK_MARKS.e.img}" alt="">イージー ${total.e}</span>
+        <span><img src="${KNOCK_MARKS[''].img}" alt="">未クリア ${total['']}</span>
+        <span class="kn-total">全 ${all}譜面</span></div>`;
+    html += buildDirectionBar(mode);
+    orderRowsForVertical(rows, vertical).forEach(row => {
+        const ordered = orderForDirection(row.cells, COLS, getGridDirection(mode), vertical);
+        let cellsHtml = '';
+        ordered.forEach(c => { cellsHtml += buildKnockCellHtml(c); });
+        const cleared = row.cells.filter(c => c.mark).length;
+        html += `
+            <div class="dg-row">
+                <div class="dg-label kn-label" style="background: ${colorOf(row.i)};"><span class="dg-label-cls">${escapeHtml(row.lvl.label)}</span>${row.lvl.sub ? `<span class="dg-label-idx">${escapeHtml(row.lvl.sub)}</span>` : ''}<span class="sg-count">${cleared}/${row.cells.length}</span></div>
+                <div class="dg-cells" style="grid-template-columns: repeat(${COLS}, minmax(0, 1fr));">${cellsHtml}</div>
+            </div>`;
+    });
+    grid.innerHTML = html;
+}
+
+function buildKnockCellHtml(c) {
+    const m = KNOCK_MARKS[c.mark];
+    const song = c.song;
+    const medalKey = song ? (clearRecords[song.id] || '') : '';
+    const medalHtml = song && medalKey ? `<span class="kn-medal">${buildGridMedalInner(medalKey)}</span>` : '';
+    const markBtn = `<button type="button" class="dg-medal kn-mark" onclick="openKnockMarkModal('${jsStringAttr(c.key)}')" title="${escapeHtml(m.label)}（押して変更）"><img src="${m.img}" alt="${escapeHtml(m.label)}" loading="lazy">${medalHtml}</button>`;
+    if (!song) {
+        return `
+                <div class="dg-cell">
+                    ${markBtn}
+                    <div class="dg-banner kn-noapp" title="${escapeHtml(c.item.t)}（アプリに無い譜面）"><span class="kn-name">${escapeHtml(c.item.t)}</span>${c.item.bpm !== undefined ? `<span class="kn-lv">Lv${escapeHtml(c.item.lv)}</span>` : ''}</div>
+                </div>`;
+    }
+    const bannerSrc = safeUrl(song.bannerUrl, true);
+    const bannerInner = bannerSrc
+        ? `<img src="${escapeHtml(bannerSrc)}" alt="${escapeHtml(song.title)}" loading="lazy">`
+        : `<span class="dg-banner-text">${escapeHtml(song.title)}</span>`;
+    return `
+                <div class="dg-cell">
+                    ${markBtn}
+                    <a class="dg-banner" data-sid="${escapeHtml(song.id)}" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(c.item.t)}（Lv${escapeHtml(song.level)}・攻略wikiを開く）">${bannerInner}${buildMemoMarkHtml(song.id)}</a>
+                </div>`;
+}
+
+// マークを選ぶ小さな画面
+let knockMarkKey = null;
+function openKnockMarkModal(key) {
+    knockMarkKey = key;
+    const [prefix, ...rest] = key.split(':');
+    const name = rest.join(':');
+    const cur = getKnockMark(key);
+    document.getElementById('knock-mark-title').textContent = `${prefix === 'sran' ? 'S乱' : '乱'}：${name}`;
+    document.getElementById('knock-mark-choices').innerHTML = ['c', 'e', ''].map(k => `
+        <button type="button" class="kn-choice${cur === k ? ' on' : ''}" onclick="setKnockMark('${k}')">
+            <img src="${KNOCK_MARKS[k].img}" alt=""><span>${KNOCK_MARKS[k].label}</span>
+        </button>`).join('');
+    document.getElementById('knock-mark-modal').style.display = 'flex';
+}
+
+function closeKnockMarkModal() {
+    knockMarkKey = null;
+    document.getElementById('knock-mark-modal').style.display = 'none';
+}
+
+function setKnockMark(mark) {
+    if (!knockMarkKey) return;
+    const recs = getKnockRecords();
+    if (mark === 'c' || mark === 'e') recs[knockMarkKey] = mark; else delete recs[knockMarkKey];
+    closeKnockMarkModal();
+    scheduleAutoSave();
+    renderTable();
+}
