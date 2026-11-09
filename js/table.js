@@ -1721,16 +1721,8 @@ const SCORE_VIEW_MODES = ['score', 'pokkura', 'oldpokkura'];
 function updateViewModeButtons() {
     const scoreOk = hasAnyScore();
     document.querySelectorAll('#view-mode-switch button').forEach(btn => {
-        // BAD表・旧ポックラはメダル表・ポックラのボタンをダブルクリックして出すので、そのボタンを選ばれた見た目にして文字を変える
+        // フルコン表・BAD表・旧ポックラ・S乱ノックは、組のボタン（難易度表・メダル表・ポックラ・ノック表）を選ばれた見た目にする
         btn.classList.toggle('active', btn.dataset.mode === viewMode || VIEW_TAP_ALT[btn.dataset.mode] === viewMode);
-        const gridLabel = btn.dataset.mode === 'grid' ? btn.querySelector('.vm-grid-label') : null;
-        if (gridLabel) gridLabel.textContent = viewMode === 'fc' ? 'フルコン表' : '難易度表';
-        const medalLabel = btn.dataset.mode === 'medal' ? btn.querySelector('.vm-medal-label') : null;
-        if (medalLabel) medalLabel.textContent = viewMode === 'bad' ? 'BAD表' : 'メダル表';
-        const pkLabel = btn.dataset.mode === 'pokkura' ? btn.querySelector('.vm-pokkura-label') : null;
-        if (pkLabel) pkLabel.textContent = viewMode === 'oldpokkura' ? '旧ポックラ' : 'ポックラ';
-        const knockLabel = btn.dataset.mode === 'knock' ? btn.querySelector('.vm-knock-label') : null;
-        if (knockLabel) knockLabel.textContent = viewMode === 'sknock' ? 'S乱ノック' : '乱ノック';
         if (SCORE_VIEW_MODES.includes(btn.dataset.mode)) btn.style.display = scoreOk ? '' : 'none';
     });
     const pkImageBtn = document.getElementById('btn-pokkura-image');
@@ -1753,6 +1745,7 @@ function applyViewMode(displaySongs) {
     document.body.classList.toggle('view-knock', isKnockView());
     capture.style.display = isGrid ? 'none' : '';
     grid.style.display = isGrid ? '' : 'none';
+    renderViewSubTabs();
     const specialGrid = viewMode === 'grid' && !(document.getElementById('search-input').value.trim()) && isSpecialViewLevel(currentViewLevel);
     if (specialGrid && currentViewLevel === 'UPDATED') renderUpdatedGrid(displaySongs);
     else if (specialGrid && currentViewLevel === 'RECENT') renderRecentGrid(displaySongs);
@@ -1846,7 +1839,7 @@ function renderDiffGrid(targetSongs) {
     grid.innerHTML = html;
 }
 
-// ---------- フルコン難易度表（難易度表のボタンをダブルクリック。Lv46〜48 だけ） ----------
+// ---------- フルコン難易度表（難易度表の切り替えタブ。Lv46〜48 だけ） ----------
 // 曲データの fc = { v: 値（1.1＝別格 〜 -1.0）, o: 同じ値の中の順番（小さいほど強い） }。管理者が画像から取り込む（fc-import.js）
 const FC_LEVELS = ['46', '47', '48'];
 const FC_VALUES = [1.1, 1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0, -0.1, -0.2, -0.3, -0.4, -0.5, -0.6, -0.7, -0.8, -0.9, -1.0];
@@ -2092,31 +2085,34 @@ function renderRecentGrid(targetSongs) {
 }
 
 // ---------- メダル表 ----------
-// ---------- 表示方法のボタンのダブルクリック ----------
-//   メダル表のボタン：ダブルクリックでメダル表⇔BAD表。ポックラのボタン：ダブルクリックで新ポックラ⇔旧ポックラ。
-//   1回押しは、ほかの表示のときだけメダル表・新ポックラにする（BAD表・旧ポックラのときは何もしない）
-const VIEW_TAP_DOUBLE_MS = 350;
+// ---------- 表示方法のボタンと、表の上の切り替えタブ ----------
+//   難易度表・メダル表・ノック表・ポックラのボタンは、組になった表（フルコン表・BAD表・S乱ノック・旧ポックラ）を持つ。
+//   ボタンを押すと組の表側を出し（組のどちらかを出しているときは何もしない）、表のすぐ上の切り替えタブ（#view-sub-tabs）でもう片方に切り替える
 const VIEW_TAP_ALT = { grid: 'fc', medal: 'bad', pokkura: 'oldpokkura', knock: 'sknock' };
-let viewTapTimer = null;
-let viewTapMode = null;
+const VIEW_SUB_TABS = {
+    grid: [['grid', '難易度表'], ['fc', 'フルコン表']],
+    medal: [['medal', 'メダル表'], ['bad', 'BAD表']],
+    knock: [['knock', '乱ノック'], ['sknock', 'S乱ノック']],
+    pokkura: [['pokkura', '新ポックラ'], ['oldpokkura', '旧ポックラ']]
+};
 
 function onViewModeTap(mode) {
-    if (viewTapTimer && viewTapMode === mode) {
-        // 2回目：今の側と反対へ（ペアの外からは裏側へ）
-        clearTimeout(viewTapTimer);
-        viewTapTimer = null;
-        setViewMode(viewMode === VIEW_TAP_ALT[mode] ? mode : VIEW_TAP_ALT[mode]);
-        return;
-    }
-    clearTimeout(viewTapTimer);
-    viewTapMode = mode;
-    viewTapTimer = setTimeout(() => {
-        viewTapTimer = null;
-        if (viewMode !== mode && viewMode !== VIEW_TAP_ALT[mode]) setViewMode(mode);
-    }, VIEW_TAP_DOUBLE_MS);
+    if (viewMode !== mode && viewMode !== VIEW_TAP_ALT[mode]) setViewMode(mode);
 }
 
-// ---------- BAD表（メダル表のボタンをダブルクリック）：最小BAD の少ない順の行 ----------
+// 組の表を出しているときだけ、表の上に切り替えタブ（「更新」「最近」の縦並びでは出さない）
+function renderViewSubTabs() {
+    const box = document.getElementById('view-sub-tabs');
+    if (!box) return;
+    const base = Object.keys(VIEW_TAP_ALT).find(k => k === viewMode || VIEW_TAP_ALT[k] === viewMode);
+    const special = viewMode === 'grid' && !(document.getElementById('search-input').value.trim()) && isSpecialViewLevel(currentViewLevel);
+    if (!base || special) { box.hidden = true; box.innerHTML = ''; return; }
+    box.hidden = false;
+    box.innerHTML = VIEW_SUB_TABS[base].map(([mode, label]) =>
+        `<button type="button" class="vst-tab${mode === viewMode ? ' on' : ''}" onclick="setViewMode('${mode}')" aria-pressed="${mode === viewMode}">${label}</button>`).join('');
+}
+
+// ---------- BAD表（メダル表の切り替えタブ）：最小BAD の少ない順の行 ----------
 // 行の分け方（上から強い順）。max まで（null は上限なし）
 const BAD_GRID_ROWS = [
     { label: '0', max: 0, color: '#1b5e20' }, { label: '1〜5', max: 5, color: '#2e7d32' }, { label: '6〜9', max: 9, color: '#43a047' },
@@ -2751,7 +2747,7 @@ function buildPokkuraSectionHtml(label, sub, color, list, COLS, pointText) {
         </div>`;
 }
 
-// 旧ポックラ（ポックラのボタンをダブルクリック）：大きな枠に値と +0.01まで、その下に上位50曲と圏外10曲の表
+// 旧ポックラ（ポックラの切り替えタブ）：大きな枠に値と +0.01まで、その下に上位50曲と圏外10曲の表
 function renderOldPokkuraGrid() {
     const grid = document.getElementById('diff-grid-view');
     const narrow = isNarrowScreen();
@@ -2909,7 +2905,7 @@ window.addEventListener('resize', () => {
     }, 200);
 });
 
-// ---------- 乱ノック表・S乱ノック表（ノック表のボタン。ダブルクリックで乱⇔S乱） ----------
+// ---------- 乱ノック表・S乱ノック表（ノック表のボタン。切り替えタブで乱⇔S乱） ----------
 // データは knock-data.js の KNOCK_TABLES（強い段が先）。表示レベルに関係なく全部を出す。
 // マークは knockRecords（ユーザーごと・クラウド保存）{ 'ran:表の書き方' | 'sran:表の書き方': 'c'（クリア）| 'e'（イージークリア） }。未クリアは記録なし
 const KNOCK_MARKS = {
