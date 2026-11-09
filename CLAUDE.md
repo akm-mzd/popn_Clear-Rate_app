@@ -66,7 +66,7 @@ pop'n music のクリア状況を管理する静的サイトです（GitHub Page
 
 ## 次にやること
 
-- ユーザーから頼まれた、まだ作っていないことは `docs/next-todo.md` にまとめてある（「次にやる」曲のメモ、乱・S乱ノック表）。乱ノックの難易度は `docs/ran-knock.tsv`。始める前に読む。
+- ユーザーから頼まれた、まだ作っていないことは `docs/next-todo.md` にまとめてある（「次にやる」曲のメモ、乱・S乱ノック表）。乱ノックの難易度は `docs/ran-knock.tsv`、S乱ノックは `docs/sran-knock.tsv`、ノックのクリアマークの画像は `images/knock/`。始める前に読む。
 
 ## 動作確認
 
