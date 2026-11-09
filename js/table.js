@@ -2945,13 +2945,15 @@ const KNOCK_DIFF_SUFFIX_RE = /\s*[(（](EX|H|N|E)[)）]\s*$/i;
 function buildKnockSongIndex() {
     const full = new Map(), base = new Map();
     const add = (map, k, s) => { if (!k) return; if (!map.has(k)) map.set(k, []); if (!map.get(k).includes(s)) map.get(k).push(s); };
+    const links = new Map(); // 手でつないだ譜面（曲データの knock：['ran:表の書き方', …]）
     songs.forEach(s => {
+        if (Array.isArray(s.knock)) s.knock.forEach(k => { if (typeof k === 'string') links.set(k, s); });
         add(full, normalizeSongText(s.genre), s);
         add(full, normalizeSongText(s.title), s);
         add(base, normalizeSongText(String(s.genre || '').replace(KNOCK_DIFF_SUFFIX_RE, '')), s);
         add(base, normalizeSongText(s.title), s);
     });
-    return { full, base };
+    return { full, base, links };
 }
 
 // アプリの曲の譜面（ジャンル名の末尾に書いてあれば EX/H…、無ければ ''）
@@ -3023,7 +3025,9 @@ function renderKnockGrid(tableKey) {
     html += buildDirectionBar(mode);
     const pageRows = pages[page].rows;
     pageRows.forEach(row => row.cells.forEach(c => {
-        c.song = matchKnockSong(c.item, index, tableKey === 'sran');
+        // 手でつないだ曲が先。無ければ名前で合わせる
+        c.song = index.links.get(c.key) || matchKnockSong(c.item, index, tableKey === 'sran');
+        c.linked = index.links.has(c.key);
         // H 譜面：アプリに H 譜面が無くても、同じ曲（EX）があればそのバナーを出す（枠を黄色にして H と分かるように）
         if (!c.song && c.item.d === 'H') c.song = matchKnockSongForH(c.item, index);
     }));
@@ -3103,7 +3107,9 @@ function buildKnockCellHtml(c) {
         return `
                 <div class="dg-cell">
                     ${markBtn}
-                    <div class="dg-banner kn-noapp" title="${escapeHtml(c.item.t)}（アプリに無い譜面）"><span class="kn-name">${escapeHtml(c.item.t)}</span>${c.item.bpm !== undefined ? `<span class="kn-lv">Lv${escapeHtml(c.item.lv)}</span>` : ''}</div>
+                    ${isKnockLinkable(c)
+                        ? `<button type="button" class="dg-banner kn-noapp kn-linkable" onclick="openKnockLinkModal('${jsStringAttr(c.key)}')" title="${escapeHtml(c.item.t)}（押してアプリの曲につなぐ）"><span class="kn-name">${escapeHtml(c.item.t)}</span><span class="kn-lv">${c.item.bpm !== undefined ? `Lv${escapeHtml(c.item.lv)}・` : ''}🔗 曲につなぐ</span></button>`
+                        : `<div class="dg-banner kn-noapp" title="${escapeHtml(c.item.t)}（アプリに無い譜面）"><span class="kn-name">${escapeHtml(c.item.t)}</span>${c.item.bpm !== undefined ? `<span class="kn-lv">Lv${escapeHtml(c.item.lv)}</span>` : ''}</div>`}
                 </div>`;
     }
     const bannerSrc = safeUrl(song.bannerUrl, true);
@@ -3113,7 +3119,10 @@ function buildKnockCellHtml(c) {
     return `
                 <div class="dg-cell">
                     ${markBtn}
+                    <div class="dg-banner-wrap kn-wrap">
                     <a class="dg-banner${c.item.d === 'H' ? ' kn-h' : ''}" data-sid="${escapeHtml(song.id)}" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(c.item.t)}（${c.item.d === 'H' ? 'H 譜面・' : ''}攻略wikiを開く）">${bannerInner}${buildMemoMarkHtml(song.id)}</a>
+                    ${c.linked ? `<button type="button" class="kn-relink" onclick="openKnockLinkModal('${jsStringAttr(c.key)}')" title="手でつないだ曲（押して変える・外す）" aria-label="つなぐ曲を変える">🔗</button>` : ''}
+                    </div>
                 </div>`;
 }
 
@@ -3144,4 +3153,78 @@ function setKnockMark(mark) {
     closeKnockMarkModal();
     scheduleAutoSave();
     renderTable();
+}
+
+// ---------- ノック表の譜面を、アプリの曲に手でつなぐ（全員共通：曲データの knock に入れて楽曲リストごとクラウド保存。管理者） ----------
+//   つなげるのは、アプリにありうる譜面だけ（S乱は正規Lv 46 以上。乱は表の Lv が乱を掛けた正規相当なので全部）
+let knockLinkKey = null;
+
+function isKnockLinkable(c) {
+    return !(c.item.bpm !== undefined && !(c.item.lv >= 46));
+}
+
+function findKnockItem(key) {
+    const [prefix, ...rest] = key.split(':');
+    const t = rest.join(':');
+    const tk = Object.keys(KNOCK_TABLES).find(k => KNOCK_TABLES[k].prefix === prefix);
+    if (!tk) return null;
+    for (const l of KNOCK_TABLES[tk].levels) for (const it of l.items) if (it.t === t) return { tableKey: tk, item: it };
+    return null;
+}
+
+function getKnockLinkedSong(key) {
+    return songs.find(s => Array.isArray(s.knock) && s.knock.includes(key)) || null;
+}
+
+function openKnockLinkModal(key) {
+    const found = findKnockItem(key);
+    if (!found) return;
+    knockLinkKey = key;
+    document.getElementById('knock-link-title').textContent = `${found.tableKey === 'sran' ? 'S乱' : '乱'}：${found.item.t}${found.item.bpm !== undefined ? `（Lv${found.item.lv}）` : ''}`;
+    const input = document.getElementById('knock-link-search');
+    input.value = found.item.n.replace(/\s*[(（]UPPER[)）]\s*/i, ' ').trim();
+    document.getElementById('knock-link-modal').style.display = 'flex';
+    renderKnockLinkResults();
+    input.focus();
+}
+
+function closeKnockLinkModal() {
+    knockLinkKey = null;
+    document.getElementById('knock-link-modal').style.display = 'none';
+}
+
+// 曲名・ジャンルで探す（アプリの Lv46〜50 の曲。今つないでいる曲には印）
+function renderKnockLinkResults() {
+    const box = document.getElementById('knock-link-results');
+    if (!box || !knockLinkKey) return;
+    const terms = getSearchTerms(document.getElementById('knock-link-search').value);
+    const linked = getKnockLinkedSong(knockLinkKey);
+    const hits = terms.length === 0 ? [] : songs.filter(s => songMatchesSearch(s, terms))
+        .sort((a, b) => (parseInt(b.level, 10) || 0) - (parseInt(a.level, 10) || 0) || String(a.title).localeCompare(String(b.title), 'ja'));
+    const rows = hits.slice(0, 20).map(s => `
+        <button type="button" class="kl-item${linked === s ? ' on' : ''}" onclick="linkKnockToSong('${jsStringAttr(s.id)}')">
+            <span class="level-badge">${escapeHtml(s.level)}</span>
+            <span class="nx-text"><span class="nx-title">${escapeHtml(s.title)}</span><span class="nx-genre">${escapeHtml(s.genre || '')}</span></span>
+            <span class="nx-add">${linked === s ? 'つないでいます' : 'つなぐ'}</span>
+        </button>`).join('');
+    box.innerHTML = (linked ? `<button type="button" class="kl-unlink" onclick="linkKnockToSong('')">今のつなぎ（${escapeHtml(linked.title)}）を外す</button>` : '')
+        + (rows || `<div class="nx-suggest-none">${terms.length ? '見つかりません。曲名・ジャンルの一部で探してください' : '曲名・ジャンルを入れてください'}</div>`)
+        + (hits.length > 20 ? `<div class="nx-suggest-none">ほか ${hits.length - 20}曲。もう少し詳しく入れてください</div>` : '');
+}
+
+// つなぐ（songId が空ならつなぎを外す）。ほかの曲に同じ譜面がつないであれば外す
+async function linkKnockToSong(songId) {
+    const key = knockLinkKey;
+    if (!key || !checkAdminAuth()) return;
+    songs.forEach(s => {
+        if (!Array.isArray(s.knock)) return;
+        s.knock = s.knock.filter(k => k !== key);
+        if (s.knock.length === 0) delete s.knock;
+    });
+    const song = songId ? songs.find(s => s.id === songId) : null;
+    if (song) song.knock = (song.knock || []).concat(key);
+    closeKnockLinkModal();
+    renderTable();
+    showToast('toast-eagate', song ? `「${song.title}」につなぎました` : 'つなぎを外しました', '#4caf50', 2500);
+    await saveToCloud(true);
 }
