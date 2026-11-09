@@ -64,6 +64,10 @@ pop'n music のクリア状況を管理する静的サイトです（GitHub Page
 - 曲名の UPPER の書き方（Ⓤ・UPPER・(UPPER)・upper・全角）は同じものとして扱う。曲名を比べるときは `normalizeSongText()`（UPPER の表記を消してそろえる）、UPPER かどうかは `isUpperText()` / `songSaysUpper()` を使う（`js/eagate-import.js`）。
 - スマホかどうかの判定は、`isNarrowScreen()`（画面幅）か `isMobileDevice()`（端末）を使う。
 
+## 次にやること
+
+- ユーザーから頼まれた、まだ作っていないことは `docs/next-todo.md` にまとめてある（「次にやる」曲のメモ、乱・S乱ノック表）。乱ノックの難易度は `docs/ran-knock.tsv`。始める前に読む。
+
 ## 動作確認
 
 - `python3 -m http.server` で配信し、ブラウザ（Playwright など）でスマホ幅（375px）と PC 幅を確認する。
