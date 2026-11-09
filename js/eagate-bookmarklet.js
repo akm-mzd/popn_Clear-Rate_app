@@ -795,8 +795,9 @@
     // ---------- ノック表のバナー（公開の楽曲一覧から曲カードを集める） ----------
     const BANNER_WIDTH = 200; // 送る画像の幅（元は 244×58）
     // 曲名・ジャンル名を比べるためにそろえる（全角/半角・大文字/小文字・記号の違いを無視。UPPER の書き方もそろえる）
-    const normName = s => String(s || '').replace(/[\u24CA\u24E4]/g, ' (upper)').normalize('NFKC').toLowerCase()
-        .replace(/[(\[]\s*upper\s*[)\]]/g, ' upper ').replace(/[^\p{L}\p{N}]/gu, '');
+    //   withUpper = false：UPPER の書き方を消す（一覧に UPPER の行が無い曲は、通常の曲カードを使う）
+    const normName = (s, withUpper = true) => String(s || '').replace(/[\u24CA\u24E4]/g, ' (upper)').normalize('NFKC').toLowerCase()
+        .replace(/[(\[]\s*upper\s*[)\]]/g, withUpper ? ' upper ' : ' ').replace(/[^\p{L}\p{N}]/gu, '');
 
     function loadKnockTables() {
         return new Promise((resolve, reject) => {
@@ -838,22 +839,22 @@
         let tables;
         try { tables = await loadKnockTables(); } catch (e) { setStatus(e.message); addCloseButton(); return finish(); }
         // 集める譜面：S乱は正規Lv 45 以下、乱は全部（アプリに無い譜面のバナーを出すため。アプリにある曲かどうかはアプリが決める）
-        const wanted = new Map(); // そろえた名前 → [キー]
+        const wanted = []; // { key, name: そろえた名前, loose: UPPER を消した名前 }
         const addWanted = (prefix, it) => {
-            const k = normName(it.n);
-            if (!k) return;
-            if (!wanted.has(k)) wanted.set(k, []);
-            wanted.get(k).push(`${prefix}:${it.t}`);
+            const name = normName(it.n);
+            if (name) wanted.push({ key: `${prefix}:${it.t}`, name, loose: normName(it.n, false) });
         };
         tables.sran.levels.forEach(l => l.items.forEach(it => { if (it.lv <= 45) addWanted(tables.sran.prefix, it); }));
         tables.ran.levels.forEach(l => l.items.forEach(it => addWanted(tables.ran.prefix, it)));
         const listUrl = page => new URL(`/game/popn/${VER_DIR}/music/list.html?page=${page}&version=-1&lv=0&bemani=0&category=0&keyword=&sort=music&sort_type=up`, location.origin).href;
+        // 一覧の曲：ジャンル名・曲名・「ジャンル名(曲名)」（表は「ハッピーハードコア(BE LOVIN)」のように書くことがある）で引く
+        const exact = new Map(), loose = new Map(); // そろえた名前 → 画像の URL
         const found = new Map(); // 画像の URL → Set(キー)
         let pageCount = null, rows = 0, firstDoc = null;
         try {
             for (let page = 0; page < MAX_PAGES; page++) {
                 if (pageCount !== null && page >= pageCount) break;
-                setStatus(`楽曲一覧を読み取り中… ${page + 1}${pageCount ? '/' + pageCount : ''}ページ目（見つかった譜面 ${Array.from(found.values()).reduce((n, s) => n + s.size, 0)}）`);
+                setStatus(`楽曲一覧を読み取り中… ${page + 1}${pageCount ? '/' + pageCount : ''}ページ目（${rows}曲）`);
                 const doc = await fetchDoc(listUrl(page));
                 if (!firstDoc) firstDoc = doc;
                 if (page === 0) {
@@ -870,18 +871,24 @@
                     const ps = info ? info.querySelectorAll('p') : [];
                     const genre = ps[0] ? ps[0].textContent : '', title = ps[1] ? ps[1].textContent : '';
                     n++;
-                    [genre, title].forEach(name => {
-                        const keys = wanted.get(normName(name));
-                        if (!keys) return;
-                        const src = new URL(img.getAttribute('src'), location.href).href;
-                        if (!found.has(src)) found.set(src, new Set());
-                        keys.forEach(k => found.get(src).add(k));
+                    const src = new URL(img.getAttribute('src'), location.href).href;
+                    [genre, title, genre + title].forEach(name => {
+                        const a = normName(name), b = normName(name, false);
+                        if (a && !exact.has(a)) exact.set(a, src);
+                        if (b && !loose.has(b)) loose.set(b, src);
                     });
                 });
                 if (n === 0) break;
                 rows += n;
                 await sleep(PAGE_INTERVAL_MS);
             }
+            // 表の譜面に合う曲カード：まず書き方どおり、無ければ UPPER を消して
+            wanted.forEach(w => {
+                const src = exact.get(w.name) || exact.get(w.loose) || loose.get(w.loose);
+                if (!src) return;
+                if (!found.has(src)) found.set(src, new Set());
+                found.get(src).add(w.key);
+            });
         } catch (e) {
             setStatus('楽曲一覧を読めませんでした：' + e.message);
             if (firstDoc) showDiag(buildDiag(firstDoc, listUrl(0), {}, 'banner: ' + e.message), 'エラーが出ました。');
