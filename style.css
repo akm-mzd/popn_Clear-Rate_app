@@ -1923,3 +1923,16 @@ button.kn-choice.on { border-color: #6a3fb0; background: #f3e5f5; font-weight: b
 .kn-page-count { font-size: 10px; opacity: 0.8; }
 #diff-grid-view button.kn-page-move { flex-shrink: 0; width: 32px; height: 36px; margin: 0; padding: 0; border: 1px solid #ddd; border-radius: 8px; background: #fff; color: #6a3fb0; font-size: 20px; font-weight: bold; cursor: pointer; font-family: inherit; }
 #diff-grid-view button.kn-page-move:disabled { color: #ccc; cursor: default; }
+/* ノック表：手で曲につなぐ */
+#diff-grid-view button.dg-banner.kn-linkable { width: 100%; margin: 0; cursor: pointer; font-family: inherit; border-color: #90caf9; background: #f3f8fd; }
+#diff-grid-view button.dg-banner.kn-linkable .kn-lv { color: #1565c0; }
+.kn-wrap { position: relative; }
+#diff-grid-view button.kn-relink { position: absolute; left: -4px; bottom: -4px; width: 18px; height: 18px; margin: 0; padding: 0; border: 1px solid #90caf9; border-radius: 50%; background: #fff; font-size: 10px; line-height: 1; cursor: pointer; }
+.knock-link-content { max-width: 440px; width: 92vw; }
+.kl-target { font-size: 13px; font-weight: bold; color: #555; margin-bottom: 8px; }
+#knock-link-search { width: 100%; box-sizing: border-box; height: 36px; padding: 0 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; }
+.kl-results { margin-top: 6px; max-height: 50vh; overflow-y: auto; border: 1px solid #eee; border-radius: 8px; }
+button.kl-item { display: flex; align-items: center; gap: 8px; width: 100%; margin: 0; padding: 6px 8px; border: none; border-bottom: 1px solid #f0f0f0; background: #fff; text-align: left; cursor: pointer; font-family: inherit; color: #333; }
+button.kl-item.on { background: #e3f2fd; }
+button.kl-unlink { display: block; width: 100%; margin: 0; padding: 8px; border: none; border-bottom: 1px solid #f0f0f0; background: #fff8e1; color: #e65100; font-family: inherit; font-size: 13px; cursor: pointer; }
+.kl-note { margin-top: 6px; font-size: 11px; color: #888; }
