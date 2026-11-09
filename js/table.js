@@ -3107,9 +3107,7 @@ function buildKnockCellHtml(c) {
         return `
                 <div class="dg-cell">
                     ${markBtn}
-                    ${isKnockLinkable(c)
-                        ? `<button type="button" class="dg-banner kn-noapp kn-linkable" onclick="openKnockLinkModal('${jsStringAttr(c.key)}')" title="${escapeHtml(c.item.t)}（押してアプリの曲につなぐ）"><span class="kn-name">${escapeHtml(c.item.t)}</span><span class="kn-lv">${c.item.bpm !== undefined ? `Lv${escapeHtml(c.item.lv)}・` : ''}🔗 曲につなぐ</span></button>`
-                        : buildKnockNoAppHtml(c)}
+                    ${isKnockLinkable(c) ? buildKnockLinkableHtml(c) : buildKnockNoAppHtml(c)}
                 </div>`;
     }
     const bannerSrc = safeUrl(song.bannerUrl, true);
@@ -3255,6 +3253,16 @@ function buildKnockNoAppHtml(c) {
         return `<div class="dg-banner kn-noapp kn-hasimg${c.item.d === 'H' ? ' kn-h' : ''}" title="${escapeHtml(c.item.t)}（アプリに無い譜面）"><img src="${escapeHtml(src)}" alt="${escapeHtml(c.item.t)}" loading="lazy">${lv ? `<span class="kn-lv-badge">Lv${escapeHtml(c.item.lv)}</span>` : ''}</div>`;
     }
     return `<div class="dg-banner kn-noapp" title="${escapeHtml(c.item.t)}（アプリに無い譜面）"><span class="kn-name">${escapeHtml(c.item.t)}</span>${lv}</div>`;
+}
+
+// 手でつなげる枠（乱は全部・S乱は Lv46 以上）。取り込んだバナーがあれば名前の代わりに画像を出し、右下に 🔗
+function buildKnockLinkableHtml(c) {
+    const onclick = `openKnockLinkModal('${jsStringAttr(c.key)}')`;
+    const src = safeUrl(getKnockBannerUrl(c.key), true);
+    if (src) {
+        return `<button type="button" class="dg-banner kn-noapp kn-linkable kn-hasimg${c.item.d === 'H' ? ' kn-h' : ''}" onclick="${onclick}" title="${escapeHtml(c.item.t)}（押してアプリの曲につなぐ）"><img src="${escapeHtml(src)}" alt="${escapeHtml(c.item.t)}" loading="lazy"><span class="kn-lv-badge">${c.item.bpm !== undefined ? `Lv${escapeHtml(c.item.lv)} ` : ''}🔗</span></button>`;
+    }
+    return `<button type="button" class="dg-banner kn-noapp kn-linkable" onclick="${onclick}" title="${escapeHtml(c.item.t)}（押してアプリの曲につなぐ）"><span class="kn-name">${escapeHtml(c.item.t)}</span><span class="kn-lv">${c.item.bpm !== undefined ? `Lv${escapeHtml(c.item.lv)}・` : ''}🔗 曲につなぐ</span></button>`;
 }
 
 // 受け取ったバナーの確認（公式データ取り込みと同じ画面）
