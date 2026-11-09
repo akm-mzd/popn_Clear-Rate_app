@@ -448,10 +448,12 @@ function applyEagateImport() {
     if (hasRecent) saveRecentRecords(currentUser, pending.recent, pending.rt, pending.at);
     // その日のポックラ（公式の値・計算値）を記録する（伸びのグラフ・今日のまとめで使う）
     recordPokkuraHistory();
+    // 「次にやる」：記録が変わった曲は消す
+    const nextRemoved = typeof removeNextForSongs === 'function' ? removeNextForSongs(pending.changes.map(c => c.song.id)) : 0;
     closeEagateImportModal();
     scheduleAutoSave();
     renderTable();
-    showToast('toast-eagate', `公式データを反映しました（${pending.changes.length}曲）`, '#4caf50', 3000);
+    showToast('toast-eagate', `公式データを反映しました（${pending.changes.length}曲${nextRemoved ? `・次にやるから ${nextRemoved}曲を消しました` : ''}）`, '#4caf50', 3000);
     // 何か上がったら、今日のまとめを出す
     //   （更新履歴に残さなかったときは、まとめに出るものが無いので開かない）
     if (pending.changes.length > 0 && recordHistory) openDailySummary(true);

@@ -93,12 +93,14 @@ function updateMemo(songId, changes) {
 // 一覧の印（バナーの右上）：タグの色の点・★・📝（コメント）
 function buildMemoMarkHtml(songId) {
     const memo = getMemo(songId);
-    if (!hasMemoContent(memo)) return '';
+    // 「次にやる」に入っている曲は ▶
+    const next = typeof isInNext === 'function' && isInNext(songId) ? '<span class="memo-mark-next" title="次にやる">▶</span>' : '';
+    if (!hasMemoContent(memo)) return next ? `<span class="memo-mark">${next}</span>` : '';
     const dots = getMemoTags(memo).slice(0, 4).map(t => `<span class="memo-dot" style="background: ${getMemoTagColor(t)};"></span>`).join('');
     const star = memo.star ? '<span class="memo-mark-star">★</span>' : '';
     const note = memo.comment ? '<span class="memo-mark-note">📝</span>' : '';
-    if (!dots && !star && !note) return '';
-    return `<span class="memo-mark" title="${escapeHtml(describeMemo(memo))}">${star}${dots}${note}</span>`;
+    if (!dots && !star && !note && !next) return '';
+    return `<span class="memo-mark" title="${escapeHtml(describeMemo(memo))}">${next}${star}${dots}${note}</span>`;
 }
 
 // ---------- 入力欄（メダルを選ぶ画面・メモの画面で共通） ----------
@@ -123,6 +125,7 @@ function buildMemoEditorHtml(songId) {
             <div class="me-head">
                 <span class="me-title">メモ</span>
                 <button type="button" class="me-star${memo.star ? ' on' : ''}" onclick="toggleMemoStar('${safeId}')" aria-pressed="${!!memo.star}">★ 練習したい</button>
+                ${typeof isInNext === 'function' ? `<button type="button" class="me-star me-next${isInNext(songId) ? ' on' : ''}" onclick="toggleNext('${safeId}')" aria-pressed="${isInNext(songId)}">▶ 次にやる</button>` : ''}
             </div>
             <div class="me-label">タグ <button type="button" class="me-link" onclick="openMemoTagsModal()">タグを編集</button></div>
             <div class="me-chips">${tagChips || '<span class="me-empty">タグがありません</span>'}</div>
