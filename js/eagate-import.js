@@ -17,10 +17,11 @@ const EAGATE_HOW_LABELS = { guess: '(推定)', fuzzy: '(似た曲名)', lv: '(�
 let pendingEagateImport = null; // 確認画面で表示中の変更 { user, changes }
 
 // ---------- ブックマークレット ----------
-//   old：旧筐体用（メダルだけを読む。window.__popnEagateMode に 'old' を入れてから本体を読み込む）
+//   old：旧筐体用（メダルだけを読む。window.__popnEagateMode に 'old' を入れてから本体を読み込む）／ 'banner'：ノック表のバナー用
 function getBookmarkletCode(old) {
     const src = new URL('js/eagate-bookmarklet.js', location.href).href;
-    return `javascript:(function(){window.__popnEagateMode=${old ? "'old'" : "''"};var s=document.createElement('script');s.charset='UTF-8';s.src=${JSON.stringify(src)}+'?t='+Date.now();document.body.appendChild(s);})();`;
+    const mode = old === 'banner' ? 'banner' : old ? 'old' : '';
+    return `javascript:(function(){window.__popnEagateMode=${JSON.stringify(mode)};var s=document.createElement('script');s.charset='UTF-8';s.src=${JSON.stringify(src)}+'?t='+Date.now();document.body.appendChild(s);})();`;
 }
 
 function openEagateHelpModal() {
@@ -29,6 +30,9 @@ function openEagateHelpModal() {
     const link = document.getElementById('eagate-bookmarklet-link');
     link.setAttribute('href', code);
     document.getElementById('eagate-bookmarklet-code').value = code;
+    const bannerCode = getBookmarkletCode('banner');
+    document.getElementById('eagate-banner-bookmarklet-link').setAttribute('href', bannerCode);
+    document.getElementById('eagate-banner-bookmarklet-code').value = bannerCode;
     const oldCode = getBookmarkletCode(true);
     document.getElementById('eagate-old-bookmarklet-link').setAttribute('href', oldCode);
     document.getElementById('eagate-old-bookmarklet-code').value = oldCode;
@@ -342,6 +346,12 @@ function medalLabelHtml(key) {
 
 // 確認画面を開く。データがおかしければ false
 function openEagateImportPreview(text) {
+    // ノック表のバナー（バナー用のブックマークレット）は別の画面で
+    if (typeof text === 'string' && text.includes('"popn-knock-banners"') && typeof openKnockBannerImport === 'function') {
+        let data = null;
+        try { data = JSON.parse(text); } catch (e) { data = null; }
+        if (data && data.type === 'popn-knock-banners') return openKnockBannerImport(data);
+    }
     const parsed = parseEagatePayload(text);
     if (!parsed) return false;
     if (songs.length === 0) {
@@ -427,6 +437,7 @@ function applyEagateImport() {
         return;
     }
     if (pending.mode === 'old') { applyOldMedalImport(pending); return; }
+    if (pending.mode === 'knockBanner') { applyKnockBannerImport(pending); return; }
     const cb = document.getElementById('eagate-record-history');
     const recordHistory = !cb || cb.checked;
     pending.changes.forEach(c => {

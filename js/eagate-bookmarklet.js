@@ -17,6 +17,9 @@
     const PANEL_ID = 'popn-eagate-panel';
     // 旧筐体用のブックマークレット（window.__popnEagateMode = 'old'）：Lv46〜50 のメダルだけを読んで送る
     const OLD_MODE = window.__popnEagateMode === 'old';
+    // ノック表のバナー用のブックマークレット（window.__popnEagateMode = 'banner'）：公開の楽曲一覧（music/list.html）から、
+    // ノック表の Lv45 以下の譜面（S乱）と乱ノックの譜面の曲カード（バナー画像）を集めて送る
+    const BANNER_MODE = window.__popnEagateMode === 'banner';
 
     // メダル画像のファイル名（meda_○.png の ○）→ アプリのメダル名。'' は未プレイ
     // ※ 公式の画像名が変わったときは、ここだけ直す
@@ -50,7 +53,7 @@
             'background:#fff;color:#333;border:2px solid #e91e63;border-radius:10px;padding:14px;' +
             'box-shadow:0 6px 24px rgba(0,0,0,.35);font:14px/1.5 sans-serif;text-align:left;';
         const title = document.createElement('div');
-        title.textContent = OLD_MODE ? "Pop'n Clear Rate app 取り込み（旧筐体のメダル）" : "Pop'n Clear Rate app 取り込み";
+        title.textContent = OLD_MODE ? "Pop'n Clear Rate app 取り込み（旧筐体のメダル）" : BANNER_MODE ? "Pop'n Clear Rate app 取り込み（ノック表のバナー）" : "Pop'n Clear Rate app 取り込み";
         title.style.cssText = 'font-weight:bold;color:#c2185b;margin-bottom:6px;';
         statusEl = document.createElement('div');
         bodyEl = document.createElement('div');
@@ -637,6 +640,7 @@
             addCloseButton();
             return finish();
         }
+        if (BANNER_MODE) return runBannerMode();
 
         const diag = { unknownMedals: {}, positional: 0, badRows: 0, multiInLevelPage: 0 };
         const charts = [];
@@ -784,6 +788,133 @@
         } else if (unknown.length) {
             showDiag(buildDiag(firstDoc, firstUrl, diag, 'old: unknown medals'), `知らないメダル画像がありました（${unknown.join(', ')}）。その譜面は取り込みません。`);
         }
+        addCloseButton();
+        finish();
+    }
+
+    // ---------- ノック表のバナー（公開の楽曲一覧から曲カードを集める） ----------
+    const BANNER_WIDTH = 200; // 送る画像の幅（元は 244×58）
+    // 曲名・ジャンル名を比べるためにそろえる（全角/半角・大文字/小文字・記号の違いを無視。UPPER の書き方もそろえる）
+    //   withUpper = false：UPPER の書き方を消す（一覧に UPPER の行が無い曲は、通常の曲カードを使う）
+    const normName = (s, withUpper = true) => String(s || '').replace(/[\u24CA\u24E4]/g, ' (upper)').normalize('NFKC').toLowerCase()
+        .replace(/[(\[]\s*upper\s*[)\]]/g, withUpper ? ' upper ' : ' ').replace(/[^\p{L}\p{N}]/gu, '');
+
+    function loadKnockTables() {
+        return new Promise((resolve, reject) => {
+            if (window.KNOCK_TABLES) return resolve(window.KNOCK_TABLES);
+            const s = document.createElement('script');
+            s.charset = 'UTF-8';
+            s.src = APP_URL + 'js/knock-data.js?t=' + Date.now();
+            s.onload = () => {
+                // knock-data.js は const で定義しているので、window には付かない。名前でそのまま読める
+                // eslint-disable-next-line no-undef
+                const t = typeof KNOCK_TABLES !== 'undefined' ? KNOCK_TABLES : null;
+                if (t) resolve(t); else reject(new Error('ノック表のデータを読めませんでした'));
+            };
+            s.onerror = () => reject(new Error('ノック表のデータを読めませんでした'));
+            document.body.appendChild(s);
+        });
+    }
+
+    // 画像を読んで、幅 BANNER_WIDTH の data URL にする（同じサイトの画像なので canvas に描ける）
+    async function imageToDataUrl(url) {
+        const res = await fetch(url, { credentials: 'include' });
+        if (!res.ok) throw new Error('画像 ' + res.status);
+        const blob = await res.blob();
+        const objUrl = URL.createObjectURL(blob);
+        try {
+            const img = await new Promise((ok, ng) => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => ng(new Error('画像を開けません')); im.src = objUrl; });
+            const w = Math.min(BANNER_WIDTH, img.naturalWidth || BANNER_WIDTH);
+            const h = Math.max(1, Math.round((img.naturalHeight || 58) * w / (img.naturalWidth || 244)));
+            const cv = document.createElement('canvas');
+            cv.width = w; cv.height = h;
+            cv.getContext('2d').drawImage(img, 0, 0, w, h);
+            let data = cv.toDataURL('image/webp', 0.85);
+            if (!/^data:image\/webp/.test(data)) data = cv.toDataURL('image/png');
+            return data;
+        } finally { URL.revokeObjectURL(objUrl); }
+    }
+
+    async function runBannerMode() {
+        let tables;
+        try { tables = await loadKnockTables(); } catch (e) { setStatus(e.message); addCloseButton(); return finish(); }
+        // 集める譜面：S乱は正規Lv 45 以下、乱は全部（アプリに無い譜面のバナーを出すため。アプリにある曲かどうかはアプリが決める）
+        const wanted = []; // { key, name: そろえた名前, loose: UPPER を消した名前 }
+        const addWanted = (prefix, it) => {
+            const name = normName(it.n);
+            if (name) wanted.push({ key: `${prefix}:${it.t}`, name, loose: normName(it.n, false) });
+        };
+        tables.sran.levels.forEach(l => l.items.forEach(it => { if (it.lv <= 45) addWanted(tables.sran.prefix, it); }));
+        tables.ran.levels.forEach(l => l.items.forEach(it => addWanted(tables.ran.prefix, it)));
+        const listUrl = page => new URL(`/game/popn/${VER_DIR}/music/list.html?page=${page}&version=-1&lv=0&bemani=0&category=0&keyword=&sort=music&sort_type=up`, location.origin).href;
+        // 一覧の曲：ジャンル名・曲名・「ジャンル名(曲名)」（表は「ハッピーハードコア(BE LOVIN)」のように書くことがある）で引く
+        const exact = new Map(), loose = new Map(); // そろえた名前 → 画像の URL
+        const found = new Map(); // 画像の URL → Set(キー)
+        let pageCount = null, rows = 0, firstDoc = null;
+        try {
+            for (let page = 0; page < MAX_PAGES; page++) {
+                if (pageCount !== null && page >= pageCount) break;
+                setStatus(`楽曲一覧を読み取り中… ${page + 1}${pageCount ? '/' + pageCount : ''}ページ目（${rows}曲）`);
+                const doc = await fetchDoc(listUrl(page));
+                if (!firstDoc) firstDoc = doc;
+                if (page === 0) {
+                    const opts = doc.querySelectorAll('#s_page option');
+                    pageCount = opts.length || 1;
+                }
+                const items = doc.querySelectorAll('ul.mu_list_table:not(.mu_head) > li');
+                // 1曲 = [曲カードの li, 楽曲（ジャンル名/曲名/アーティスト）の li, LEVEL の li]
+                let n = 0;
+                items.forEach(li => {
+                    const img = li.querySelector('img[src*="img_binary"]');
+                    if (!img) return;
+                    const info = li.nextElementSibling;
+                    const ps = info ? info.querySelectorAll('p') : [];
+                    const genre = ps[0] ? ps[0].textContent : '', title = ps[1] ? ps[1].textContent : '';
+                    n++;
+                    const src = new URL(img.getAttribute('src'), location.href).href;
+                    [genre, title, genre + title].forEach(name => {
+                        const a = normName(name), b = normName(name, false);
+                        if (a && !exact.has(a)) exact.set(a, src);
+                        if (b && !loose.has(b)) loose.set(b, src);
+                    });
+                });
+                if (n === 0) break;
+                rows += n;
+                await sleep(PAGE_INTERVAL_MS);
+            }
+            // 表の譜面に合う曲カード：まず書き方どおり、無ければ UPPER を消して
+            wanted.forEach(w => {
+                const src = exact.get(w.name) || exact.get(w.loose) || loose.get(w.loose);
+                if (!src) return;
+                if (!found.has(src)) found.set(src, new Set());
+                found.get(src).add(w.key);
+            });
+        } catch (e) {
+            setStatus('楽曲一覧を読めませんでした：' + e.message);
+            if (firstDoc) showDiag(buildDiag(firstDoc, listUrl(0), {}, 'banner: ' + e.message), 'エラーが出ました。');
+            addCloseButton();
+            return finish();
+        }
+        if (found.size === 0) {
+            setStatus(`楽曲一覧（${rows}曲）から、ノック表の譜面が見つかりませんでした。`);
+            if (firstDoc) showDiag(buildDiag(firstDoc, listUrl(0), {}, 'banner: none'), '公式ページの形が想定と違うようです。');
+            addCloseButton();
+            return finish();
+        }
+        // 画像を読む
+        const images = [];
+        let i = 0, failed = 0;
+        for (const [src, keys] of found) {
+            i++;
+            setStatus(`バナーを読み取り中… ${i}/${found.size}`);
+            try { images.push({ k: Array.from(keys), d: await imageToDataUrl(src) }); } catch (e) { failed++; }
+            if (i % 10 === 0) await sleep(100);
+        }
+        const keyCount = images.reduce((n, x) => n + x.k.length, 0);
+        const json = JSON.stringify({ type: 'popn-knock-banners', v: 1, at: new Date().toISOString(), images });
+        setStatus(`楽曲一覧の ${rows}曲から、ノック表の ${keyCount}譜面ぶんのバナー ${images.length}枚を読み取りました。` + (failed ? `（読めなかった画像 ${failed}枚）` : ''));
+        addNote('「アプリに送る」を押すと、アプリでクラウドに保存します（データが大きいので、コピーより「アプリに送る」がおすすめです）。');
+        addButton('アプリに送る（新しいタブで開く）', '#e91e63', () => sendToApp(json));
         addCloseButton();
         finish();
     }

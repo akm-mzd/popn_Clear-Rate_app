@@ -1936,3 +1936,9 @@ button.kl-item { display: flex; align-items: center; gap: 8px; width: 100%; marg
 button.kl-item.on { background: #e3f2fd; }
 button.kl-unlink { display: block; width: 100%; margin: 0; padding: 8px; border: none; border-bottom: 1px solid #f0f0f0; background: #fff8e1; color: #e65100; font-family: inherit; font-size: 13px; cursor: pointer; }
 .kl-note { margin-top: 6px; font-size: 11px; color: #888; }
+/* ノック表：アプリに無い譜面のバナー */
+.dg-banner.kn-noapp.kn-hasimg { position: relative; padding: 0; border-style: solid; border-color: #e0e0e0; background: #fff; align-items: center; justify-content: center; }
+.dg-banner.kn-noapp.kn-hasimg img { width: 100%; height: 100%; object-fit: contain; }
+.kn-lv-badge { position: absolute; right: 2px; bottom: 1px; padding: 0 4px; border-radius: 6px; background: rgba(0,0,0,0.6); color: #fff; font-size: 9px; font-weight: bold; line-height: 13px; }
+.kb-preview { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.kb-preview img { width: 100px; height: auto; border: 1px solid #eee; border-radius: 3px; }

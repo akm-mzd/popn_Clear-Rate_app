@@ -5,7 +5,7 @@
 // ==========================================
 
 function downloadSongsAndClearsJson() {
-    const exportData = { songs: songs, clearRecords: clearRecords, scoreRecords: scoreRecords, memoRecords: memoRecords, historyRecords: getHistoryRecords(), pokkuraRecords: (allUsersData[currentUser] && allUsersData[currentUser].pokkuraRecords) || {}, goalRecords: getGoalRecords(), pokkuraFlagRecords: getPokkuraFlagRecords(), recentRecords: (allUsersData[currentUser] && allUsersData[currentUser].recentRecords) || {}, memoConfigRecords: (allUsersData[currentUser] && allUsersData[currentUser].memoConfigRecords) || {}, attrConfigRecords: (allUsersData[currentUser] && allUsersData[currentUser].attrConfigRecords) || {}, pokkuraHistRecords: (allUsersData[currentUser] && allUsersData[currentUser].pokkuraHistRecords) || {}, badRecords: (allUsersData[currentUser] && allUsersData[currentUser].badRecords) || {}, badReachRecords: (allUsersData[currentUser] && allUsersData[currentUser].badReachRecords) || {}, oldMedalRecords: (allUsersData[currentUser] && allUsersData[currentUser].oldMedalRecords) || {}, nextRecords: (allUsersData[currentUser] && allUsersData[currentUser].nextRecords) || {}, knockRecords: (allUsersData[currentUser] && allUsersData[currentUser].knockRecords) || {} };
+    const exportData = { songs: songs, clearRecords: clearRecords, scoreRecords: scoreRecords, memoRecords: memoRecords, historyRecords: getHistoryRecords(), pokkuraRecords: (allUsersData[currentUser] && allUsersData[currentUser].pokkuraRecords) || {}, goalRecords: getGoalRecords(), pokkuraFlagRecords: getPokkuraFlagRecords(), recentRecords: (allUsersData[currentUser] && allUsersData[currentUser].recentRecords) || {}, memoConfigRecords: (allUsersData[currentUser] && allUsersData[currentUser].memoConfigRecords) || {}, attrConfigRecords: (allUsersData[currentUser] && allUsersData[currentUser].attrConfigRecords) || {}, pokkuraHistRecords: (allUsersData[currentUser] && allUsersData[currentUser].pokkuraHistRecords) || {}, badRecords: (allUsersData[currentUser] && allUsersData[currentUser].badRecords) || {}, badReachRecords: (allUsersData[currentUser] && allUsersData[currentUser].badReachRecords) || {}, oldMedalRecords: (allUsersData[currentUser] && allUsersData[currentUser].oldMedalRecords) || {}, nextRecords: (allUsersData[currentUser] && allUsersData[currentUser].nextRecords) || {}, knockRecords: (allUsersData[currentUser] && allUsersData[currentUser].knockRecords) || {}, knockBannerRecords: (allUsersData[currentUser] && allUsersData[currentUser].knockBannerRecords) || {} };
     const dataStr = JSON.stringify(exportData, null, 2);
     triggerDownload(dataStr, `popn_data_${currentUser}.json`, 'クリア・スコア・メモを含めて');
 }
@@ -500,6 +500,7 @@ async function restoreFromJson(event) {
             if (isObj(data.oldMedalRecords)) user.oldMedalRecords = data.oldMedalRecords;
             if (isObj(data.nextRecords)) user.nextRecords = data.nextRecords;
             if (isObj(data.knockRecords)) user.knockRecords = data.knockRecords;
+            if (isObj(data.knockBannerRecords)) user.knockBannerRecords = data.knockBannerRecords;
 
             clearRecords = user.clearRecords;
             scoreRecords = user.scoreRecords;
