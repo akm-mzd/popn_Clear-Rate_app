@@ -1915,3 +1915,11 @@ button.nx-suggest-item.on { background: #f1f8e9; }
 button.kn-choice { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 90px; margin: 0; padding: 8px 4px; border: 2px solid #e0e0e0; border-radius: 10px; background: #fff; cursor: pointer; font-family: inherit; font-size: 12px; color: #444; }
 button.kn-choice img { width: 56px; height: 56px; object-fit: contain; }
 button.kn-choice.on { border-color: #6a3fb0; background: #f3e5f5; font-weight: bold; }
+.kn-pagebar { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; }
+.kn-pages { flex: 1; min-width: 0; display: flex; gap: 6px; overflow-x: auto; padding: 2px; -webkit-overflow-scrolling: touch; }
+#diff-grid-view button.kn-page { flex: 0 0 auto; width: auto; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 1px; margin: 0; padding: 4px 10px; border: 1px solid #ddd; border-radius: 8px; background: #fff; color: #444; cursor: pointer; font-family: inherit; line-height: 1.2; }
+#diff-grid-view button.kn-page.on { border-color: #6a3fb0; background: #6a3fb0; color: #fff; }
+.kn-page-range { font-size: 12px; font-weight: bold; white-space: nowrap; }
+.kn-page-count { font-size: 10px; opacity: 0.8; }
+#diff-grid-view button.kn-page-move { flex-shrink: 0; width: 32px; height: 36px; margin: 0; padding: 0; border: 1px solid #ddd; border-radius: 8px; background: #fff; color: #6a3fb0; font-size: 20px; font-weight: bold; cursor: pointer; font-family: inherit; }
+#diff-grid-view button.kn-page-move:disabled { color: #ccc; cursor: default; }
