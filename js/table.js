@@ -2979,6 +2979,15 @@ function matchKnockSong(item, index, realLevel) {
     return pick((index.base.get(normalizeSongText(item.n)) || []).filter(s => { const d = getKnockSongDiff(s); return d === '' ? want === 'EX' : d === want; }));
 }
 
+// H 譜面の曲を、譜面を見ずに名前だけで探す（UPPER はそろえる。EX・譜面の書いていない曲を先に、レベルの近い順）
+function matchKnockSongForH(item, index) {
+    const wantUpper = isUpperText(item.n);
+    const cands = (index.base.get(normalizeSongText(item.n)) || []).filter(s => songSaysUpper(s) === wantUpper);
+    if (cands.length === 0) return null;
+    const rank = s => { const d = getKnockSongDiff(s); return d === 'EX' || d === '' ? 0 : 1; };
+    return cands.slice().sort((a, b) => (rank(a) - rank(b)) || (Math.abs((parseInt(a.level, 10) || 0) - item.lv) - Math.abs((parseInt(b.level, 10) || 0) - item.lv)))[0];
+}
+
 function renderKnockGrid(tableKey) {
     const grid = document.getElementById('diff-grid-view');
     const table = KNOCK_TABLES[tableKey];
@@ -3013,7 +3022,11 @@ function renderKnockGrid(tableKey) {
     html += buildKnockPageBar(tableKey, pages, page);
     html += buildDirectionBar(mode);
     const pageRows = pages[page].rows;
-    pageRows.forEach(row => row.cells.forEach(c => { c.song = matchKnockSong(c.item, index, tableKey === 'sran'); }));
+    pageRows.forEach(row => row.cells.forEach(c => {
+        c.song = matchKnockSong(c.item, index, tableKey === 'sran');
+        // H 譜面：アプリに H 譜面が無くても、同じ曲（EX）があればそのバナーを出す（枠を黄色にして H と分かるように）
+        if (!c.song && c.item.d === 'H') c.song = matchKnockSongForH(c.item, index);
+    }));
     orderRowsForVertical(pageRows, vertical).forEach(row => {
         const ordered = orderForDirection(row.cells, COLS, getGridDirection(mode), vertical);
         let cellsHtml = '';
@@ -3085,9 +3098,7 @@ function buildKnockPageBar(tableKey, pages, page) {
 function buildKnockCellHtml(c) {
     const m = KNOCK_MARKS[c.mark];
     const song = c.song;
-    const medalKey = song ? (clearRecords[song.id] || '') : '';
-    const medalHtml = song && medalKey ? `<span class="kn-medal">${buildGridMedalInner(medalKey)}</span>` : '';
-    const markBtn = `<button type="button" class="dg-medal kn-mark" onclick="openKnockMarkModal('${jsStringAttr(c.key)}')" title="${escapeHtml(m.label)}（押して変更）"><img src="${m.img}" alt="${escapeHtml(m.label)}" loading="lazy">${medalHtml}</button>`;
+    const markBtn = `<button type="button" class="dg-medal kn-mark" onclick="openKnockMarkModal('${jsStringAttr(c.key)}')" title="${escapeHtml(m.label)}（押して変更）"><img src="${m.img}" alt="${escapeHtml(m.label)}" loading="lazy"></button>`;
     if (!song) {
         return `
                 <div class="dg-cell">
@@ -3102,7 +3113,7 @@ function buildKnockCellHtml(c) {
     return `
                 <div class="dg-cell">
                     ${markBtn}
-                    <a class="dg-banner" data-sid="${escapeHtml(song.id)}" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(c.item.t)}（Lv${escapeHtml(song.level)}・攻略wikiを開く）">${bannerInner}${buildMemoMarkHtml(song.id)}</a>
+                    <a class="dg-banner${c.item.d === 'H' ? ' kn-h' : ''}" data-sid="${escapeHtml(song.id)}" href="${escapeHtml(getWikiUrl(song))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(c.item.t)}（${c.item.d === 'H' ? 'H 譜面・' : ''}攻略wikiを開く）">${bannerInner}${buildMemoMarkHtml(song.id)}</a>
                 </div>`;
 }
 
