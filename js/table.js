@@ -2938,24 +2938,45 @@ function getKnockMark(key) {
     return v === 'c' || v === 'e' ? v : '';
 }
 
-// アプリの曲を、ジャンル名と曲名の両方で引けるようにする（normalizeSongText でそろえる）
+// アプリのジャンル名の末尾の譜面「(EX)」「(H)」など（アプリのジャンル名には付いていることが多い）
+const KNOCK_DIFF_SUFFIX_RE = /\s*[(（](EX|H|N|E)[)）]\s*$/i;
+
+// アプリの曲を引けるようにする。full＝ジャンル名そのまま・曲名、base＝ジャンル名から譜面を外したもの・曲名（normalizeSongText でそろえる）
 function buildKnockSongIndex() {
-    const index = new Map();
-    const add = (k, s) => { if (!k) return; if (!index.has(k)) index.set(k, []); if (!index.get(k).includes(s)) index.get(k).push(s); };
-    songs.forEach(s => { add(normalizeSongText(s.genre), s); add(normalizeSongText(s.title), s); });
-    return index;
+    const full = new Map(), base = new Map();
+    const add = (map, k, s) => { if (!k) return; if (!map.has(k)) map.set(k, []); if (!map.get(k).includes(s)) map.get(k).push(s); };
+    songs.forEach(s => {
+        add(full, normalizeSongText(s.genre), s);
+        add(full, normalizeSongText(s.title), s);
+        add(base, normalizeSongText(String(s.genre || '').replace(KNOCK_DIFF_SUFFIX_RE, '')), s);
+        add(base, normalizeSongText(s.title), s);
+    });
+    return { full, base };
+}
+
+// アプリの曲の譜面（ジャンル名の末尾に書いてあれば EX/H…、無ければ ''）
+function getKnockSongDiff(song) {
+    const m = String(song.genre || '').match(KNOCK_DIFF_SUFFIX_RE);
+    return m ? m[1].toUpperCase() : '';
 }
 
 // ノック表の1譜面を、アプリの曲に合わせる（無ければ null）
-//   H 譜面はアプリに無い。S乱の lv は譜面の正規Lv なので、46 未満もアプリに無い（乱の lv は「乱を掛けた正規相当」なので使わない）
+//   1) 表の書き方そのまま（「サイレント(EX)」）でアプリのジャンル名・曲名と比べる。H 譜面もここで合う
+//   2) 無ければ、表の名前（譜面を外したもの）で比べる。アプリ側に別の譜面が書いてある曲は除く
+//   S乱の lv は譜面の正規Lv なので 46 未満はアプリに無い（乱の lv は乱を掛けた正規相当なので使わない）
 //   UPPER かどうかをそろえ、候補が複数なら lv に一番近い曲
 function matchKnockSong(item, index, realLevel) {
-    if (item.d === 'H' || (realLevel && !(item.lv >= 46))) return null;
-    let cands = index.get(normalizeSongText(item.n)) || [];
+    if (realLevel && !(item.lv >= 46)) return null;
     const wantUpper = isUpperText(item.n);
-    cands = cands.filter(s => songSaysUpper(s) === wantUpper);
-    if (cands.length === 0) return null;
-    return cands.slice().sort((a, b) => Math.abs((parseInt(a.level, 10) || 0) - item.lv) - Math.abs((parseInt(b.level, 10) || 0) - item.lv))[0];
+    const pick = list => {
+        const cands = (list || []).filter(s => songSaysUpper(s) === wantUpper);
+        if (cands.length === 0) return null;
+        return cands.slice().sort((a, b) => Math.abs((parseInt(a.level, 10) || 0) - item.lv) - Math.abs((parseInt(b.level, 10) || 0) - item.lv))[0];
+    };
+    const exact = pick(index.full.get(normalizeSongText(item.t)));
+    if (exact) return exact;
+    const want = item.d || 'EX';
+    return pick((index.base.get(normalizeSongText(item.n)) || []).filter(s => { const d = getKnockSongDiff(s); return d === '' ? want === 'EX' : d === want; }));
 }
 
 function renderKnockGrid(tableKey) {
@@ -2973,10 +2994,13 @@ function renderKnockGrid(tableKey) {
             const key = getKnockKey(tableKey, item);
             const mark = getKnockMark(key);
             total[mark]++;
-            return { item, key, mark, song: matchKnockSong(item, index, tableKey === 'sran') };
+            return { item, key, mark };
         });
         return { lvl, cells, i };
     });
+    // 数段ずつのページ。今のページの段だけ曲を合わせて描く
+    const pages = buildKnockPages(rows);
+    const page = Math.min(Math.max(0, getKnockPage(tableKey)), pages.length - 1);
     const n = rows.length;
     const [dark, light] = KNOCK_LABEL_COLORS[tableKey];
     const colorOf = i => '#' + [0, 1, 2].map(c => Math.round(dark[c] + (light[c] - dark[c]) * (n > 1 ? i / (n - 1) : 0)).toString(16).padStart(2, '0')).join('');
@@ -2986,8 +3010,11 @@ function renderKnockGrid(tableKey) {
         <span><img src="${KNOCK_MARKS.e.img}" alt="">イージー ${total.e}</span>
         <span><img src="${KNOCK_MARKS[''].img}" alt="">未クリア ${total['']}</span>
         <span class="kn-total">全 ${all}譜面</span></div>`;
+    html += buildKnockPageBar(tableKey, pages, page);
     html += buildDirectionBar(mode);
-    orderRowsForVertical(rows, vertical).forEach(row => {
+    const pageRows = pages[page].rows;
+    pageRows.forEach(row => row.cells.forEach(c => { c.song = matchKnockSong(c.item, index, tableKey === 'sran'); }));
+    orderRowsForVertical(pageRows, vertical).forEach(row => {
         const ordered = orderForDirection(row.cells, COLS, getGridDirection(mode), vertical);
         let cellsHtml = '';
         ordered.forEach(c => { cellsHtml += buildKnockCellHtml(c); });
@@ -2999,6 +3026,60 @@ function renderKnockGrid(tableKey) {
             </div>`;
     });
     grid.innerHTML = html;
+    // 今のページのボタンが見えるように、ページの並びを横に動かす
+    const on = grid.querySelector('.kn-page.on');
+    const bar = grid.querySelector('.kn-pages');
+    if (on && bar) bar.scrollLeft = on.offsetLeft - bar.offsetLeft - (bar.clientWidth - on.offsetWidth) / 2;
+}
+
+// 段を上（強い段）から順にまとめ、譜面の数が KNOCK_PAGE_SIZE を超えたら次のページ（段の途中では切らない）
+const KNOCK_PAGE_SIZE = 50;
+function buildKnockPages(rows) {
+    const pages = [];
+    let cur = null;
+    rows.forEach(row => {
+        if (!cur || cur.count >= KNOCK_PAGE_SIZE || (cur.count > 0 && cur.count + row.cells.length > KNOCK_PAGE_SIZE * 1.3)) {
+            cur = { rows: [], count: 0 };
+            pages.push(cur);
+        }
+        cur.rows.push(row);
+        cur.count += row.cells.length;
+    });
+    return pages.length ? pages : [{ rows: [], count: 0 }];
+}
+
+function getKnockPage(tableKey) {
+    const n = parseInt(storageGet(`popn_knock_page_${tableKey}`), 10);
+    return isNaN(n) ? 0 : n;
+}
+
+function setKnockPage(tableKey, page) {
+    storageSet(`popn_knock_page_${tableKey}`, String(Math.max(0, page)));
+    renderTable();
+    const grid = document.getElementById('diff-grid-view');
+    if (grid) grid.scrollIntoView({ block: 'start' });
+}
+
+// 段の短い名前（「乱●14」→「●14」、「S乱Lv19」→「Lv19」）
+function shortKnockLabel(label) {
+    return String(label).replace(/^S?乱/, '');
+}
+
+function buildKnockPageBar(tableKey, pages, page) {
+    if (pages.length <= 1) return '';
+    const safeKey = jsStringAttr(tableKey);
+    const btns = pages.map((pg, i) => {
+        const first = shortKnockLabel(pg.rows[0].lvl.label);
+        const last = shortKnockLabel(pg.rows[pg.rows.length - 1].lvl.label);
+        const cleared = pg.rows.reduce((n, r) => n + r.cells.filter(c => c.mark).length, 0);
+        return `<button type="button" class="kn-page${i === page ? ' on' : ''}" onclick="setKnockPage('${safeKey}', ${i})"${i === page ? ' aria-current="page"' : ''}>
+            <span class="kn-page-range">${escapeHtml(first === last ? first : `${first}〜${last}`)}</span><span class="kn-page-count">${cleared}/${pg.count}</span></button>`;
+    }).join('');
+    return `<div class="kn-pagebar">
+        <button type="button" class="kn-page-move" onclick="setKnockPage('${safeKey}', ${page - 1})"${page <= 0 ? ' disabled' : ''} aria-label="前のページ">‹</button>
+        <div class="kn-pages">${btns}</div>
+        <button type="button" class="kn-page-move" onclick="setKnockPage('${safeKey}', ${page + 1})"${page >= pages.length - 1 ? ' disabled' : ''} aria-label="次のページ">›</button>
+    </div>`;
 }
 
 function buildKnockCellHtml(c) {
