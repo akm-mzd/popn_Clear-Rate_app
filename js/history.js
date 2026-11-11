@@ -30,9 +30,32 @@ function getBadReachRecords(user = currentUser) {
 
 const toBadNum = v => (v === undefined || v === null || v === '' || isNaN(parseInt(v, 10)) || parseInt(v, 10) < 0) ? null : parseInt(v, 10);
 
-// 曲の BAD の数：記録があればその数、なければフルコンボ以上（銀丸以上）なら 0、どちらでもなければ null
+// 更新履歴の BAD（変更前・変更後）の中で一番少ない数（{ 曲ID: 数 }）。曲の詳細ページの最小BAD と同じ決まり
+//   1回描くあいだは同じものを使い、すぐ捨てる。履歴を書き換えたときも捨てる（clearHistoryMinBadCache）。ユーザーが変わったら作り直す
+let historyMinBadCache = null; // { src: 履歴, map }
+function clearHistoryMinBadCache() { historyMinBadCache = null; }
+function getHistoryMinBadMap() {
+    const records = getHistoryRecords();
+    if (historyMinBadCache && historyMinBadCache.src === records) return historyMinBadCache.map;
+    const map = {};
+    Object.values(records).forEach(e => {
+        if (!e || !e.id || typeof e.t !== 'number' || !('nb' in e)) return;
+        [toBadNum(e.nb), toBadNum(e.ob)].forEach(n => {
+            if (n !== null && (map[e.id] === undefined || n < map[e.id])) map[e.id] = n;
+        });
+    });
+    const cache = { src: records, map };
+    historyMinBadCache = cache;
+    queueMicrotask(() => { if (historyMinBadCache === cache) historyMinBadCache = null; });
+    return map;
+}
+
+// 曲の BAD の数：今の記録と更新履歴の中で一番少ない数（曲の詳細ページの最小BAD と同じ）。
+//   どちらも無ければフルコンボ以上（銀丸以上）なら 0、それ以外は null。記録を変えるときは badRecords を直接見る
 function getSongBad(id) {
-    const n = toBadNum(getBadRecords()[id]);
+    const rec = toBadNum(getBadRecords()[id]);
+    const hist = getHistoryMinBadMap()[id];
+    const n = hist === undefined ? rec : (rec === null ? hist : Math.min(rec, hist));
     if (n !== null) return n;
     const m = MEDAL_TYPES[clearRecords[id] || ''];
     return m && m.rank >= MEDAL_TYPES['銀丸'].rank ? 0 : null;
@@ -86,6 +109,7 @@ function addHistoryEntry(song, change, src) {
     const records = getHistoryRecords();
     const key = entry.t.toString(36) + '_' + Math.random().toString(36).slice(2, 7);
     records[key] = entry;
+    clearHistoryMinBadCache();
 
     // 多すぎたら古いものから消す
     const keys = Object.keys(records);
@@ -201,6 +225,7 @@ function deleteHistoryEntry(key) {
         if (!('nm' in x) && !('ns' in x) && !('nb' in x)) delete records[k];
     });
     delete records[key];
+    clearHistoryMinBadCache();
     scheduleAutoSave();
     renderTable();
     refreshSongHistoryViews(e.id);
@@ -655,6 +680,7 @@ function applyHistoryImport() {
     if (keys.length > HISTORY_MAX) {
         keys.sort((a, b) => (records[a].t || 0) - (records[b].t || 0)).slice(0, keys.length - HISTORY_MAX).forEach(k => delete records[k]);
     }
+    clearHistoryMinBadCache();
     closeHistoryImport();
     scheduleAutoSave();
     renderTable();
@@ -810,6 +836,7 @@ function addManualHistoryEntry(id, prefix) {
     if (ns !== null) { const p = before.find(e => 'ns' in e); entry.os = p ? toScoreNum(p.ns) : null; entry.ns = ns; }
     if (nb !== null) { const p = before.find(e => 'nb' in e); entry.ob = p ? toBadNum(p.nb) : null; entry.nb = nb; }
     records[t.toString(36) + '_' + Math.random().toString(36).slice(2, 7)] = entry;
+    clearHistoryMinBadCache();
     if (apply) {
         if ('nm' in entry) { if (nm === '') delete clearRecords[id]; else clearRecords[id] = nm; }
         if (ns !== null) scoreRecords[id] = ns;
@@ -887,6 +914,7 @@ function saveHistoryEdit() {
     if ((ob !== null || nb !== null) && ob !== nb) { next.ob = ob; next.nb = nb; }
     if (!('nm' in next) && !('ns' in next) && !('nb' in next)) { alert('変更が何もありません。消すときは ✕ を使ってください。'); return; }
     records[historyEditKey] = next;
+    clearHistoryMinBadCache();
     closeHistoryEdit();
     scheduleAutoSave();
     renderTable();
