@@ -260,8 +260,8 @@ async function fetchCloudVersion() {
 
 async function checkRemoteChanges() {
     if (!cloudReady || syncing || document.hidden) return;
-    // 管理者として編集中・未保存の変更がある間は上書きしない
-    if (isAdminAuthenticated || autoSaving || dirtyUsers.size > 0) return;
+    // 未保存の変更（記録・楽曲リスト）がある間は上書きしない。管理者でも、楽曲リストを変えていなければ取り込む
+    if (autoSaving || dirtyUsers.size > 0 || hasLocalSongEdits()) return;
 
     syncing = true;
     lastSyncAt = Date.now();
@@ -271,7 +271,7 @@ async function checkRemoteChanges() {
         if (v !== undefined && v !== knownVersion) {
             // 変更があったときだけ全データを取り直す
             const fresh = await fetchCloudData(0);
-            const localChanged = seq !== localChangeSeq || autoSaving || dirtyUsers.size > 0 || isAdminAuthenticated;
+            const localChanged = seq !== localChangeSeq || autoSaving || dirtyUsers.size > 0 || hasLocalSongEdits();
 
             if (!localChanged) {
                 knownVersion = fresh.version;
@@ -288,6 +288,7 @@ async function checkRemoteChanges() {
 
                 saveCache(fresh);
                 applyFetchedData(fresh);
+                markSongsSynced(songs);
                 initUserSelector();
                 updateCompareUserSelect();
                 updateDynamicFilters();
@@ -387,9 +388,107 @@ async function saveAllToCloud() {
     }
 }
 
-async function saveToCloud(isSongUpdate = false, targetUserName = currentUser, customLoadingText = null) {
+// ---------- 楽曲リストの写し（最後にクラウドとそろえたときのもの） ----------
+//   楽曲リストの保存は全部を送るので、保存の前にクラウドの最新を取り、この端末で変えた分（写しとの違い）だけを重ねる
+let syncedSongs = null;
+
+// applyFetchedData と同じ形にそろえた写しを作る
+function normalizeSongsCopy(list) {
+    return JSON.parse(JSON.stringify(list || [])).map(s => {
+        if (!s.level) s.level = '48';
+        const p = parseDifficulty(s.diffRaw);
+        s.diffClass = p.diffClass;
+        s.diffIndex = p.diffIndex;
+        s.id = s.genre + '_' + s.title + '_' + s.notes;
+        return s;
+    });
+}
+function markSongsSynced(list) { syncedSongs = normalizeSongsCopy(list); }
+
+// この端末に、まだクラウドに保存していない楽曲リストの変更があるか
+function hasLocalSongEdits() {
+    return !!syncedSongs && stableStr(songs) !== stableStr(syncedSongs);
+}
+
+// 最新の楽曲リスト（fresh）に、この端末で変えた分（base → local の違い）だけを重ねる
+//   足した曲・消した曲・曲ごとに変えた項目。それ以外は最新のまま（ほかの端末で付けたバナーなどを消さない）
+function mergeSongLists(fresh, base, local) {
+    const baseMap = new Map(base.map(s => [s.id, s]));
+    const localIds = new Set(local.map(s => s.id));
+    const out = fresh.map(s => JSON.parse(JSON.stringify(s)));
+    const outMap = new Map(out.map(s => [s.id, s]));
+    local.forEach(l => {
+        const b = baseMap.get(l.id);
+        const copy = JSON.parse(JSON.stringify(l));
+        if (!b) {
+            // この端末で足した曲（最新にも同じ曲があれば、この端末のものにする）
+            const i = out.findIndex(s => s.id === l.id);
+            if (i >= 0) out[i] = copy; else out.push(copy);
+            outMap.set(l.id, copy);
+            return;
+        }
+        const keys = new Set([...Object.keys(b), ...Object.keys(l)]);
+        const changed = [...keys].filter(k => stableStr(l[k]) !== stableStr(b[k]));
+        if (changed.length === 0) return;
+        let target = outMap.get(l.id);
+        if (!target) { target = JSON.parse(JSON.stringify(b)); out.push(target); outMap.set(l.id, target); } // ほかの端末で消された曲を、この端末で直していた
+        changed.forEach(k => { if (k in l) target[k] = copy[k]; else delete target[k]; });
+    });
+    // この端末で消した曲
+    return out.filter(s => !(baseMap.has(s.id) && !localIds.has(s.id)));
+}
+
+// 全部を送る保存の前に、クラウドの最新を取り込む（記録はこの端末のまだ保存していない分を重ねる）
+//   楽曲リストの保存なら、楽曲リストも最新にこの端末の変更を重ねる（replaceSongs のときはこの端末のものをそのまま使う）
+//   最新を取れなければ false（古いデータで上書きしないよう、保存をやめる）
+async function refreshBeforeFullSave(isSongUpdate, replaceSongs) {
+    clearTimeout(autoSaveTimer);
+    for (let i = 0; i < 100 && autoSaving; i++) await new Promise(r => setTimeout(r, 200));
+    if (cloudReady && dirtyUsers.size > 0) await runAutoSave();
+    let fresh;
+    try {
+        fresh = await fetchCloudData(1);
+    } catch (e) {
+        console.warn('保存前の読み込み失敗', e);
+        return false;
+    }
+    const freshSongs = normalizeSongsCopy(fresh.songs);
+    const localEdited = hasLocalSongEdits();
+    let nextSongs;
+    if (isSongUpdate) nextSongs = (replaceSongs || !syncedSongs) ? songs : mergeSongLists(freshSongs, syncedSongs, songs);
+    else nextSongs = localEdited ? songs : freshSongs;
+
+    const cloudUsers = JSON.parse(JSON.stringify(fresh.users || {}));
+    fresh.users = fresh.users || {};
+    mergeLocalEdits(fresh, syncedUsers, allUsersData);
+    knownVersion = fresh.version;
+    lastSyncAt = Date.now();
+    markSynced(cloudUsers);
+    // 楽曲リストの写しはクラウドの最新にする（この端末の変更は、保存できるまで違いとして残る）
+    syncedSongs = freshSongs;
+    fresh.songs = JSON.parse(JSON.stringify(nextSongs));
+    applyFetchedData(fresh);
+    for (const u in allUsersData) {
+        if (userRecordsStr(allUsersData[u]) !== userRecordsStr(syncedUsers[u])) dirtyUsers.add(u);
+    }
+    cloudReady = true;
+    const c = loadCache();
+    saveCache(Object.assign({}, c || {}, { songs: freshSongs, users: cloudUsers, version: fresh.version }));
+    if (typeof refreshUI === 'function') refreshUI();
+    return true;
+}
+
+async function saveToCloud(isSongUpdate = false, targetUserName = currentUser, customLoadingText = null, opts = {}) {
     if (!GAS_URL || GAS_URL.trim() === '') return false;
     if (!dataLoaded) { alert("データを読み込めていないため保存できません。再読み込みしてください。"); return false; } // ←追加
+
+    // 全部を送る保存なので、先にクラウドの最新を取り込む（古いデータで、ほかの端末の変更を上書きしないため）
+    showLoading(true, '最新のデータを確認中...');
+    if (!(await refreshBeforeFullSave(isSongUpdate, !!opts.replaceSongs))) {
+        showLoading(false);
+        alert('最新のデータを取れないので、保存をやめました（古いデータで上書きしないため）。\n通信を確かめて、もう一度保存してください。');
+        return false;
+    }
 
     // ローディング表示（カスタムテキストがあればそれを優先表示）
     const defaultText = `クラウドに保存中... (${isSongUpdate ? '楽曲リスト' : targetUserName})`;
@@ -439,6 +538,13 @@ async function saveToCloud(isSongUpdate = false, targetUserName = currentUser, c
         if (result.status === 'error') {
             alert(result.message);
         } else {
+            // 送ったものがクラウドと同じになった
+            if (isSongUpdate) markSongsSynced(songs);
+            // 記録を全部送ったときだけ、その記録も保存済みにする（楽曲リストの保存の記録は、ふだんの自動保存で送る）
+            if (!isSongUpdate && allUsersData[targetUserName]) {
+                syncedUsers[targetUserName] = JSON.parse(JSON.stringify(allUsersData[targetUserName]));
+                if (!buildPatch(targetUserName)) dirtyUsers.delete(targetUserName);
+            }
             // 現在のユーザーを保存した場合は、メモリ内のデータも最新として同期
             if (!isSongUpdate && targetUserName === currentUser) {
                 if (!allUsersData[currentUser]) allUsersData[currentUser] = { clearRecords: {}, scoreRecords: {}, memoRecords: {} };
@@ -453,6 +559,8 @@ async function saveToCloud(isSongUpdate = false, targetUserName = currentUser, c
         alert("通信エラーが発生しました。サイトを 更新しない で、保存が完了するまで試してください。");
     }
     showLoading(false);
+    // 取り込んだ最新に重ねた、この端末のまだ保存していない記録は、ふだんの自動保存で送る
+    if (dirtyUsers.size > 0) runAutoSave();
     return isSuccess;
 }
 
