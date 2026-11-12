@@ -515,7 +515,7 @@ async function restoreFromJson(event) {
 
         // クラウドへ反映（楽曲リストはその場で保存、記録は自動保存に任せる）
         let songsSaved = true;
-        if (restoreSongs) songsSaved = await saveToCloud(true);
+        if (restoreSongs) songsSaved = await saveToCloud(true, currentUser, null, { replaceSongs: true });
         if (restoreRecords) scheduleAutoSave();
 
         let done = '復元が完了しました。';
@@ -858,4 +858,37 @@ async function applyBulkDiff() {
         const ok = await saveToCloud(true);
         if (ok) alert('楽曲リストをクラウドに保存しました！');
     }
+}
+
+// ==========================================
+// ★ バックアップから消えたバナーを戻す
+//   バックアップにはバナーがあって、今の楽曲リストではバナーが空の曲だけを戻す（今あるバナー・記録は変えない）
+// ==========================================
+async function restoreBannersFromBackup(event) {
+    const input = event.target;
+    const file = input.files[0];
+    input.value = '';
+    if (!file) return;
+    if (!checkAdminAuth()) return;
+    let data;
+    try { data = JSON.parse(await file.text()); } catch (e) { data = null; }
+    const fileSongs = Array.isArray(data) ? data : (data && Array.isArray(data.songs) ? data.songs : null);
+    if (!fileSongs) { alert('楽曲リストの入ったバックアップ（.json）を選んでください。'); return; }
+    // 曲は「ジャンル・曲名・ノーツ数」で合わせる（id と同じ決まり）
+    const keyOf = s => String(s.genre ?? '') + '_' + String(s.title ?? '') + '_' + String(s.notes ?? '');
+    const backup = new Map();
+    fileSongs.forEach(s => {
+        if (!s || typeof s !== 'object') return;
+        const url = safeUrl(s.bannerUrl, true);
+        if (url) backup.set(keyOf(s), url);
+    });
+    const list = songs.filter(s => !safeUrl(s.bannerUrl, true) && backup.has(keyOf(s)))
+        .map(song => ({ song, url: backup.get(keyOf(song)) }));
+    if (list.length === 0) { alert('戻すバナーはありません（バックアップにバナーがあって、今は消えている曲はありません）。'); return; }
+    const sample = list.slice(0, 15).map(x => `Lv${x.song.level} ${x.song.title}`).join('\n');
+    if (!confirm(`${list.length}曲のバナーを、バックアップのものに戻します。\n\n${sample}${list.length > 15 ? `\n…ほか ${list.length - 15}曲` : ''}\n\n楽曲リストをクラウドに保存します。よろしいですか？`)) return;
+    list.forEach(x => { x.song.bannerUrl = x.url; });
+    renderTable();
+    const ok = await saveToCloud(true);
+    if (ok) alert(`${list.length}曲のバナーを戻しました。`);
 }

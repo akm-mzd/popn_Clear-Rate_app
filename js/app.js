@@ -36,7 +36,11 @@ window.onload = async () => {
         if (!songsEdited) {
             if (before) mergeLocalEdits(fresh, before.allUsersData, allUsersData);
             applyFetchedData(fresh);
+            markSongsSynced(songs);
             refreshUI();
+        } else {
+            // 読み込むあいだに楽曲リストを変えていたら、前回のデータを写しにする（保存のときに、変えた分だけを最新に重ねる）
+            markSongsSynced(before.songs);
         }
         saveCache(fresh);
         cloudReady = true;

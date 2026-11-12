@@ -429,6 +429,35 @@ function applySongHistoryLatest(id) {
     refreshSongHistoryViews(id);
 }
 
+// 「履歴の一番良い記録をまとめて反映」：全曲で、履歴の一番良いメダル・一番高いスコア・一番少ない BAD が
+//   今の記録より良い曲だけを、確認してから今の記録にする（下げることはしない。履歴は足さない）
+function applyHistoryBestAll() {
+    const name = v => v === null || v === '' ? 'なし' : String(v);
+    const list = songs.map(song => ({ song, diff: getSongHistoryLatestDiff(song.id) }))
+        .filter(x => x.diff.medal || x.diff.score || x.diff.bad);
+    if (list.length === 0) { alert('反映する曲はありません（どの曲も、今の記録が履歴と同じか、より良いです）。'); return; }
+    const line = x => {
+        const parts = [];
+        if (x.diff.medal) parts.push(`${x.diff.medal[0] || '未プレイ'}→${x.diff.medal[1] || '未プレイ'}`);
+        if (x.diff.score) parts.push(`スコア ${name(x.diff.score[0])}→${name(x.diff.score[1])}`);
+        if (x.diff.bad) parts.push(`BAD ${name(x.diff.bad[0])}→${name(x.diff.bad[1])}`);
+        return `Lv${x.song.level} ${x.song.title}：${parts.join('、')}`;
+    };
+    const sample = list.slice(0, 12).map(line).join('\n');
+    if (!confirm(`${list.length}曲の記録を、履歴の一番良い記録にします（今の記録より良いものだけ）。\n\n${sample}${list.length > 12 ? `\n…ほか ${list.length - 12}曲` : ''}`)) return;
+    const badRecs = getBadRecords();
+    list.forEach(({ song, diff }) => {
+        const id = song.id;
+        if (diff.medal) { if (diff.medal[1] === '') delete clearRecords[id]; else clearRecords[id] = diff.medal[1]; }
+        if (diff.score) { if (diff.score[1] === null) delete scoreRecords[id]; else scoreRecords[id] = diff.score[1]; }
+        if (diff.bad) { if (diff.bad[1] === null) delete badRecs[id]; else badRecs[id] = diff.bad[1]; }
+    });
+    scheduleAutoSave();
+    renderTable();
+    if (currentDetailSongId) refreshSongHistoryViews(currentDetailSongId);
+    showToast('toast-eagate', `${list.length}曲の記録を反映しました`, '#4caf50', 3000);
+}
+
 // 曲の詳細ページ・メダルを選ぶ画面で開いている曲なら、その画面（記録・最高スコア・BAD・裏メダル）を描き直す
 function refreshSongHistoryViews(id) {
     if (currentMedalEditId === id) renderUraMedalBox();
