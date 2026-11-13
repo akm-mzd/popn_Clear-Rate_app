@@ -349,9 +349,13 @@ function getAttrStats(songList) {
         .sort((x, y) => ((y.total >= ATTR_MIN_SONGS) - (x.total >= ATTR_MIN_SONGS)) || (x.rate - y.rate) || ((x.avg || 0) - (y.avg || 0)) || (y.total - x.total));
 }
 
-// 苦手な属性（曲が3曲以上で、クリア率が一番低いもの。全部クリアしていればなし）
+// 苦手の候補にしない属性（名前にこの文字を含むもの。辛ゲージはゲージの種類で、クリア率がいつも低くなるため）
+const WEAK_ATTR_EXCLUDE = ['辛ゲージ'];
+const isWeakAttrCandidate = a => !WEAK_ATTR_EXCLUDE.some(x => String(a).includes(x));
+
+// 苦手な属性（曲が3曲以上で、クリア率が一番低いもの。全部クリアしていればなし。辛ゲージは除く）
 function getWeakAttrs(songList) {
-    const list = getAttrStats(songList).filter(r => r.total >= ATTR_MIN_SONGS && r.rate < 1);
+    const list = getAttrStats(songList).filter(r => r.total >= ATTR_MIN_SONGS && r.rate < 1 && isWeakAttrCandidate(r.a));
     return list.length > 0 ? list.filter(r => r.rate === list[0].rate).map(r => r.a) : [];
 }
 

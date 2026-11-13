@@ -685,6 +685,8 @@ function checkGoalBackup() {
 // 今日の練習メニュー（目標シートの一番上）
 //   次の中から8曲を、順番に1曲ずつ（それぞれの中はランダムに）選ぶ。同じ曲は1回だけ。
 //   ★練習したい → 目標のまだの曲（達成に近いもの）→ ポックラのおすすめ → クリアまであと少し → 苦手な属性の曲
+//   「クリアまであと少し」「苦手な属性」は、ポックラの対象曲から作った今の実力の目安（getPracticeProfile）に
+//   レベル・難易度・属性が合う曲から、合い具合（practiceFit）の重みを付けたランダムで選ぶ
 //   選んだメニューは、同じ日のうちはこの端末に残す（popn_practice_ユーザー名）。「入れ替える」で選び直す
 // ==========================================
 const PRACTICE_COUNT = 8;
@@ -708,6 +710,53 @@ function shuffleList(list) {
     return a;
 }
 
+// ---------- 今の実力の目安（ポックラの対象曲から） ----------
+const PRACTICE_PROFILE_MIN = 5;   // 対象曲がこれより少なければ目安を作らない
+const PRACTICE_FIT_MIN = 0.3;     // 合い具合がこれより低い曲は選ばない
+const PRACTICE_SIGMA_MIN = 0.8;   // 幅の下限（対象曲の強さがそろっていても、Lv が1つ下の強い曲くらいまでは入れる）
+
+// 曲の強さ：Lv と難易度（ポックラのおすすめの「大変さ」と同じ考え方。未定は 0）
+function practiceStrength(song) {
+    const lv = parseInt(getPokkuraLevel(song), 10) || 0;
+    const d = getDiffSortValue(song);
+    return (lv - 48) + (d <= -999 ? 0 : d) * 0.5;
+}
+
+// { target: 狙いどころの強さ, sigma: 幅, attrs: { 属性: 対象曲の中の割合 } }。対象曲が少なければ null
+function getPracticeProfile() {
+    let pk;
+    try { pk = calcPokkura(); } catch (e) { return null; }
+    const list = [...pk.topNew, ...pk.topOld].filter(e => e.song).map(e => e.song);
+    if (list.length < PRACTICE_PROFILE_MIN) return null;
+    const hs = list.map(practiceStrength);
+    const mean = hs.reduce((a, b) => a + b, 0) / hs.length;
+    const sd = Math.sqrt(hs.reduce((a, h) => a + (h - mean) * (h - mean), 0) / hs.length);
+    const sigma = Math.max(PRACTICE_SIGMA_MIN, sd);
+    const attrs = {};
+    list.forEach(s => getSongAttrs(s).forEach(a => { attrs[a] = (attrs[a] || 0) + 1 / list.length; }));
+    return { target: mean + sigma / 2, sigma, attrs };
+}
+
+// 曲の合い具合（0〜1.3）：強さが狙いどころに近いほど高い。対象曲に多い属性を持てば少し上げる
+function practiceFit(profile, song) {
+    const dh = practiceStrength(song) - profile.target;
+    const base = Math.exp(-(dh * dh) / (2 * profile.sigma * profile.sigma));
+    const share = getSongAttrs(song).reduce((m, a) => Math.max(m, profile.attrs[a] || 0), 0);
+    return base * (1 + 0.3 * Math.min(1, share * 2));
+}
+
+// 重み付きのランダムな並び（重みの大きいものほど前に来やすい）
+function weightedShuffle(list, weightOf) {
+    return list.map(x => ({ x, k: Math.pow(Math.random(), 1 / Math.max(1e-6, weightOf(x))) }))
+        .sort((a, b) => b.k - a.k).map(o => o.x);
+}
+
+// 理由の欄に添える「Lv48 強」
+function practiceSongLabel(song) {
+    const d = song.diffClass && song.diffClass !== '未定' ? ` ${song.diffClass}` : '';
+    return `Lv${getPokkuraLevel(song)}${d}`;
+}
+
 function buildPracticePools() {
     const isNormal = s => !!(MEDAL_TYPES[clearRecords[s.id] || ''] || {}).isNormalClear;
     const pools = [];
@@ -723,15 +772,33 @@ function buildPracticePools() {
     let recs = [];
     try { recs = calcPokkuraRecommendations(calcPokkura()); } catch (e) { recs = []; }
     pools.push(recs.slice(0, 8).filter(rec => rec.song).map(rec => ({ id: rec.song.id, r: `ポックラ +${rec.gain.toFixed(2)}` })));
-    pools.push(songs.filter(s => PRACTICE_NEAR_CLEAR.includes(clearRecords[s.id])).map(s => ({ id: s.id, r: 'クリアまであと少し' })));
-    const weak = getWeakAttrs(songs);
-    pools.push(songs.filter(s => !isNormal(s) && clearRecords[s.id] !== '未解禁' && getSongAttrs(s).some(a => weak.includes(a)))
-        .map(s => ({ id: s.id, r: `苦手：${getSongAttrs(s).find(a => weak.includes(a))}` })));
+    const profile = getPracticeProfile();
+    if (!profile) {
+        // ポックラの対象曲が少ないときは、今まで通り全曲から
+        pools.push(songs.filter(s => PRACTICE_NEAR_CLEAR.includes(clearRecords[s.id])).map(s => ({ id: s.id, r: 'クリアまであと少し' })));
+        const weak = getWeakAttrs(songs);
+        pools.push(songs.filter(s => !isNormal(s) && clearRecords[s.id] !== '未解禁' && getSongAttrs(s).some(a => weak.includes(a)))
+            .map(s => ({ id: s.id, r: `苦手：${getSongAttrs(s).find(a => weak.includes(a))}` })));
+        return pools;
+    }
+    // 今の実力に合う曲（レベル・難易度・属性）だけから、合い具合の重みを付けて選ぶ
+    const fit = new Map();
+    songs.forEach(s => fit.set(s.id, practiceFit(profile, s)));
+    const band = songs.filter(s => fit.get(s.id) >= PRACTICE_FIT_MIN && clearRecords[s.id] !== '未解禁');
+    const weighted = list => weightedShuffle(list, x => fit.get(x.id));
+    pools.push(weighted(band.filter(s => PRACTICE_NEAR_CLEAR.includes(clearRecords[s.id]))
+        .map(s => ({ id: s.id, r: `クリアまであと少し（${practiceSongLabel(s)}）` }))));
+    const weak = getWeakAttrs(band);
+    pools.push(weighted(band.filter(s => !isNormal(s) && getSongAttrs(s).some(a => weak.includes(a)))
+        .map(s => ({ id: s.id, r: `苦手：${getSongAttrs(s).find(a => weak.includes(a))}（${practiceSongLabel(s)}）` }))));
+    pools.weighted = true;
     return pools;
 }
 
 function pickPracticeMenu() {
-    const pools = buildPracticePools().map(shuffleList);
+    const built = buildPracticePools();
+    // 重みを付けて並べた分（今の実力の目安があるときの後ろ2つ）は、そのままの順にする
+    const pools = built.map((p, i) => built.weighted && i >= built.length - 2 ? p.slice() : shuffleList(p));
     const picked = [];
     const used = new Set();
     for (let round = 0; picked.length < PRACTICE_COUNT; round++) {
