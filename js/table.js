@@ -1976,7 +1976,7 @@ function buildSvSongInfoHtml(song, fallback) {
 function buildUpdatedModeTabs() {
     const mode = getUpdatedMode();
     const tab = (m, label) => `<button type="button" class="vst-tab${mode === m ? ' on' : ''}" onclick="setUpdatedMode('${m}')" aria-pressed="${mode === m}">${label}</button>`;
-    return `<div class="view-sub-tabs sv-mode-tabs" role="group" aria-label="更新の見方">${tab('day', '日ごと')}${tab('song', '曲ごと（最後の更新順）')}</div>`;
+    return `<div class="view-sub-tabs sv-mode-tabs" role="group" aria-label="更新の見方">${tab('day', '日ごと')}${tab('song', '曲ごと')}</div>`;
 }
 
 // 1件（または1日分のまとめ）の変更の中身：メダル → メダル、スコアの差、BAD
