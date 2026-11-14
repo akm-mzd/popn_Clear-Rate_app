@@ -2966,10 +2966,11 @@ function getKnockSongDiff(song) {
 function matchKnockSong(item, index, realLevel) {
     if (realLevel && !(item.lv >= 46)) return null;
     const wantUpper = isUpperText(item.n);
+    const lv = knockItemTargetLevel(item);
     const pick = list => {
         const cands = (list || []).filter(s => songSaysUpper(s) === wantUpper);
         if (cands.length === 0) return null;
-        return cands.slice().sort((a, b) => Math.abs((parseInt(a.level, 10) || 0) - item.lv) - Math.abs((parseInt(b.level, 10) || 0) - item.lv))[0];
+        return cands.slice().sort((a, b) => Math.abs((parseInt(a.level, 10) || 0) - lv) - Math.abs((parseInt(b.level, 10) || 0) - lv))[0];
     };
     const exact = pick(index.full.get(normalizeSongText(item.t)));
     if (exact) return exact;
@@ -2980,10 +2981,16 @@ function matchKnockSong(item, index, realLevel) {
 // H 譜面の曲を、譜面を見ずに名前だけで探す（UPPER はそろえる。EX・譜面の書いていない曲を先に、レベルの近い順）
 function matchKnockSongForH(item, index) {
     const wantUpper = isUpperText(item.n);
+    const lv = knockItemTargetLevel(item);
     const cands = (index.base.get(normalizeSongText(item.n)) || []).filter(s => songSaysUpper(s) === wantUpper);
     if (cands.length === 0) return null;
     const rank = s => { const d = getKnockSongDiff(s); return d === 'EX' || d === '' ? 0 : 1; };
-    return cands.slice().sort((a, b) => (rank(a) - rank(b)) || (Math.abs((parseInt(a.level, 10) || 0) - item.lv) - Math.abs((parseInt(b.level, 10) || 0) - item.lv)))[0];
+    return cands.slice().sort((a, b) => (rank(a) - rank(b)) || (Math.abs((parseInt(a.level, 10) || 0) - lv) - Math.abs((parseInt(b.level, 10) || 0) - lv)))[0];
+}
+
+// 同じ名前の曲が複数あるときに近さを比べるレベル：表に正規Lv（rl）があればそれ、なければ表の lv
+function knockItemTargetLevel(item) {
+    return typeof item.rl === 'number' ? item.rl : item.lv;
 }
 
 function renderKnockGrid(tableKey) {
