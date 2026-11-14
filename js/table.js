@@ -378,6 +378,15 @@ function isSpecialViewLevel(level) {
     return Object.prototype.hasOwnProperty.call(SPECIAL_VIEW_LEVELS, level);
 }
 
+// 「更新」の見方：'day'＝日ごと（月ごとに、日付の行にその日に更新した曲）、'song'＝曲ごと（選んだレベルの曲を、最後に更新した日の順）
+//   どれもこの端末に保存（popn_updated_mode / popn_updated_level / popn_updated_order）
+function getUpdatedMode() { return storageGet('popn_updated_mode') === 'song' ? 'song' : 'day'; }
+function getUpdatedSongLevel() { return storageGet('popn_updated_level') || '48'; }
+function getUpdatedOrder() { return storageGet('popn_updated_order') === 'new' ? 'new' : 'old'; }
+function setUpdatedMode(mode) { storageSet('popn_updated_mode', mode === 'song' ? 'song' : 'day'); renderTable(); }
+function setUpdatedLevel(level) { storageSet('popn_updated_level', String(level)); renderTable(); }
+function setUpdatedOrder(order) { storageSet('popn_updated_order', order === 'new' ? 'new' : 'old'); renderTable(); }
+
 // 見ている月（月の数え方は 年×12＋月。null は今月）
 let updatedMonthIndex = null;
 const monthIndexOf = t => { const d = new Date(t); return d.getFullYear() * 12 + d.getMonth(); };
@@ -434,7 +443,11 @@ function getUpdatedHistoryList() {
 // レベルの代わりに「更新」「最近」を選んだときの曲
 function getSpecialViewSongIds(level) {
     const ids = new Set();
-    if (level === 'UPDATED') getUpdatedHistoryList().forEach(e => ids.add(e.id));
+    if (level === 'UPDATED' && getUpdatedMode() === 'song') {
+        // 曲ごと：選んだレベルの曲全部（更新したことのない曲も）
+        const lv = getUpdatedSongLevel();
+        songs.forEach(s => { if (lv === 'ALL' || String(s.level) === lv) ids.add(s.id); });
+    } else if (level === 'UPDATED') getUpdatedHistoryList().forEach(e => ids.add(e.id));
     if (level === 'RECENT') {
         const recent = typeof loadRecentRecords === 'function' ? loadRecentRecords() : null;
         if (recent) matchRecentSongs(recent.list).forEach(r => r.songs.forEach(s => ids.add(s.id)));
@@ -1959,13 +1972,100 @@ function buildSvSongInfoHtml(song, fallback) {
     </div>`;
 }
 
+// 「更新」の見方の切り替え（日ごと｜曲ごと）
+function buildUpdatedModeTabs() {
+    const mode = getUpdatedMode();
+    const tab = (m, label) => `<button type="button" class="vst-tab${mode === m ? ' on' : ''}" onclick="setUpdatedMode('${m}')" aria-pressed="${mode === m}">${label}</button>`;
+    return `<div class="view-sub-tabs sv-mode-tabs" role="group" aria-label="更新の見方">${tab('day', '日ごと')}${tab('song', '曲ごと（最後の更新順）')}</div>`;
+}
+
+// 1件（または1日分のまとめ）の変更の中身：メダル → メダル、スコアの差、BAD
+function buildSvChangeParts(it) {
+    const parts = [];
+    if ('nm' in it && it.om !== it.nm) parts.push(`<span class="sv-change">${buildSvMedalIcon(it.om || '')}<span class="sv-arrow">→</span>${buildSvMedalIcon(it.nm || '')}</span>`);
+    if ('ns' in it && it.os !== it.ns) {
+        if (it.ns === null) parts.push('<span class="sv-score">スコア削除</span>');
+        else if (it.os === null || it.os === undefined) parts.push(`<span class="sv-score">→${Number(it.ns).toLocaleString('ja-JP')}</span>`);
+        else {
+            const diff = it.ns - it.os;
+            parts.push(`<span class="sv-score ${diff >= 0 ? 'up' : 'down'}">${diff >= 0 ? '+' : '−'}${Math.abs(diff).toLocaleString('ja-JP')}</span>`);
+        }
+    }
+    if ('nb' in it && it.ob !== it.nb) parts.push(`<span class="sv-score sv-bad">BAD ${it.ob === null || it.ob === undefined ? '' : `${it.ob}→`}${it.nb === null ? '削除' : it.nb}</span>`);
+    return parts;
+}
+
+// ---------- 「更新」の曲ごと：選んだレベルの曲を、最後に更新した日の古い順（新しい順）に。更新したことのない曲は「記録なし」 ----------
+function renderUpdatedSongList(targetSongs) {
+    const grid = document.getElementById('diff-grid-view');
+    const showScore = document.getElementById('show-score-col').checked;
+    lastGridNarrow = isNarrowScreen();
+    const level = getUpdatedSongLevel();
+    const order = getUpdatedOrder();
+    const levels = [...new Set(songs.map(s => String(s.level)))].sort((a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0));
+    const chip = (on, onclick, label) => `<button type="button" class="sv-chip${on ? ' on' : ''}" onclick="${onclick}" aria-pressed="${on}">${label}</button>`;
+    const bar = `
+        <div class="sv-bar sv-song-bar">
+            <span class="sv-chips">${levels.map(lv => chip(lv === level, `setUpdatedLevel('${jsStringAttr(lv)}')`, escapeHtml(lv))).join('')}${chip(level === 'ALL', "setUpdatedLevel('ALL')", 'すべて')}</span>
+            <span class="sv-chips">${chip(order === 'old', "setUpdatedOrder('old')", '古い順')}${chip(order === 'new', "setUpdatedOrder('new')", '新しい順')}</span>
+        </div>`;
+    const head = buildUpdatedModeTabs() + bar;
+    if (targetSongs.length === 0) {
+        grid.innerHTML = head + '<div class="dg-empty">表示する曲がありません</div>';
+        return;
+    }
+    // 曲ごとの一番新しい更新履歴
+    const shown = new Set(targetSongs.map(s => s.id));
+    const last = new Map();
+    Object.values(getHistoryRecords()).forEach(e => {
+        if (!e || typeof e.t !== 'number' || !shown.has(e.id)) return;
+        const cur = last.get(e.id);
+        if (!cur || e.t > cur.t) last.set(e.id, e);
+    });
+    const dir = order === 'new' ? -1 : 1;
+    const list = targetSongs.slice().sort((a, b) => {
+        const ta = last.has(a.id) ? last.get(a.id).t : -Infinity;
+        const tb = last.has(b.id) ? last.get(b.id).t : -Infinity;
+        if (ta !== tb) return ta < tb ? -dir : dir;
+        return (getDiffSortValue(b) - getDiffSortValue(a)) || (a.originalOrder - b.originalOrder);
+    });
+    const today0 = new Date(); today0.setHours(0, 0, 0, 0);
+    const rows = [];
+    list.forEach(song => {
+        const e = last.get(song.id);
+        const key = e ? (() => { const d = new Date(e.t); return `${d.getFullYear()}/${d.getMonth() + 1}`; })() : '記録なし';
+        if (rows.length === 0 || rows[rows.length - 1].key !== key) rows.push({ key, cells: '' });
+        let info;
+        if (e) {
+            const d = new Date(e.t);
+            const day0 = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+            const ago = Math.round((today0.getTime() - day0) / 86400000);
+            const parts = buildSvChangeParts(e);
+            info = `<span class="sv-last">最後の更新 <span class="sv-last-date">${d.getFullYear() % 100}/${d.getMonth() + 1}/${d.getDate()}（${ago === 0 ? '今日' : `${ago}日前`}）</span></span>${parts.join('')}`;
+        } else {
+            info = '<span class="sv-last">更新の記録なし</span>';
+        }
+        rows[rows.length - 1].cells += buildDiffGridCellHtml(song, showScore, `<div class="sv-info">${info}</div>${buildSvSongInfoHtml(song)}`);
+    });
+    grid.innerHTML = head + rows.map(r => {
+        const [y, m] = r.key.split('/');
+        const label = m ? `<span class="dg-label-cls">${m}月</span><span class="dg-label-idx">${y}</span>` : `<span class="dg-label-cls">記録なし</span>`;
+        return `
+            <div class="dg-row">
+                <div class="dg-label sv-label">${label}</div>
+                <div class="dg-cells sv-list">${r.cells}</div>
+            </div>`;
+    }).join('');
+}
+
 function renderUpdatedGrid(targetSongs) {
+    if (getUpdatedMode() === 'song') { renderUpdatedSongList(targetSongs); return; }
     const grid = document.getElementById('diff-grid-view');
     const showScore = document.getElementById('show-score-col').checked;
     lastGridNarrow = isNarrowScreen();
     const mi = getUpdatedMonthIndex();
     const monthLabel = `${Math.floor(mi / 12)}年${mi % 12 + 1}月`;
-    const rangeBar = `
+    const rangeBar = buildUpdatedModeTabs() + `
         <div class="sv-bar sv-month-bar">
             <button type="button" class="sv-month-btn" onclick="moveUpdatedMonth(-1)" aria-label="前の月"${mi <= getOldestUpdatedMonthIndex() ? ' disabled' : ''}>‹</button>
             <select class="sv-month-select" onchange="setUpdatedMonth(this.value)" aria-label="月を選ぶ">${buildUpdatedMonthOptions(mi)}</select>
@@ -2013,17 +2113,7 @@ function renderUpdatedGrid(targetSongs) {
     days.forEach(day => {
         let cells = '';
         [...day.items.values()].sort(byUpdate).forEach(it => {
-            const parts = [];
-            if ('nm' in it && it.om !== it.nm) parts.push(`<span class="sv-change">${buildSvMedalIcon(it.om || '')}<span class="sv-arrow">→</span>${buildSvMedalIcon(it.nm || '')}</span>`);
-            if ('ns' in it && it.os !== it.ns) {
-                if (it.ns === null) parts.push('<span class="sv-score">スコア削除</span>');
-                else if (it.os === null || it.os === undefined) parts.push(`<span class="sv-score">→${it.ns.toLocaleString('ja-JP')}</span>`);
-                else {
-                    const diff = it.ns - it.os;
-                    parts.push(`<span class="sv-score ${diff >= 0 ? 'up' : 'down'}">${diff >= 0 ? '+' : '−'}${Math.abs(diff).toLocaleString('ja-JP')}</span>`);
-                }
-            }
-            if ('nb' in it && it.ob !== it.nb) parts.push(`<span class="sv-score sv-bad">BAD ${it.ob === null || it.ob === undefined ? '' : `${it.ob}→`}${it.nb === null ? '削除' : it.nb}</span>`);
+            const parts = buildSvChangeParts(it);
             if (parts.length === 0) parts.push('<span class="sv-score">もとに戻した</span>');
             cells += buildDiffGridCellHtml(it.song, showScore, `<div class="sv-info">${parts.join('')}</div>${buildSvSongInfoHtml(it.song)}`);
         });
