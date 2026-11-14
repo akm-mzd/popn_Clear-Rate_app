@@ -63,19 +63,74 @@ function getGoalTargetSongs(goal) {
 }
 
 function isGoalSongDone(goal, song) {
+    return isGoalValueDone(goal, song, { m: clearRecords[song.id] || '', s: scoreRecords[song.id], b: getSongBad(song.id) });
+}
+
+// 値（m＝メダル・s＝スコア・b＝最小BAD）で、その曲が目標の条件を満たすか（今日のまとめで、今日の0時の値でも使う）
+function isGoalValueDone(goal, song, v) {
     // BAD：最小BAD（記録が無ければ達成していない）
     if (goal.kind === 'bad') {
-        const n = getSongBad(song.id);
-        return n !== null && (goal.bo === 'le' ? n <= (goal.bad || 0) : n < (goal.bad || 0));
+        const n = v.b;
+        return n !== null && n !== undefined && (goal.bo === 'le' ? n <= (goal.bad || 0) : n < (goal.bad || 0));
     }
-    if (goal.kind === 'score') return (parseInt(scoreRecords[song.id], 10) || 0) >= (goal.score || 0);
+    if (goal.kind === 'score') return (parseInt(v.s, 10) || 0) >= (goal.score || 0);
     if (goal.kind === 'rank') {
-        const rank = getSongScoreRank(song);
+        const medalInfo = MEDAL_TYPES[v.m || ''];
+        const rank = getScoreRankInfo(v.s, !!(medalInfo && medalInfo.isEasyClear)).rank;
         return !!rank && SCORE_RANK_KEYS.indexOf(rank) <= SCORE_RANK_KEYS.indexOf(goal.rank);
     }
     const opt = GOAL_MEDAL_OPTIONS.find(o => o.value === goal.medal);
-    const m = MEDAL_TYPES[clearRecords[song.id] || ''];
+    const m = MEDAL_TYPES[v.m || ''];
     return !!(opt && m && opt.test(m));
+}
+
+// 今日達成した目標：[{ goal, progress }]。今は達成していて、今日の0時の時点では達成していなかった目標
+//   sum は getPeriodChanges の今日のまとめ（all＝今日変わった曲ごとの最初の変更前と最後の変更後）、since は今日の0時
+//   0時の値は、今日変わった曲だけ今日の最初の変更前（BAD は今日より前の履歴の最小BAD とも比べる）。ほかの曲は今と同じ
+function getGoalsAchievedToday(sum, since) {
+    const goals = Object.values(getGoalRecords()).filter(g => g && typeof g === 'object');
+    if (goals.length === 0) return [];
+    // 今日より前の履歴の最小BAD
+    const histBefore = {};
+    Object.values(getHistoryRecords()).forEach(e => {
+        if (!e || typeof e.t !== 'number' || e.t >= since || !('nb' in e)) return;
+        [toBadNum(e.nb), toBadNum(e.ob)].forEach(n => { if (n !== null && (histBefore[e.id] === undefined || n < histBefore[e.id])) histBefore[e.id] = n; });
+    });
+    const silverRank = MEDAL_TYPES['銀丸'].rank;
+    const changed = (sum.all || []).filter(c => c.song).map(c => {
+        const id = c.id;
+        const now = { m: clearRecords[id] || '', s: scoreRecords[id], b: getSongBad(id) };
+        const start = { m: 'nm' in c ? (c.om || '') : now.m, s: 'ns' in c ? c.os : now.s, b: now.b };
+        if ('nb' in c) {
+            const cands = [toBadNum(c.ob), histBefore[id]].filter(n => n !== null && n !== undefined);
+            start.b = cands.length > 0 ? Math.min(...cands) : null;
+        }
+        // BAD の記録が無くフルコンボ以上なら 0（getSongBad と同じ）
+        if ((start.b === null || start.b === undefined) && ((MEDAL_TYPES[start.m] || {}).rank || 0) >= silverRank) start.b = 0;
+        return { song: c.song, now, start };
+    });
+    const pkToday = typeof getTodayPokkuraChange === 'function' ? getTodayPokkuraChange() : null;
+    const out = [];
+    goals.forEach(goal => {
+        const progress = getGoalProgress(goal);
+        if (!progress.complete) return;
+        if (goal.kind === 'pokkura') {
+            // 前の日のポックラが目標に届いていなかったときだけ（前の日の記録が無ければ出さない）
+            if (pkToday && pkToday.prev !== null && pkToday.prev < (goal.pc || 0) - 1e-9) out.push({ goal, progress });
+            return;
+        }
+        const targetIds = new Set(getGoalTargetSongs(goal).map(s => s.id));
+        let startAchieved = progress.achieved;
+        changed.forEach(x => {
+            if (!targetIds.has(x.song.id)) return;
+            const nowDone = isGoalValueDone(goal, x.song, x.now);
+            const startDone = isGoalValueDone(goal, x.song, x.start);
+            if (nowDone && !startDone) startAchieved--;
+            if (!nowDone && startDone) startAchieved++;
+        });
+        if (Math.min(startAchieved, progress.need) < progress.need) out.push({ goal, progress });
+    });
+    return out;
 }
 
 // 今のポップンクラス（ポックラ画面で大きく出している値：公式の値、なければ計算値）
