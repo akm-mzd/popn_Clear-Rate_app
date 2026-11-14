@@ -1666,6 +1666,8 @@ button.sh-more { width: 100%; margin: 6px 0 0; padding: 6px; border: 1px solid #
 .ds-pokkura small { margin-left: 6px; color: #999; }
 .ds-sub { font-size: 12px; font-weight: bold; color: #666; margin: 8px 0 4px; }
 .ds-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid #f3f3f3; font-size: 13px; }
+.ds-row.ds-goal { background: #fff8e1; border: 1px solid #ffca28; border-radius: 8px; padding: 6px 10px; margin-bottom: 4px; font-weight: bold; }
+.ds-row.ds-goal .ds-score { color: #e65100; }
 .ds-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: bold; }
 .ds-score { font-weight: bold; white-space: nowrap; }
 .ds-score small { margin-left: 4px; color: #2e7d32; }

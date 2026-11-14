@@ -555,7 +555,10 @@ function toggleSongHistoryForm(id) {
 //   今日（0時から）の更新履歴を曲ごとにまとめる（その日の最初の「変更前」と最後の「変更後」）
 function getTodayChanges() {
     const since = new Date(); since.setHours(0, 0, 0, 0);
-    return getPeriodChanges(since.getTime(), Infinity);
+    const sum = getPeriodChanges(since.getTime(), Infinity);
+    // 今日達成した目標（js/goals.js）
+    sum.goals = typeof getGoalsAchievedToday === 'function' ? getGoalsAchievedToday(sum, since.getTime()) : [];
+    return sum;
 }
 
 // 期間（from 以上 to 未満）の更新履歴を曲ごとにまとめる（期間の最初の変更前と最後の変更後）。ids を渡すとその曲だけ
@@ -580,7 +583,7 @@ function getPeriodChanges(from, to, ids) {
     const isNormal = k => !!(MEDAL_TYPES[k] || {}).isNormalClear;
     const isFc = k => rankOf(k) >= MEDAL_TYPES['銀丸'].rank;
     return {
-        medalUp, scoreUp, badDown, count: changes.length,
+        medalUp, scoreUp, badDown, count: changes.length, all: changes,
         newNormal: medalUp.filter(c => !isNormal(c.om) && isNormal(c.nm)).length,
         newFc: medalUp.filter(c => !isFc(c.om) && isFc(c.nm)).length
     };
@@ -613,7 +616,7 @@ function closeDailySummary() {
 
 // 今日のまとめの数（0 のものは外す）：[[数, 名前]]
 function getDailySummaryTiles(sum) {
-    return [[sum.medalUp.length, 'メダルが上がった'], [sum.scoreUp.length, 'スコアが上がった'], [sum.badDown.length, 'BADが減った'], [sum.newNormal, '初クリア'], [sum.newFc, '初フルコン']].filter(([n]) => n > 0);
+    return [[(sum.goals || []).length, '目標達成'], [sum.medalUp.length, 'メダルが上がった'], [sum.scoreUp.length, 'スコアが上がった'], [sum.badDown.length, 'BADが減った'], [sum.newNormal, '初クリア'], [sum.newFc, '初フルコン']].filter(([n]) => n > 0);
 }
 
 function buildDailySummaryHtml(sum, pk) {
@@ -625,6 +628,9 @@ function buildDailySummaryHtml(sum, pk) {
     if (pk && pk.cur !== null) {
         const diff = pk.prev !== null ? pk.cur - pk.prev : null;
         html += `<div class="ds-pokkura">ポップンクラス <b>${pk.cur.toFixed(2)}</b>${diff !== null ? `<span class="${diff >= 0 ? 'up' : 'down'}">（${diff >= 0 ? '+' : '−'}${Math.abs(diff).toFixed(2)}）</span>` : ''}${pk.official ? '' : '<small>計算値</small>'}</div>`;
+    }
+    if (sum.goals && sum.goals.length > 0) {
+        html += `<div class="ds-sub">🎉 目標達成</div>` + sum.goals.map(g => `<div class="ds-row ds-goal"><span class="ds-title">${escapeHtml(goalTitle(g.goal))}</span><span class="ds-score">${escapeHtml(goalCountText(g.progress))}</span></div>`).join('');
     }
     if (sum.medalUp.length > 0) {
         html += `<div class="ds-sub">メダル</div>` + sum.medalUp.map(c => `<div class="ds-row"><span class="level-badge">${escapeHtml(c.lv)}</span><span class="ds-title">${escapeHtml(c.ti)}</span><span class="hist-change">${historyMedalHtml(c.om)}<span class="hist-arrow">→</span>${historyMedalHtml(c.nm)}</span></div>`).join('');

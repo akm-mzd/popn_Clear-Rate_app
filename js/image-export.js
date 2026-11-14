@@ -859,6 +859,12 @@ function buildDailySummaryRoot(sum, pk) {
         const diff = pk.prev !== null ? pk.cur - pk.prev : null;
         html += `<div style="background: #fff; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; font-size: 15px; font-weight: bold;">ポップンクラス <span style="font-size: 22px; color: #7b1fa2;">${pk.cur.toFixed(2)}</span>${diff !== null ? ` <span style="color: ${diff >= 0 ? '#2e7d32' : '#c62828'};">（${diff >= 0 ? '+' : '−'}${Math.abs(diff).toFixed(2)}）</span>` : ''}</div>`;
     }
+    if (sum.goals && sum.goals.length > 0) {
+        html += `<div style="font-size: 13px; font-weight: bold; color: #666; margin: 6px 0 4px;">🎉 目標達成</div>`;
+        html += sum.goals.map(g => `<div style="display: flex; align-items: center; gap: 8px; background: #fff8e1; border: 1px solid #ffca28; border-radius: 8px; padding: 6px 10px; margin-bottom: 4px;">
+            <div style="flex: 1; min-width: 0; font-size: 14px; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">${escapeHtml(goalTitle(g.goal))}</div>
+            <div style="font-size: 14px; font-weight: bold; color: #e65100; flex-shrink: 0;">${escapeHtml(goalCountText(g.progress))}</div></div>`).join('');
+    }
     if (sum.medalUp.length > 0) {
         html += `<div style="font-size: 13px; font-weight: bold; color: #666; margin: 6px 0 4px;">メダル</div>`;
         html += sum.medalUp.map(c => row(c.lv, c.ti, `<div style="display: flex; align-items: center; gap: 4px;">${medal(c.om)}<span style="color: #999;">→</span>${medal(c.nm)}</div>`)).join('');
