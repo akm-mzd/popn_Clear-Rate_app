@@ -560,7 +560,7 @@ function isTodayStart(day) { return day === dayStartOf(Date.now()); }
 function getDayChanges(day) {
     const today = isTodayStart(day);
     const to = today ? Infinity : nextDayStart(day);
-    const sum = getPeriodChanges(day, to);
+    const sum = getPeriodChanges(day, to, null, true);
     sum.day = day;
     sum.isToday = today;
     // その日に達成した目標（js/goals.js）
@@ -573,19 +573,39 @@ function getTodayChanges() {
 }
 
 // 期間（from 以上 to 未満）の更新履歴を曲ごとにまとめる（期間の最初の変更前と最後の変更後）。ids を渡すとその曲だけ
-function getPeriodChanges(from, to, ids) {
+//   best：期間の中の一番良い値を「変わった後」にする（メダルは一番良いもの・スコアは一番高いもの・BAD は一番少ないもの）。
+//     「変わる前」はスコアは一番低い変更前・BAD は一番多い変更前。手で足した記録の時刻が公式の取り込みより前でも、その日のまとめに出るように（今日のまとめで使う）
+function getPeriodChanges(from, to, ids, best) {
     const list = Object.values(getHistoryRecords())
         .filter(e => e && typeof e.t === 'number' && e.t >= from && e.t < to && (!ids || ids.has(e.id)))
         .sort((a, b) => a.t - b.t);
+    const rankOf = k => (MEDAL_TYPES[k] || MEDAL_TYPES['']).rank;
     const bySong = new Map();
     list.forEach(e => {
         const c = bySong.get(e.id) || { id: e.id, ti: e.ti, lv: e.lv };
-        if ('nm' in e) { if (!('om' in c)) c.om = e.om || ''; c.nm = e.nm || ''; }
-        if ('ns' in e) { if (!('os' in c)) c.os = toScoreNum(e.os); c.ns = toScoreNum(e.ns); }
-        if ('nb' in e) { if (!('ob' in c)) c.ob = toBadNum(e.ob); c.nb = toBadNum(e.nb); }
+        if (!best) {
+            if ('nm' in e) { if (!('om' in c)) c.om = e.om || ''; c.nm = e.nm || ''; }
+            if ('ns' in e) { if (!('os' in c)) c.os = toScoreNum(e.os); c.ns = toScoreNum(e.ns); }
+            if ('nb' in e) { if (!('ob' in c)) c.ob = toBadNum(e.ob); c.nb = toBadNum(e.nb); }
+        } else {
+            if ('nm' in e) {
+                if (!('om' in c)) c.om = e.om || '';
+                const nm = e.nm || '';
+                if (!('nm' in c) || rankOf(nm) > rankOf(c.nm)) c.nm = nm;
+            }
+            if ('ns' in e) {
+                const os = toScoreNum(e.os), ns = toScoreNum(e.ns);
+                if (!('os' in c) || (os !== null && (c.os === null || os < c.os))) c.os = os;
+                if (!('ns' in c) || (ns !== null && (c.ns === null || ns > c.ns))) c.ns = ns;
+            }
+            if ('nb' in e) {
+                const ob = toBadNum(e.ob), nb = toBadNum(e.nb);
+                if (!('ob' in c) || (ob !== null && (c.ob === null || ob > c.ob))) c.ob = ob;
+                if (!('nb' in c) || (nb !== null && (c.nb === null || nb < c.nb))) c.nb = nb;
+            }
+        }
         bySong.set(e.id, c);
     });
-    const rankOf = k => (MEDAL_TYPES[k] || MEDAL_TYPES['']).rank;
     const changes = [...bySong.values()].map(c => ({ ...c, song: songs.find(s => s.id === c.id) || null }));
     // どの欄もレベルの高い順。同じレベルの中は、メダルは良い順（→ スコアが高い順）、スコアは高い順、BAD は少ない順
     const lvOf = c => parseInt(c.song ? c.song.level : c.lv, 10) || 0;
