@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pop’n Clear Rate app</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="loading" class="loading-overlay">
+        <div class="spinner"></div>
+        <div id="loading-text">クラウドと通信中...</div>
+    </div>
+
+    <div style="padding: 20px;">
+        <h1>Pop’n Clear Rate app</h1>
+        <div id="current-user-label" class="current-user-label">👤 ユーザー: -</div>
+
+        <details id="admin-controls" class="controls" style="cursor: pointer;">
+            <summary style="font-weight: bold; font-size: 1.1em; color: #333; user-select: none; outline: none; padding-bottom: 5px; border-bottom: 1px dashed #ccc;">
+                ⚙️ データ追加・管理・バックアップ (タップして開く)
+            </summary>
+            
+            <div style="margin-top: 15px; cursor: default;">
+                <div class="flex-row">
+                    <label style="font-weight: bold;">追加するレベル: 
+                        <select id="import-level" style="padding: 10px;">
+                            <option value="50">Lv 50</option>
+                            <option value="49">Lv 49</option>
+                            <option value="48" selected>Lv 48</option>
+                            <option value="47">Lv 47</option>
+                            <option value="46">Lv 46</option>
+                            <option value="45">Lv 45</option>
+                            <option value="44">Lv 44</option>
+                            <option value="43">Lv 43</option>
+                            <option value="42">Lv 42</option>
+                            <option value="41">Lv 41</option>
+                            <option value="40">Lv 40</option>
+                            <option value="その他">その他</option>
+                        </select>
+                    </label>
+                    <button onclick="importFromClipboard()" style="background-color: #2196F3; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">📋 コピーしたデータを追加</button>
+                    <button onclick="downloadSongsAndClearsJson()" style="background-color: #ff9800; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">💾 バックアップ (データ＋記録)</button>
+                    <button onclick="downloadSongsJsonOnly()" style="background-color: #795548; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">💾 バックアップ (楽曲のみ)</button>
+
+                    <button onclick="document.getElementById('restore-file').click()" style="background-color: #9c27b0; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">📂 ファイルから復元</button>
+                    <input type="file" id="restore-file" accept=".json" style="display: none;" onchange="restoreFromJson(event)">
+                    </div>
+                
+                <details style="margin-top: 10px; cursor: pointer; background: #f5f5f5; padding: 10px; border-radius: 4px;">
+                    <summary style="font-size: 0.9em; color: #666; font-weight: bold;">📝 手動でペーストして追加する場合はこちら</summary>
+                    <div style="margin-top: 10px; cursor: default;">
+                        <textarea id="import-text" placeholder="Wikiでコピーしたテキストをここにペーストしてください..."></textarea>
+                        <button onclick="importDataManual()">手動ペーストで追加</button>
+                    </div>
+                </details>
+
+                <details style="margin-top: 10px; cursor: pointer; background: #e3f2fd; padding: 10px; border-radius: 4px;">
+                    <summary style="font-size: 0.9em; color: #0056b3; font-weight: bold;">➕ フォームに手入力して新規追加する場合はこちら</summary>
+                    <div style="margin-top: 10px; cursor: default; text-align: center;">
+                        <button onclick="openAddModal()" style="background-color: #0056b3; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">📝 新規楽曲を手動入力して追加</button>
+                    </div>
+                </details>
+
+                <details style="margin-top: 10px; cursor: pointer; background: #fff3e0; padding: 10px; border-radius: 4px;">
+                    <summary style="font-size: 0.9em; color: #e65100; font-weight: bold;">🎯 難易度・指数をまとめて割り当てる場合はこちら</summary>
+                     <div style="margin-top: 10px; cursor: default; text-align: center;">
+                        <button onclick="openBulkDiffModal()" style="background-color: #e65100; color: white; font-weight: bold; font-size: 1.1em; padding: 10px 20px; border: none; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">🎯 難易度・指数を一括割り当て</button>
+                    </div>
+                </details>
+                
+                <div id="banner-drop-zone" style="margin-top: 15px; border: 2px dashed #999; border-radius: 8px; padding: 20px; text-align: center; background: #fdfdfd; transition: all 0.2s; cursor: default;">
+                    <div style="font-weight: bold; color: #333; font-size: 1.05em; margin-bottom: 5px;">🖼️ ここにバナー画像（複数可）をドロップして一括更新</div>
+                    <div style="font-size: 0.85em; color: #666; line-height: 1.4;">
+                        ※ファイル名（拡張子抜き）が「曲名」と完全一致する楽曲のバナーを更新します。<br>
+                        ※現在選択している「表示レベル」の楽曲を優先してマッチングします。<br>
+                        ※アップロードされた画像はクラウド（Google Drive）にURLとして保存されます。<br>
+                        <span style="color: #d32f2f; font-weight: bold; display: inline-block; margin-top: 5px;">🔑 画像ドロップ時に管理者パスワードが求められます</span>
+                    </div>
+                </div>
+
+                <div style="margin-top: 10px; text-align: center;">
+                    <button onclick="migrateBannersToCloud()" style="background-color: #ff9800; color: white; font-weight: bold; padding: 10px 16px; border: none; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">🖼️ 既存のバナー画像をクラウドURLへ一括移行</button>
+                    <div style="font-size: 0.8em; color: #666; margin-top: 5px;">
+                        以前アップロードした画像（Base64埋め込み）を、クラウドの画像URLに変換して軽量化します。
+                    </div>
+                </div>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 15px 0;">
+                
+                <div class="flex-row" style="margin-bottom: 0;">
+                    <label style="font-weight: bold; color: #d32f2f;">レベル一括削除: 
+                        <select id="delete-level" style="border-color: #d32f2f; padding: 6px;">
+                            <option value="50">Lv 50</option>
+                            <option value="49">Lv 49</option>
+                            <option value="48" selected>Lv 48</option>
+                            <option value="47">Lv 47</option>
+                            <option value="46">Lv 46</option>
+                            <option value="45">Lv 45</option>
+                            <option value="44">Lv 44</option>
+                            <option value="43">Lv 43</option>
+                            <option value="42">Lv 42</option>
+                            <option value="41">Lv 41</option>
+                            <option value="40">Lv 40</option>
+                            <option value="その他">その他</option>
+                        </select>
+                    </label>
+                    <button onclick="deleteLevelData()" style="color: #d32f2f; border-color: #d32f2f; background-color: #fff;">削除実行</button>
+                    
+                    <div style="margin-left: auto; display: flex; flex-wrap: wrap; gap: 10px;">
+                        <button onclick="clearRecordsOnly()" style="padding: 8px 12px;">現在のユーザーの記録(クリア・スコア・メモ)リセット</button>
+                    </div>
+                </div>
+            </div>
+        </details>
+
+        <button id="menu-btn" onclick="toggleMenu()" title="メニュー">☰</button>
+        <div id="menu-backdrop" onclick="toggleMenu(false)"></div>
+        <div class="view-header" id="menu-panel">
+            <div class="menu-title">メニュー</div>
+            <!-- ① ユーザー -->
+            <section class="menu-card menu-user-section">
+                <div class="menu-card-title">👤 ユーザー</div>
+                <div class="menu-user-controls">
+                    <select id="current-user-select" onchange="switchUser()"></select>
+                    <button onclick="addNewUser()" class="menu-add-user-btn">+ 新規追加</button>
+                    <button onclick="saveAllToCloud()" class="menu-save-all-btn pc-only">☁️ 全体保存 (楽曲リスト＋全ユーザー)</button>
+                </div>
+            </section>
+
+            <!-- ② 表示レベル -->
+            <section class="menu-card menu-level-row">
+                <div class="menu-card-title">
+                    <span>表示レベル・方法</span>
+                    <label class="check-label" style="font-size: 0.85em; font-weight: normal; cursor: pointer;"><input type="checkbox" id="level-btn-on-main" onchange="setLevelButtonPlacement(this.checked)" checked> メイン画面に表示</label>
+                </div>
+                <div id="menu-level-slot">
+                    <!-- 「メイン画面に表示」で、この枠ごとメイン画面とメニューを行き来する -->
+                    <div id="level-view-panel">
+                        <div id="view-level-buttons"></div>
+                        <div id="view-mode-switch" role="group" aria-label="表示方法">
+                            <button type="button" data-mode="list" onclick="setViewMode('list')">リスト</button>
+                            <button type="button" data-mode="grid" onclick="setViewMode('grid')">難易度表</button>
+                            <button type="button" data-mode="score" onclick="setViewMode('score')" style="display: none;">スコア表</button>
+                            <button type="button" data-mode="pokkura" onclick="setViewMode('pokkura')" style="display: none;">ポックラ</button>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="btn-history" onclick="openHistoryModal()">📜 更新履歴を見る</button>
+                <!-- 起動時の表示（メニューの中だけ。この端末に保存） -->
+                <div class="startup-view-settings">
+                    <div class="startup-view-title">起動時の表示 <span>（この端末に保存）</span></div>
+                    <div class="startup-view-fields">
+                        <label>レベル
+                            <select id="startup-level" onchange="saveStartupSettings()"></select>
+                        </label>
+                        <label>表示方法
+                            <select id="startup-view-mode" onchange="saveStartupSettings()">
+                                <option value="grid">難易度表</option>
+                                <option value="list">リスト</option>
+                                <option value="score">スコア表</option>
+                                <option value="pokkura">ポックラ</option>
+                            </select>
+                        </label>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ③ 検索（検索・ランダムセレクト・絞り込み） -->
+            <section class="menu-card">
+                <div class="menu-card-title">🔍 検索</div>
+                <div class="menu-search-row">
+                    <span class="menu-row-label">検索</span>
+                    <input type="text" id="search-input" class="search-box" placeholder="ジャンル・曲名で全レベル検索..." oninput="handleSearch()">
+                    <button onclick="clearSearch()" style="padding: 6px 12px; border: 1px solid #ccc; background: #eee; cursor: pointer;">クリア</button>
+                </div>
+                <div class="menu-random-row">
+                    <span class="menu-row-label">ランダムセレクト</span>
+                    <button onclick="openRandomModal()" class="random-ready-btn">Are You Ready?</button>
+                </div>
+                <details class="menu-filter-details">
+                    <summary style="cursor: pointer; font-weight: bold; color: #555; user-select: none;">🔍 さらに条件で絞り込む<span id="filter-summary-count"></span></summary>
+                    <div class="filter-groups">
+                        <div class="filter-group">
+                            <div class="filter-group-title">メダル</div>
+                            <div class="filter-checks" id="filter-medal"></div>
+                        </div>
+                        <div class="filter-group">
+                            <div class="filter-group-title">難易度</div>
+                            <div class="filter-checks" id="filter-diff">
+                                <label class="check-label"><input type="checkbox" value="危険" onchange="renderTable()"> 危険</label>
+                                <label class="check-label"><input type="checkbox" value="別格" onchange="renderTable()"> 別格</label>
+                                <label class="check-label"><input type="checkbox" value="詐称" onchange="renderTable()"> 詐称</label>
+                                <label class="check-label"><input type="checkbox" value="強" onchange="renderTable()"> 強</label>
+                                <label class="check-label"><input type="checkbox" value="中(+)" onchange="renderTable()"> 中(+)</label>
+                                <label class="check-label"><input type="checkbox" value="中(-)" onchange="renderTable()"> 中(-)</label>
+                                <label class="check-label"><input type="checkbox" value="弱" onchange="renderTable()"> 弱</label>
+                                <label class="check-label"><input type="checkbox" value="逆詐称" onchange="renderTable()"> 逆詐称</label>
+                                <label class="check-label"><input type="checkbox" value="入門" onchange="renderTable()"> 入門</label>
+                                <label class="check-label"><input type="checkbox" value="未分類" onchange="renderTable()"> 未分類</label>
+                            </div>
+                        </div>
+                        <details class="filter-group filter-sub-details">
+                            <summary class="filter-group-title">バージョン<span id="filter-version-count" class="filter-count"></span></summary>
+                            <div class="filter-checks" id="filter-version"></div>
+                        </details>
+                        <details class="filter-group filter-sub-details">
+                            <summary class="filter-group-title">相性 (メモ)<span id="filter-affinity-count" class="filter-count"></span></summary>
+                            <div class="filter-checks" id="filter-affinity">
+                                <label class="check-label"><input type="checkbox" value="得意" onchange="renderTable()"> 得意</label>
+                                <label class="check-label"><input type="checkbox" value="苦手" onchange="renderTable()"> 苦手</label>
+                                <label class="check-label"><input type="checkbox" value="噛み合い待ち" onchange="renderTable()"> 噛み合い待ち</label>
+                                <label class="check-label"><input type="checkbox" value="敵" onchange="renderTable()"> 敵</label>
+                                <label class="check-label"><input type="checkbox" value="💩" onchange="renderTable()"> 💩</label>
+                                <label class="check-label"><input type="checkbox" value="未設定" onchange="renderTable()"> 未設定(メモ無含む)</label>
+                            </div>
+                        </details>
+                        <details class="filter-group filter-sub-details">
+                            <summary class="filter-group-title">スコアランク<span id="filter-rank-count" class="filter-count"></span></summary>
+                            <div class="filter-checks" id="filter-rank"></div>
+                        </details>
+                        <div class="filter-group-footer">
+                            <span class="filter-hint">何も選ばない項目は「すべて」になります</span>
+                            <button onclick="resetFilters()" style="padding: 4px 12px; background: #eee; border: 1px solid #ccc;">リセット</button>
+                        </div>
+                    </div>
+                </details>
+            </section>
+
+            <!-- ④ 統計表示 -->
+            <section class="menu-card">
+                <div class="menu-card-title">📊 統計表示</div>
+                <div class="stats-toggles">
+                    <label><input type="checkbox" id="show-kurohishi-rate" onchange="renderTable()" style="margin:0;"> 黒菱</label>
+                    <label><input type="checkbox" id="show-kuroboshi-rate" onchange="renderTable()" style="margin:0;"> 黒星</label>
+                    <label><input type="checkbox" id="show-easy-rate" onchange="renderTable()" style="margin:0;"> イージー</label>
+                    <label><input type="checkbox" id="show-normal-rate" checked onchange="renderTable()" style="margin:0;"> ノーマル</label>
+                    <label><input type="checkbox" id="show-unreleased" onchange="renderTable()" style="margin:0;"> 未解禁を含む</label>
+                    <label><input type="checkbox" id="show-diff-stats" onchange="renderTable(); toggleMenu(false);" style="margin:0;"> 難易度別</label>
+                    <label><input type="checkbox" id="show-medal-stats" onchange="renderTable(); toggleMenu(false);" style="margin:0;"> メダル内訳</label>
+                    <label><input type="checkbox" id="show-score-stats" onchange="renderTable(); toggleMenu(false);" style="margin:0;"> スコア内訳</label>
+                </div>
+            </section>
+
+            <!-- ⑤ スコア -->
+            <section class="menu-card">
+                <div class="menu-card-title">🔢 スコア</div>
+                <div class="stats-toggles">
+                    <label><input type="checkbox" id="show-score-col" onchange="handleScoreToggle()" style="margin:0;"> スコア表示</label>
+                    <label><input type="checkbox" id="enable-compare" onchange="renderTable()" style="margin:0;"> スコア比較</label>
+                    <select id="compare-user-select" onchange="if(document.getElementById('enable-compare').checked) renderTable()" style="padding: 4px 8px; font-size: 0.9em; border-radius: 4px; border: 1px solid #ccc;">
+                    </select>
+                </div>
+            </section>
+
+            <!-- ⑥ 公式データ取り込み -->
+            <section class="menu-card">
+                <div class="menu-card-title">📥 公式データ取り込み</div>
+                <div class="eagate-import-actions">
+                    <button onclick="importEagateFromClipboard()" class="btn-eagate">クリップボードから取り込む</button>
+                    <button onclick="openEagateHelpModal()" class="btn-eagate-sub">ブックマークレットと使い方</button>
+                </div>
+                <details class="eagate-manual">
+                    <summary>手で貼り付けて取り込む</summary>
+                    <textarea id="eagate-import-text" placeholder="公式サイトでコピーしたデータを貼り付け"></textarea>
+                    <button onclick="importEagateFromText()" class="btn-eagate">取り込む</button>
+                </details>
+            </section>
+
+            <!-- ⑦ 画像 -->
+            <section class="menu-card menu-image-section">
+                <div class="menu-card-title">🖼️ 画像</div>
+                <div id="image-export-area" class="controls" style="margin: 0; padding: 0; box-shadow: none; background: transparent; display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 8px;">
+                    <button id="btn-overview-image" onclick="generateOverviewImage()" class="btn-image">全体統計画像</button>
+                    <button id="btn-diff-image" onclick="generateDiffTableImage()" class="btn-image">難易度順画像</button>
+                    <button onclick="exportAsImage(event)" class="btn-image">表示曲画像</button>
+                    <button id="btn-pokkura-image" onclick="generatePokkuraImage()" class="btn-image" style="display: none;">ポックラ画像</button>
+
+                    <details style="position: relative;">
+                        <summary style="padding: 6px 12px; border: 1px solid #ccc; background-color: #fff; border-radius: 4px; cursor: pointer; font-size: 0.9em; font-weight: bold; color: #555;">⚙️ 画像の列設定</summary>
+                        <div style="position: absolute; top: 100%; right: 0; background: #fff; border: 1px solid #ccc; border-radius: 6px; padding: 12px; z-index: 2000; box-shadow: 0 4px 10px rgba(0,0,0,0.2); width: max-content; display: grid; gap: 8px; margin-top: 5px; text-align: left;">
+                            <div style="font-size: 0.85em; color: #666; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 4px; margin-bottom: 4px;">📷 画像に出力する列</div>
+                            <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="0" checked> メダル</label>
+                            <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="1"> スコア</label>
+                            <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="2"> 比較</label>
+                            <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="3"> Lv</label>
+                            <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="4"> Ver</label>
+                            <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="5" checked> バナー</label>
+                            <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="6" checked> ジャンル / 曲名 (+メモ)</label>
+                            <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="7"> BPM</label>
+                            <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="8"> ノーツ</label>
+                            <label style="cursor: pointer;"><input type="checkbox" class="export-col-toggle" value="9" checked> 難易度</label>
+                        </div>
+                    </details>
+                </div>
+            </section>
+            <div class="app-version" id="app-version"></div>
+        </div>
+
+        <div id="main-level-slot"></div>
+        <div class="stats-container" id="stats-display"></div>
+        <div id="extended-stats-display"></div>
+
+        <div id="capture-area" style="background-color: #f9f9f9; padding: 10px;">
+            <div id="capture-stats-placeholder"></div>
+            <table id="song-table">
+                <thead>
+                    <tr>
+                        <th class="col-medal" style="width: 8%; text-align: center;" onclick="sortBy('clear')" id="th-clear" title="クリックでソート">メダル</th>
+                        <th class="col-score" style="width: 10%; text-align: center;" onclick="sortBy('score')" id="th-score" title="クリックでソート">スコア<span class="sp-br"></span>(ランク)</th>
+                        <th class="col-compare" style="width: 10%; text-align: center;" id="th-compare">比較</th>
+                        <th class="col-level" style="width: 5%; text-align: center;" onclick="sortBy('level')" id="th-level" title="クリックでソート">Lv</th>
+                        <th class="col-version" style="width: 5%; text-align: center;" onclick="sortBy('version')" id="th-version" title="クリックでソート">Ver</th>
+                        <th class="col-banner" style="width: 12%; text-align: center;">バナー</th>
+                        <th class="col-title" style="width: 20%;" onclick="sortBy('title')" id="th-title" title="クリックでソート">ジャンル / 曲名 <span style="font-size: 0.8em; font-weight: normal; color: #555;">(メモ)</span></th>
+                        <th class="col-bpm" style="width: 6%; text-align: right;" onclick="sortBy('bpm')" id="th-bpm" title="クリックでソート">BPM</th>
+                        <th class="col-notes" style="width: 6%; text-align: right;" onclick="sortBy('notes')" id="th-notes" title="クリックでソート">ノーツ</th>
+                        <th class="col-diff" style="width: 13%; text-align: center;" onclick="sortBy('diff')" id="th-diff" title="クリックでソート">難易度<span class="sp-br"></span><span class="diff-header-sub">(指数)</span></th>
+                        <th class="col-action no-export" style="width: 5%; text-align: center;">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="song-list"></tbody>
+            </table>
+        </div>
+
+        <!-- 表示方法「難易度表」：指数ごとの行に「メダル＋バナー」を並べる -->
+        <div id="diff-grid-view" style="display: none;"></div>
+    </div>
+
+    <div id="random-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <h3>ランダムセレクト</h3>
+            <div style="font-size: 0.8em; color: #666; margin-bottom: 10px;">※各項目、<b>何もチェックしていない場合は「すべて」</b>が対象になります。</div>
+            <div style="max-height: 50vh; overflow-y: auto; margin-bottom: 15px; padding-right: 10px;">
+                <div style="margin-bottom: 15px;">
+                    <label style="font-weight: bold; border-bottom: 1px solid #ccc; display: block; margin-bottom: 5px; padding-bottom: 3px; color: #333;">レベル</label>
+                    <div id="random-level-checkboxes" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="font-weight: bold; border-bottom: 1px solid #ccc; display: block; margin-bottom: 5px; padding-bottom: 3px; color: #333;">メダル</label>
+                    <div id="random-medal-checkboxes" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="font-weight: bold; border-bottom: 1px solid #ccc; display: block; margin-bottom: 5px; padding-bottom: 3px; color: #333;">難易度</label>
+                    <div id="random-diff-checkboxes" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
+                </div>
+            </div>
+            <button onclick="executeRandomSelect()" style="width: 100%; padding: 12px; background: #2196F3; color: white; font-weight: bold; font-size: 1.1em; border: none; border-radius: 4px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">この条件で抽選する！</button>
+            
+            <div id="random-result-area" style="margin-top: 15px; padding: 15px; background: #f0f8ff; border: 1px solid #bbdefb; border-radius: 8px; display: none; text-align: center; box-shadow: inset 0 0 5px rgba(0,0,0,0.05);">
+                </div>
+
+            <div class="modal-actions" style="justify-content: flex-end; margin-top: 15px;">
+                <button onclick="closeRandomModal()" style="border: 1px solid #ccc; background: #eee; padding: 8px 20px;">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 難易度順画像：作成するレベルを選ぶ（PC版） -->
+    <div id="diff-level-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 460px;">
+            <h3>難易度順画像を作るレベル</h3>
+            <div style="font-size: 0.85em; color: #666; margin-bottom: 10px;">選んだレベルごとに1枚ずつ画像を保存します（各レベルの全曲が対象）。</div>
+            <div id="diff-level-checkboxes" style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;"></div>
+            <div style="display: flex; gap: 8px; margin-bottom: 15px;">
+                <button onclick="setAllDiffLevelChecks(true)" style="padding: 4px 12px; border: 1px solid #ccc; background: #fff;">すべて選択</button>
+                <button onclick="setAllDiffLevelChecks(false)" style="padding: 4px 12px; border: 1px solid #ccc; background: #fff;">選択解除</button>
+            </div>
+            <div class="modal-actions" style="justify-content: flex-end; gap: 10px;">
+                <button onclick="closeDiffLevelModal()" style="border: 1px solid #ccc; background: #eee; padding: 8px 20px;">キャンセル</button>
+                <button onclick="generateDiffTableImagesForSelectedLevels()" style="background-color: #4caf50; color: white; font-weight: bold; border: 1px solid #388e3c; padding: 8px 20px;">画像を作成</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="memo-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 400px;">
+            <h3 id="memo-modal-title">メモ</h3>
+            <input type="hidden" id="memo-modal-id">
+            
+            <div class="input-item" style="margin-bottom: 15px;">
+                <label>相性</label>
+                <select id="memo-input-affinity">
+                    <option value="">未設定</option>
+                    <option value="得意">得意</option>
+                    <option value="苦手">苦手</option>
+                    <option value="噛み合い待ち">噛み合い待ち</option>
+                    <option value="敵">敵</option>
+                    <option value="💩">💩</option>
+                </select>
+            </div>
+
+            <div class="input-item" style="margin-bottom: 15px;">
+                <label>SUDDEN+ (サドプラ) の値など</label>
+                <input type="text" id="memo-input-sudden" placeholder="例: -150, 300 など">
+            </div>
+
+            <div class="input-item" style="margin-bottom: 20px;">
+                <label>コメント</label>
+                <textarea id="memo-input-comment" placeholder="譜面の傾向や注意点など..."></textarea>
+            </div>
+
+            <div class="modal-actions" style="justify-content: space-between; gap: 20px;">
+                <button onclick="clearMemo()" style="background-color: #f44336; color: white;">クリア</button>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="closeMemoModal()" style="border: 1px solid #ccc; background: #eee;">キャンセル</button>
+                    <button onclick="saveMemoModal()" style="background-color: #4caf50; color: white; font-weight: bold;">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="edit-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h3 id="edit-modal-title">楽曲データの編集</h3>
+            <input type="hidden" id="edit-original-id">
+            
+            <div class="input-item" style="margin-bottom: 8px;">
+                <label>ジャンル</label>
+                <input type="text" id="edit-genre">
+            </div>
+            <div class="input-item" style="margin-bottom: 8px;">
+                <label>曲名</label>
+                <input type="text" id="edit-title">
+            </div>
+            
+            <div class="input-group">
+                <div class="input-item"><label>Lv</label><input type="text" id="edit-level"></div>
+                <div class="input-item"><label>Ver</label><input type="text" id="edit-version"></div>
+                <div class="input-item"><label>BPM</label><input type="text" id="edit-bpm"></div>
+                <div class="input-item"><label>ノーツ数</label><input type="number" id="edit-notes"></div>
+            </div>
+            
+            <div class="input-item" style="margin-bottom: 8px;">
+                <label>難易度 (例: 別格(+1.5) や 弱(-0.5))</label>
+                <input type="text" id="edit-diff">
+            </div>
+
+            <div class="input-item" style="margin-bottom: 8px;">
+                <label>個別Wiki URL（空欄の場合は自動生成）</label>
+                <input type="text" id="edit-wiki-url" placeholder="https://popn.wiki/...">
+            </div>
+            <div class="input-item" style="margin-bottom: 8px;">
+                <label>バナー画像 (URLまたはファイル選択)</label>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="text" id="edit-banner-url" placeholder="https://..." style="flex: 1;">
+                    <label style="background: #e0e0e0; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; white-space: nowrap; border: 1px solid #ccc; font-weight: bold;">
+                        📁 画像を選択
+                        <input type="file" id="edit-banner-file" accept="image/png, image/jpeg, image/gif" style="display: none;" onchange="handleBannerFileUpload(event)">
+                    </label>
+                </div>
+            </div>
+            
+            <div class="modal-actions">
+                <button id="edit-delete-btn" onclick="deleteSong()" style="background-color: #f44336; color: white; border: 1px solid #d32f2f;">削除</button>
+                <div style="display: flex; gap: 8px;">
+                    <button onclick="closeEditModal()" style="border: 1px solid #ccc; background: #eee;">キャンセル</button>
+                    <button onclick="saveEditModal()" style="background-color: #4caf50; color: white; font-weight: bold; border: 1px solid #388e3c;">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="medal-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 400px;">
+            <h3 style="text-align: center; color: #555; border-bottom: 1px solid #eee; padding-bottom: 10px;">メダルを選択</h3>
+            <div id="medal-grid" class="medal-grid"></div>
+            <div class="modal-actions" style="justify-content: center; margin-top: 20px;">
+                <button onclick="closeMedalModal()" style="border: 1px solid #ccc; background: #eee; padding: 8px 30px;">キャンセル</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="score-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 320px; text-align: center;">
+            <h3 id="score-modal-title" style="font-size: 15px; margin-bottom: 15px; color: #333;">スコア入力</h3>
+            <input type="hidden" id="score-modal-id">
+            <input type="number" id="score-input-val" placeholder="0 ~ 100000" min="0" max="100000" style="width: 80%; padding: 10px; font-size: 20px; margin-bottom: 20px; text-align: right; border-radius: 4px; border: 2px solid #ccc;">
+            <div class="modal-actions" style="justify-content: center; gap: 20px;">
+                <button onclick="closeScoreModal()" style="border: 1px solid #ccc; background: #eee; padding: 8px 20px; font-size: 14px;">キャンセル</button>
+                <button onclick="saveScoreModal()" style="background-color: #4caf50; color: white; font-weight: bold; border: 1px solid #388e3c; padding: 8px 30px; font-size: 14px;">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- メダル・スコアの更新履歴 -->
+    <div id="history-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content hist-modal" style="max-width: 560px;">
+            <h3 id="history-modal-title">📜 更新履歴</h3>
+            <div id="history-modal-body" class="hist-list"></div>
+            <div class="modal-actions" style="justify-content: flex-end;">
+                <button onclick="closeHistoryModal()" style="border: 1px solid #ccc; background: #eee;">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 公式データ取り込み：確認画面 -->
+    <div id="eagate-import-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 560px;">
+            <h3>📥 公式データの取り込み</h3>
+            <div id="eagate-import-body"></div>
+            <div class="modal-actions">
+                <button onclick="closeEagateImportModal()" style="border: 1px solid #ccc; background: #eee;">やめる</button>
+                <button id="eagate-import-apply" onclick="applyEagateImport()" class="btn-eagate">反映</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 公式データ取り込み：ブックマークレットと使い方 -->
+    <div id="eagate-help-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content eagate-help" style="max-width: 560px;">
+            <h3>📥 ブックマークレットと使い方</h3>
+            <ol>
+                <li>下のブックマークレットを、ブラウザのブックマークに登録します（最初の1回だけ）。</li>
+                <li>e-amusement にログインして、pop'n music の<b>プレーデータのページ</b>を開きます（どのページでもかまいません）。</li>
+                <li>そのページで、登録したブックマークを開きます。Lv46〜50 のレベル別一覧から、メダルとスコアを読み取ります（少し時間がかかります）。</li>
+                <li>「アプリに送る」か「コピー」を押します。コピーした場合は、このアプリのメニューで「クリップボードから取り込む」を押します。</li>
+                <li>確認画面で中身を見て、「反映」を押します。メダルは上がるときだけ、スコアは高いときだけ更新します。</li>
+            </ol>
+            <div class="eagate-help-title">PC の登録方法</div>
+            <div>このボタンを、ブックマークバーにドラッグします。 <a id="eagate-bookmarklet-link" class="eagate-bookmarklet-link" href="#" onclick="onBookmarkletLinkClick(event)">ポップン取り込み</a></div>
+            <div class="eagate-help-title">スマホの登録方法</div>
+            <div>
+                <b>iPhone（Safari）</b>：今のページをブックマークに追加して、そのブックマークを「編集」します。名前を「ポップン取り込み」に、URL を下のコードに書き換えます。<br>
+                <b>Android（Chrome）</b>：今のページをブックマークに追加して、URL を下のコードに書き換えます。使うときは、公式サイトのアドレス欄に「ポップン取り込み」と入力して、候補に出たブックマークを押します。
+            </div>
+            <textarea id="eagate-bookmarklet-code" readonly></textarea>
+            <button onclick="copyBookmarkletCode()" class="btn-eagate">コードをコピー</button>
+            <div style="font-size: 0.8em; color: #666; margin-top: 8px;">うまく読めなかったときは、公式サイトの上に「診断データをコピー」が出ます。それを作者に送ってください。</div>
+            <div class="modal-actions" style="justify-content: flex-end;">
+                <button onclick="closeEagateHelpModal()" style="border: 1px solid #ccc; background: #eee;">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="image-result-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 95vw; max-height: 95vh; display: flex; flex-direction: column; align-items: center; padding: 15px;">
+            <h3 style="margin-top: 0; margin-bottom: 10px;">画像の生成が完了しました</h3>
+            <div style="font-size: 0.85em; color: #d32f2f; font-weight: bold; margin-bottom: 10px;">画像を長押しして「写真に追加」または「画像を保存」してください。</div>
+            <div style="flex: 1; overflow-y: auto; width: 100%; border: 1px solid #ccc; background: #eee; text-align: center;">
+                <img id="generated-image-preview" src="" style="max-width: 100%; height: auto; display: block; margin: 0 auto;">
+            </div>
+            <div class="modal-actions" style="width: 100%; justify-content: center; margin-top: 15px;">
+                <button onclick="closeImageResultModal()" style="padding: 10px 30px; font-size: 16px; background: #2196F3; color: white; border: none; font-weight: bold;">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="bulk-diff-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 800px;">
+            <h3>🎯 難易度・指数の一括割り当て</h3>
+            <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px;">
+                <label style="font-weight: bold;">対象レベル:
+                    <select id="bulk-diff-level" style="padding: 6px;"></select>
+                </label>
+                <label class="check-label"><input type="checkbox" id="bulk-diff-partial" checked> 部分一致でも探す</label>
+            </div>
+            <textarea id="bulk-diff-text" style="height: 150px;" placeholder="難易度表などからコピーしたテキストを貼り付けてください。&#10;例1) [HC] ジャンル名(EX) 曲名 250 1619 中(+0.213±0.5)  ※タブ区切り&#10;例2) 曲名 詐称(+1.2)&#10;例3) ■強(+1.0) の見出しの下に曲名を並べる"></textarea>
+            <button onclick="analyzeBulkDiff()" style="background-color: #2196F3; color: white; font-weight: bold; border: none;">🔍 解析してプレビュー</button>
+            <div id="bulk-diff-preview" style="margin-top: 12px;"></div>
+            <div class="modal-actions">
+                <button onclick="closeBulkDiffModal()" style="border: 1px solid #ccc; background: #eee;">閉じる</button>
+                <button id="bulk-diff-apply-btn" onclick="applyBulkDiff()" style="display: none; background-color: #4caf50; color: white; font-weight: bold; border: 1px solid #388e3c;">✓ チェックした曲に適用</button>
+            </div>
+        </div>
+    </div>
+
+    
+
+    <button id="save-btn" onclick="saveCurrentUserToCloud()" title="開いているユーザーの変更をクラウドに保存">保存</button>
+    <button id="back-to-top" onclick="scrollToTop()" title="トップに戻る">↑</button>
+
+    <!-- 読み込み順に意味があります（config が最初、app が最後） -->
+    <!-- 以前のページ（ver 2.101）。このページは変えない。下の readonly-pre.js / readonly.js だけで「見るだけ」にする -->
+    <script src="js/readonly-pre.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/cloud.js"></script>
+    <script src="js/users.js"></script>
+    <script src="js/table.js"></script>
+    <script src="js/modals.js"></script>
+    <script src="js/history.js"></script>
+    <script src="js/admin.js"></script>
+    <script src="js/image-export.js"></script>
+    <script src="js/eagate-import.js"></script>
+    <script src="js/menu.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/readonly.js"></script>
+
+</body>
+</html>
