@@ -842,9 +842,6 @@ function buildDailySummaryRoot(sum, pk) {
         <div style="font-size: 26px; font-weight: bold; color: ${accent}; line-height: 1;">${n}</div>
         <div style="font-size: 12px; color: #666; margin-top: 6px;">${label}</div></div>`;
     const lvBox = lv => `<div style="width: 34px; height: 22px; flex-shrink: 0; ${EXPORT_CENTER} background: #555; color: #fff; border-radius: 4px; font-size: 12px; font-weight: bold;">${escapeHtml(lv)}</div>`;
-    // 行：レベルの箱・バナー（アプリにある曲だけ）・曲名・右の値
-    const row = (lv, title, right, song) => `<div style="display: flex; align-items: center; gap: 8px; background: #fff; border-radius: 8px; padding: 6px 8px; margin-bottom: 4px;">
-        ${lvBox(lv)}${song ? buildBannerBoxHtml(song, 120, 30) : ''}<div style="flex: 1; min-width: 0; font-size: 14px; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">${escapeHtml(title)}</div>${right}</div>`;
     const medal = k => k ? buildMedalIconHtml(k, 26) : `<span style="font-size: 11px; color: #999;">未プレイ</span>`;
     const now = new Date(sum.day !== undefined ? sum.day : Date.now());
     let html = `<div style="display: flex; align-items: center; gap: 16px; margin-bottom: 14px;">
@@ -868,17 +865,21 @@ function buildDailySummaryRoot(sum, pk) {
             <div style="flex: 1; min-width: 0; font-size: 14px; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">${escapeHtml(goalTitle(g.goal))}</div>
             <div style="font-size: 14px; font-weight: bold; color: #e65100; flex-shrink: 0;">${escapeHtml(goalCountText(g.progress))}</div></div>`).join('');
     }
-    if (sum.medalUp.length > 0) {
-        html += `<div style="font-size: 13px; font-weight: bold; color: #666; margin: 6px 0 4px;">メダル</div>`;
-        html += sum.medalUp.map(c => row(c.lv, c.ti, `<div style="display: flex; align-items: center; gap: 4px;">${medal(c.om)}<span style="color: #999;">→</span>${medal(c.nm)}</div>`, c.song)).join('');
-    }
-    if (sum.scoreUp.length > 0) {
-        html += `<div style="font-size: 13px; font-weight: bold; color: #666; margin: 10px 0 4px;">スコア</div>`;
-        html += sum.scoreUp.map(c => row(c.lv, c.ti, `<div style="font-size: 15px; font-weight: bold;">${c.ns.toLocaleString('ja-JP')}<span style="font-size: 12px; color: #2e7d32; margin-left: 4px;">${c.diff !== null ? '+' + c.diff.toLocaleString('ja-JP') : '初'}</span></div>`, c.song)).join('');
-    }
-    if (sum.badDown.length > 0) {
-        html += `<div style="font-size: 13px; font-weight: bold; color: #666; margin: 10px 0 4px;">BAD</div>`;
-        html += sum.badDown.map(c => row(c.lv, c.ti, `<div style="font-size: 15px; font-weight: bold;">${c.ob !== null ? `${c.ob} → ` : ''}${c.nb}</div>`, c.song)).join('');
+    // 1曲1行：レベル・バナー・曲名（下の段にスコアと BAD）・右にメダル（良くなったものだけ）
+    if (sum.songsUp && sum.songsUp.length > 0) {
+        html += `<div style="font-size: 13px; font-weight: bold; color: #666; margin: 6px 0 4px;">更新した曲</div>`;
+        html += sum.songsUp.map(c => {
+            const sub = [];
+            if (c.score) sub.push(`<span style="font-size: 14px; font-weight: bold; color: #333;">${c.ns.toLocaleString('ja-JP')}<span style="font-size: 12px; color: #2e7d32; margin-left: 4px;">${c.diff !== null ? '+' + c.diff.toLocaleString('ja-JP') : '初'}</span></span>`);
+            if (c.bad) sub.push(`<span style="font-size: 13px; font-weight: bold; color: #1565c0;">BAD ${c.ob !== null ? `${c.ob}→` : ''}${c.nb}</span>`);
+            const medalHtml = c.medal ? `<div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">${medal(c.om)}<span style="color: #999;">→</span>${medal(c.nm)}</div>` : '';
+            return `<div style="display: flex; align-items: center; gap: 8px; background: #fff; border-radius: 8px; padding: 6px 8px; margin-bottom: 4px;">
+                ${lvBox(c.lv)}${c.song ? buildBannerBoxHtml(c.song, 120, 30) : ''}
+                <div style="flex: 1; min-width: 0;">
+                    <div style="font-size: 14px; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">${escapeHtml(c.ti)}</div>
+                    ${sub.length ? `<div style="display: flex; align-items: baseline; gap: 10px; margin-top: 2px;">${sub.join('')}</div>` : ''}
+                </div>${medalHtml}</div>`;
+        }).join('');
     }
     root.innerHTML = html;
     return root;

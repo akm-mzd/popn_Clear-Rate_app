@@ -596,10 +596,19 @@ function getPeriodChanges(from, to, ids) {
         .map(c => ({ ...c, diff: c.os === null ? null : c.ns - c.os })).sort((a, b) => (lvOf(b) - lvOf(a)) || (b.ns - a.ns));
     const badDown = changes.filter(c => 'nb' in c && c.nb !== null && (c.ob === null || c.nb < c.ob))
         .sort((a, b) => (lvOf(b) - lvOf(a)) || (a.nb - b.nb));
+    // 1曲1行のまとめ（メダル・スコア・BAD のどれかが良くなった曲）。レベルの高い順 → メダルが良い順 → スコアが高い順 → BAD が少ない順
+    const up = new Map();
+    medalUp.forEach(c => up.set(c.id, { ...c, medal: true }));
+    scoreUp.forEach(c => up.set(c.id, { ...(up.get(c.id) || c), diff: c.diff, score: true }));
+    badDown.forEach(c => up.set(c.id, { ...(up.get(c.id) || c), bad: true }));
+    const medalNow = c => ('nm' in c ? c.nm : clearRecords[c.id]) || '';
+    const badNow = c => ('nb' in c && c.nb !== null ? c.nb : (typeof getSongBad === 'function' ? getSongBad(c.id) : null));
+    const songsUp = [...up.values()].sort((a, b) => (lvOf(b) - lvOf(a)) || (rankOf(medalNow(b)) - rankOf(medalNow(a)))
+        || (scoreNow(b) - scoreNow(a)) || ((badNow(a) ?? 1e9) - (badNow(b) ?? 1e9)));
     const isNormal = k => !!(MEDAL_TYPES[k] || {}).isNormalClear;
     const isFc = k => rankOf(k) >= MEDAL_TYPES['銀丸'].rank;
     return {
-        medalUp, scoreUp, badDown, count: changes.length, all: changes,
+        medalUp, scoreUp, badDown, songsUp, count: changes.length, all: changes,
         newNormal: medalUp.filter(c => !isNormal(c.om) && isNormal(c.nm)).length,
         newFc: medalUp.filter(c => !isFc(c.om) && isFc(c.nm)).length
     };
@@ -702,14 +711,15 @@ function buildDailySummaryHtml(sum, pk) {
     if (sum.goals && sum.goals.length > 0) {
         html += `<div class="ds-sub">🎉 目標達成</div>` + sum.goals.map(g => `<div class="ds-row ds-goal"><span class="ds-title">${escapeHtml(goalTitle(g.goal))}</span><span class="ds-score">${escapeHtml(goalCountText(g.progress))}</span></div>`).join('');
     }
-    if (sum.medalUp.length > 0) {
-        html += `<div class="ds-sub">メダル</div>` + sum.medalUp.map(c => `<div class="ds-row"><span class="level-badge">${escapeHtml(c.lv)}</span><span class="ds-title">${escapeHtml(c.ti)}</span><span class="hist-change">${historyMedalHtml(c.om)}<span class="hist-arrow">→</span>${historyMedalHtml(c.nm)}</span></div>`).join('');
-    }
-    if (sum.scoreUp.length > 0) {
-        html += `<div class="ds-sub">スコア</div>` + sum.scoreUp.map(c => `<div class="ds-row"><span class="level-badge">${escapeHtml(c.lv)}</span><span class="ds-title">${escapeHtml(c.ti)}</span><span class="ds-score">${c.ns.toLocaleString('ja-JP')}${c.diff !== null ? `<small>+${c.diff.toLocaleString('ja-JP')}</small>` : '<small>初</small>'}</span></div>`).join('');
-    }
-    if (sum.badDown.length > 0) {
-        html += `<div class="ds-sub">BAD</div>` + sum.badDown.map(c => `<div class="ds-row"><span class="level-badge">${escapeHtml(c.lv)}</span><span class="ds-title">${escapeHtml(c.ti)}</span><span class="ds-score">${c.ob !== null ? `${c.ob} → ` : ''}${c.nb}</span></div>`).join('');
+    // 1曲1行：曲名の下にスコア・BAD、右にメダル（良くなったものだけ）
+    if (sum.songsUp && sum.songsUp.length > 0) {
+        html += `<div class="ds-sub">更新した曲</div>` + sum.songsUp.map(c => {
+            const sub = [];
+            if (c.score) sub.push(`<span class="ds-score">${c.ns.toLocaleString('ja-JP')}${c.diff !== null ? `<small>+${c.diff.toLocaleString('ja-JP')}</small>` : '<small>初</small>'}</span>`);
+            if (c.bad) sub.push(`<span class="ds-score ds-bad">BAD ${c.ob !== null ? `${c.ob}→` : ''}${c.nb}</span>`);
+            const medal = c.medal ? `<span class="hist-change">${historyMedalHtml(c.om)}<span class="hist-arrow">→</span>${historyMedalHtml(c.nm)}</span>` : '';
+            return `<div class="ds-row"><span class="level-badge">${escapeHtml(c.lv)}</span><span class="ds-main"><span class="ds-title">${escapeHtml(c.ti)}</span>${sub.length ? `<span class="ds-subline">${sub.join('')}</span>` : ''}</span>${medal}</div>`;
+        }).join('');
     }
     return html;
 }
