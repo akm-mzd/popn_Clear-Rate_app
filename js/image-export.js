@@ -840,8 +840,9 @@ function buildDailySummaryRoot(sum, pk) {
         <div style="font-size: 26px; font-weight: bold; color: ${accent}; line-height: 1;">${n}</div>
         <div style="font-size: 12px; color: #666; margin-top: 6px;">${label}</div></div>`;
     const lvBox = lv => `<div style="width: 34px; height: 22px; flex-shrink: 0; ${EXPORT_CENTER} background: #555; color: #fff; border-radius: 4px; font-size: 12px; font-weight: bold;">${escapeHtml(lv)}</div>`;
-    const row = (lv, title, right) => `<div style="display: flex; align-items: center; gap: 8px; background: #fff; border-radius: 8px; padding: 6px 8px; margin-bottom: 4px;">
-        ${lvBox(lv)}<div style="flex: 1; min-width: 0; font-size: 14px; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">${escapeHtml(title)}</div>${right}</div>`;
+    // 行：レベルの箱・バナー（アプリにある曲だけ）・曲名・右の値
+    const row = (lv, title, right, song) => `<div style="display: flex; align-items: center; gap: 8px; background: #fff; border-radius: 8px; padding: 6px 8px; margin-bottom: 4px;">
+        ${lvBox(lv)}${song ? buildBannerBoxHtml(song, 120, 30) : ''}<div style="flex: 1; min-width: 0; font-size: 14px; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">${escapeHtml(title)}</div>${right}</div>`;
     const medal = k => k ? buildMedalIconHtml(k, 26) : `<span style="font-size: 11px; color: #999;">未プレイ</span>`;
     const now = new Date();
     let html = `<div style="display: flex; align-items: center; gap: 16px; margin-bottom: 14px;">
@@ -867,15 +868,15 @@ function buildDailySummaryRoot(sum, pk) {
     }
     if (sum.medalUp.length > 0) {
         html += `<div style="font-size: 13px; font-weight: bold; color: #666; margin: 6px 0 4px;">メダル</div>`;
-        html += sum.medalUp.map(c => row(c.lv, c.ti, `<div style="display: flex; align-items: center; gap: 4px;">${medal(c.om)}<span style="color: #999;">→</span>${medal(c.nm)}</div>`)).join('');
+        html += sum.medalUp.map(c => row(c.lv, c.ti, `<div style="display: flex; align-items: center; gap: 4px;">${medal(c.om)}<span style="color: #999;">→</span>${medal(c.nm)}</div>`, c.song)).join('');
     }
     if (sum.scoreUp.length > 0) {
         html += `<div style="font-size: 13px; font-weight: bold; color: #666; margin: 10px 0 4px;">スコア</div>`;
-        html += sum.scoreUp.map(c => row(c.lv, c.ti, `<div style="font-size: 15px; font-weight: bold;">${c.ns.toLocaleString('ja-JP')}<span style="font-size: 12px; color: #2e7d32; margin-left: 4px;">${c.diff !== null ? '+' + c.diff.toLocaleString('ja-JP') : '初'}</span></div>`)).join('');
+        html += sum.scoreUp.map(c => row(c.lv, c.ti, `<div style="font-size: 15px; font-weight: bold;">${c.ns.toLocaleString('ja-JP')}<span style="font-size: 12px; color: #2e7d32; margin-left: 4px;">${c.diff !== null ? '+' + c.diff.toLocaleString('ja-JP') : '初'}</span></div>`, c.song)).join('');
     }
     if (sum.badDown.length > 0) {
         html += `<div style="font-size: 13px; font-weight: bold; color: #666; margin: 10px 0 4px;">BAD</div>`;
-        html += sum.badDown.map(c => row(c.lv, c.ti, `<div style="font-size: 15px; font-weight: bold;">${c.ob !== null ? `${c.ob} → ` : ''}${c.nb}</div>`)).join('');
+        html += sum.badDown.map(c => row(c.lv, c.ti, `<div style="font-size: 15px; font-weight: bold;">${c.ob !== null ? `${c.ob} → ` : ''}${c.nb}</div>`, c.song)).join('');
     }
     root.innerHTML = html;
     return root;

@@ -576,10 +576,15 @@ function getPeriodChanges(from, to, ids) {
     });
     const rankOf = k => (MEDAL_TYPES[k] || MEDAL_TYPES['']).rank;
     const changes = [...bySong.values()].map(c => ({ ...c, song: songs.find(s => s.id === c.id) || null }));
-    const medalUp = changes.filter(c => 'nm' in c && rankOf(c.nm) > rankOf(c.om)).sort((a, b) => rankOf(b.nm) - rankOf(a.nm));
+    // どの欄もレベルの高い順。同じレベルの中は、メダルは良い順（→ スコアが高い順）、スコアは高い順、BAD は少ない順
+    const lvOf = c => parseInt(c.song ? c.song.level : c.lv, 10) || 0;
+    const scoreNow = c => ('ns' in c && c.ns !== null ? c.ns : toScoreNum(scoreRecords[c.id])) || 0;
+    const medalUp = changes.filter(c => 'nm' in c && rankOf(c.nm) > rankOf(c.om))
+        .sort((a, b) => (lvOf(b) - lvOf(a)) || (rankOf(b.nm) - rankOf(a.nm)) || (scoreNow(b) - scoreNow(a)));
     const scoreUp = changes.filter(c => 'ns' in c && c.ns !== null && (c.os === null || c.ns > c.os))
-        .map(c => ({ ...c, diff: c.os === null ? null : c.ns - c.os })).sort((a, b) => (b.ns - a.ns));
-    const badDown = changes.filter(c => 'nb' in c && c.nb !== null && (c.ob === null || c.nb < c.ob)).sort((a, b) => a.nb - b.nb);
+        .map(c => ({ ...c, diff: c.os === null ? null : c.ns - c.os })).sort((a, b) => (lvOf(b) - lvOf(a)) || (b.ns - a.ns));
+    const badDown = changes.filter(c => 'nb' in c && c.nb !== null && (c.ob === null || c.nb < c.ob))
+        .sort((a, b) => (lvOf(b) - lvOf(a)) || (a.nb - b.nb));
     const isNormal = k => !!(MEDAL_TYPES[k] || {}).isNormalClear;
     const isFc = k => rankOf(k) >= MEDAL_TYPES['銀丸'].rank;
     return {
