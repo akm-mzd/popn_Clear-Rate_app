@@ -871,6 +871,7 @@ function buildDailySummaryRoot(sum, pk) {
         html += sum.songsUp.map(c => {
             const sub = [];
             if (c.score) sub.push(`<span style="font-size: 14px; font-weight: bold; color: #333;">${c.os !== null ? `${c.os.toLocaleString('ja-JP')}→` : ''}${c.ns.toLocaleString('ja-JP')}<span style="font-size: 12px; color: #2e7d32; margin-left: 4px;">${c.diff !== null ? '+' + c.diff.toLocaleString('ja-JP') : '初'}</span></span>`);
+            else if (c.scoreDown) sub.push(`<span style="font-size: 14px; font-weight: bold; color: #333;">${c.os.toLocaleString('ja-JP')}→${c.ns.toLocaleString('ja-JP')}<span style="font-size: 12px; color: #c62828; margin-left: 4px;">−${Math.abs(c.diff).toLocaleString('ja-JP')}</span></span>`);
             if (c.bad) sub.push(`<span style="font-size: 13px; font-weight: bold; color: #1565c0;">BAD ${c.ob !== null ? `${c.ob}→` : ''}${c.nb}</span>`);
             const medalHtml = c.medal ? `<div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">${medal(c.om)}<span style="color: #999;">→</span>${medal(c.nm)}</div>` : '';
             return `<div style="display: flex; align-items: center; gap: 8px; background: #fff; border-radius: 8px; padding: 6px 8px; margin-bottom: 4px;">

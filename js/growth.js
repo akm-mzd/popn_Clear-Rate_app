@@ -621,6 +621,13 @@ function getPeriodChanges(from, to, ids, best) {
     medalUp.forEach(c => up.set(c.id, { ...c, medal: true }));
     scoreUp.forEach(c => up.set(c.id, { ...(up.get(c.id) || c), diff: c.diff, score: true }));
     badDown.forEach(c => up.set(c.id, { ...(up.get(c.id) || c), bad: true }));
+    // 行に出す曲のスコアが下がっていたら（メダルを取ったときのスコアが自己ベストより低いなど）、下がった分も出す（タイルの「スコア更新」には数えない）
+    up.forEach(c => {
+        if (!c.score && 'ns' in c && c.ns !== null && c.os !== null && c.os !== undefined && c.ns < c.os) {
+            c.scoreDown = true;
+            c.diff = c.ns - c.os;
+        }
+    });
     const medalNow = c => ('nm' in c ? c.nm : clearRecords[c.id]) || '';
     const badNow = c => ('nb' in c && c.nb !== null ? c.nb : (typeof getSongBad === 'function' ? getSongBad(c.id) : null));
     const songsUp = [...up.values()].sort((a, b) => (lvOf(b) - lvOf(a)) || ((b.medal ? 1 : 0) - (a.medal ? 1 : 0)) || (rankOf(medalNow(b)) - rankOf(medalNow(a)))
@@ -737,6 +744,7 @@ function buildDailySummaryHtml(sum, pk) {
             const sub = [];
             // スコアは「変わる前→変わった後 +差」（初めては「変わった後 初」）
             if (c.score) sub.push(`<span class="ds-score">${c.os !== null ? `${c.os.toLocaleString('ja-JP')}→` : ''}${c.ns.toLocaleString('ja-JP')}${c.diff !== null ? `<small>+${c.diff.toLocaleString('ja-JP')}</small>` : '<small>初</small>'}</span>`);
+            else if (c.scoreDown) sub.push(`<span class="ds-score">${c.os.toLocaleString('ja-JP')}→${c.ns.toLocaleString('ja-JP')}<small class="ds-down">−${Math.abs(c.diff).toLocaleString('ja-JP')}</small></span>`);
             if (c.bad) sub.push(`<span class="ds-score ds-bad">BAD ${c.ob !== null ? `${c.ob}→` : ''}${c.nb}</span>`);
             const medal = c.medal ? `<span class="hist-change">${historyMedalHtml(c.om)}<span class="hist-arrow">→</span>${historyMedalHtml(c.nm)}</span>` : '';
             return `<div class="ds-row"><span class="level-badge">${escapeHtml(c.lv)}</span><span class="ds-main"><span class="ds-title">${escapeHtml(c.ti)}</span>${sub.length ? `<span class="ds-subline">${sub.join('')}</span>` : ''}</span>${medal}</div>`;
