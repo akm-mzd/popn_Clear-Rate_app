@@ -4,14 +4,15 @@
 //   新しいデザインでは body に .ui-new を付け、上部バー・下部ナビ（PCは左のサイドバー）を出す。
 //   メニューの中身（検索・統計・画像・設定の枠）はそのまま使い、ナビで開いた項目の枠だけを
 //   シート（スマホは下から、PCは右から）に出す。機能のコードは両方の見た目で共通。
-//   見た目の選択は、この端末に保存する（popn_ui_mode：'new' / 'classic'）。
+//   見た目は新しいデザインだけ。以前の見た目（ver 2）は、ver 2.101 のまま凍結した「以前のページ」（classic/、見るだけ）を「見た目」から開く。
+//   ここにある以前の見た目の切り替えのコードは使わない（popn_ui_mode が 'classic' でも新しいデザインにする）。
 // ==========================================
 
 const UI_MODE_KEY = 'popn_ui_mode';
 const NEW_UI_SHEET_TITLES = { filter: '検索・絞り込み', stats: '統計', image: '画像を作る', goal: '目標', more: 'その他' };
 
 function getUiMode() {
-    return storageGet(UI_MODE_KEY) === 'classic' ? 'classic' : 'new';
+    return 'new';
 }
 
 function isNewUi() {
@@ -35,16 +36,13 @@ function applyUiMode(mode) {
     // レベル・表示方法の枠：新しいデザインでは常に一覧の上（固定の帯）
     applyLevelButtonPlacement(isNew ? true : storageGet('popn_level_btn_main') !== '0');
 
-    document.getElementById('ui-switch-text').textContent = isNew ? '新しいデザインで表示中' : '以前の見た目（ver 2）で表示中';
-    document.getElementById('ui-switch-btn').textContent = isNew ? '以前の見た目に戻す' : '新しいデザインにする';
+    document.getElementById('ui-switch-text').textContent = '以前のページ（ver 2.101）は見るだけで開きます';
+    document.getElementById('ui-switch-btn').textContent = '以前のページを開く';
 }
 
+// 「見た目」：以前のページ（ver 2.101 のまま凍結、見るだけ）を開く
 function toggleUiMode() {
-    const next = isNewUi() ? 'classic' : 'new';
-    storageSet(UI_MODE_KEY, next);
-    applyUiMode(next);
-    renderTable();
-    window.scrollTo(0, 0);
+    window.location.href = 'classic/';
 }
 
 // 以前の見た目のときだけメニューを閉じる（新しいデザインのシートは開いたまま、その場で結果を見せる）

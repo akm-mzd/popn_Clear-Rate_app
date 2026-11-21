@@ -874,6 +874,11 @@ async function restoreBannersFromBackup(event) {
     try { data = JSON.parse(await file.text()); } catch (e) { data = null; }
     const fileSongs = Array.isArray(data) ? data : (data && Array.isArray(data.songs) ? data.songs : null);
     if (!fileSongs) { alert('楽曲リストの入ったバックアップ（.json）を選んでください。'); return; }
+    await restoreBannersFromSongs(fileSongs);
+}
+
+// バックアップの楽曲リスト（fileSongs）から、今は空のバナーだけを戻して保存する（「前の状態に戻す」画面でも使う）
+async function restoreBannersFromSongs(fileSongs) {
     // 曲は「ジャンル・曲名・ノーツ数」で合わせる（id と同じ決まり）
     const keyOf = s => String(s.genre ?? '') + '_' + String(s.title ?? '') + '_' + String(s.notes ?? '');
     const backup = new Map();
