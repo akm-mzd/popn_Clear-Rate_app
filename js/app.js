@@ -44,6 +44,8 @@ window.onload = async () => {
         }
         saveCache(fresh);
         cloudReady = true;
+        // データの守り：前の日の控えより大きく減っていないか見てから、今日の控えを残す（js/backup.js）
+        if (typeof checkDataDrop === 'function') checkDataDrop(fresh).then(() => saveDeviceBackup(fresh));
         migrateLocalPokkuraRecords(); // 端末にだけあるポックラ用データをクラウドへ
         checkGoalBackup();            // クラウドに目標がなく、この端末に控えがあれば戻すか聞く
         runAutoSave();      // 待っている間の編集があれば保存

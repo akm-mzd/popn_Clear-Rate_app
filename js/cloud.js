@@ -161,8 +161,20 @@ function applyPatchToSynced(u, patch) {
     });
 }
 
+// 保存のたびに送る「どの版のアプリ・どの端末か」（クラウド側の保存の記録に残る）
+function getDeviceLabel() {
+    let id = storageGet('popn_device_id');
+    if (!id) { id = Math.random().toString(36).slice(2, 8); storageSet('popn_device_id', id); }
+    const ua = navigator.userAgent || '';
+    const kind = /iPhone|iPad|iPod/.test(ua) ? 'iPhone' : /Android/.test(ua) ? 'Android' : 'PC';
+    return `${kind}-${id}`;
+}
+function clientInfo() {
+    return { app: APP_VERSION, device: getDeviceLabel() };
+}
+
 function patchRequest(u, patch) {
-    const body = JSON.stringify({ type: 'patchRecords', targetUser: u, patch: patch });
+    const body = JSON.stringify({ type: 'patchRecords', targetUser: u, patch: patch, ...clientInfo() });
     // keepalive を付けると、ページを閉じても送信が最後まで行われる（容量制限があるので小さいときだけ）
     return fetch(GAS_URL, { method: 'POST', body: body, keepalive: body.length < 20000 });
 }
@@ -349,10 +361,23 @@ async function saveCurrentUserToCloud() {
         return;
     }
     syncCurrentUserToAllUsers();
-    const success = await saveToCloud(false, currentUser);
-    if (success) {
-        alert(`ユーザー [${currentUser}] の記録をクラウドに保存しました！`);
-    }
+    // 記録は丸ごと送らず、変わった所だけを今すぐ送る（ふだんの自動保存と同じ。古いデータで上書きしないため）
+    showLoading(true, `クラウドに保存中... (${currentUser})`);
+    const success = await saveUserRecordsNow(currentUser);
+    showLoading(false);
+    if (success) alert(`ユーザー [${currentUser}] の記録をクラウドに保存しました！`);
+    else alert('保存できませんでした。通信を確かめて、もう一度押してください（自動でも続けて保存します）。');
+}
+
+// その人の記録の、まだ保存していない分（変わった所だけ）を今すぐ送る。送れたら true
+async function saveUserRecordsNow(u) {
+    for (let i = 0; i < 100 && autoSaving; i++) await new Promise(r => setTimeout(r, 200));
+    if (!cloudReady) return false;
+    if (!buildPatch(u)) { dirtyUsers.delete(u); return true; }
+    dirtyUsers.add(u);
+    clearTimeout(autoSaveTimer);
+    await runAutoSave();
+    return !dirtyUsers.has(u) && !buildPatch(u);
 }
 
 // 「全体保存」ボタン（PC版のみ）：楽曲リスト ＋ 全ユーザーの記録を保存（管理者パスワード必須）
@@ -366,16 +391,17 @@ async function saveAllToCloud() {
     syncCurrentUserToAllUsers();
     if (!checkAdminAuth()) return;
 
-    // ① まず楽曲リスト全体を保存
+    // ① まず楽曲リストの変わった所を保存
     let success = await saveToCloud(true);
     if (!success) return; // 楽曲の保存に失敗した場合は安全のため中断
 
-    // ② 続いて、登録されている全ユーザーを順番にクラウドへ保存
+    // ② 続いて、登録されている全ユーザーの、まだ保存していない記録を送る（丸ごとは送らない）
     const users = Object.keys(allUsersData);
     for (let i = 0; i < users.length; i++) {
         const targetU = users[i];
-        const progressText = `全ユーザーを保存中 (${i + 1}/${users.length}): [${targetU}]`;
-        const res = await saveToCloud(false, targetU, progressText);
+        showLoading(true, `全ユーザーを保存中 (${i + 1}/${users.length}): [${targetU}]`);
+        const res = await saveUserRecordsNow(targetU);
+        showLoading(false);
         if (!res) {
             success = false;
             alert(`ユーザー [${targetU}] の保存中に通信エラーが発生しました。`);
@@ -478,9 +504,65 @@ async function refreshBeforeFullSave(isSongUpdate, replaceSongs) {
     return true;
 }
 
+// ---------- 楽曲リストの「変わった所だけ」 ----------
+//   写し（syncedSongs）と今の楽曲リストの違い：{ set: { 曲ID: { 項目: 値（null は消す） } }, add: [曲], remove: [曲ID] }。違いが無ければ null
+function buildSongsPatch() {
+    if (!syncedSongs) return null;
+    const base = new Map(syncedSongs.map(s => [s.id, s]));
+    const localIds = new Set(songs.map(s => s.id));
+    const set = {}, add = [], remove = [];
+    songs.forEach(l => {
+        const b = base.get(l.id);
+        if (!b) { add.push(JSON.parse(JSON.stringify(l))); return; }
+        const keys = new Set([...Object.keys(b), ...Object.keys(l)]);
+        keys.forEach(k => {
+            if (stableStr(l[k]) === stableStr(b[k])) return;
+            (set[l.id] = set[l.id] || {})[k] = (k in l && l[k] !== undefined) ? JSON.parse(JSON.stringify(l[k])) : null;
+        });
+    });
+    syncedSongs.forEach(b => { if (!localIds.has(b.id)) remove.push(b.id); });
+    return (Object.keys(set).length || add.length || remove.length) ? { set, add, remove } : null;
+}
+
+// 楽曲リストの変わった所だけを送る（クラウドが ver 2 より前なら、前のやり方＝最新に重ねて全部送る、に戻す）
+async function saveSongsPatched(customLoadingText) {
+    const patch = buildSongsPatch();
+    if (!patch) return true;
+    // 見張り：たくさん消す・バナーをたくさん消すときは確かめる
+    const clearedBanners = Object.keys(patch.set).filter(id => 'bannerUrl' in patch.set[id] && !patch.set[id].bannerUrl
+        && (syncedSongs.find(s => s.id === id) || {}).bannerUrl).length;
+    if (patch.remove.length > 3 || clearedBanners > 3) {
+        if (!confirm(`楽曲リストから ${patch.remove.length}曲を消し、${clearedBanners}曲のバナーを消します。\n本当に保存しますか？`)) return false;
+    }
+    showLoading(true, customLoadingText || 'クラウドに保存中... (楽曲リスト)');
+    let result = null;
+    try {
+        const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ type: 'patchSongs', password: ADMIN_PASSWORD, patch, force: patch.remove.length > 3 || clearedBanners > 3, ...clientInfo() }) });
+        result = await res.json();
+    } catch (e) {
+        console.error('楽曲リストの保存エラー:', e);
+        showLoading(false);
+        alert('通信エラーが発生しました。もう一度保存してください。');
+        return false;
+    }
+    showLoading(false);
+    if (result && result.status === 'success' && result.songsPatched) {
+        markSongsSynced(songs);
+        if (result.version !== undefined && result.prevVersion === knownVersion) knownVersion = result.version;
+        return true;
+    }
+    // クラウドが前の版（patchSongs を知らない）なら、前のやり方で保存する
+    if (result && !result.gasVersion) return saveToCloud(true, currentUser, customLoadingText, { legacy: true });
+    alert(result && result.message ? result.message : '保存できませんでした。');
+    return false;
+}
+
 async function saveToCloud(isSongUpdate = false, targetUserName = currentUser, customLoadingText = null, opts = {}) {
     if (!GAS_URL || GAS_URL.trim() === '') return false;
     if (!dataLoaded) { alert("データを読み込めていないため保存できません。再読み込みしてください。"); return false; } // ←追加
+    // 記録は丸ごと送らない（変わった所だけ）。楽曲リストも、バックアップからの復元のほかは変わった所だけ
+    if (!isSongUpdate) return saveUserRecordsNow(targetUserName);
+    if (!opts.replaceSongs && !opts.legacy) return saveSongsPatched(customLoadingText);
 
     // 全部を送る保存なので、先にクラウドの最新を取り込む（古いデータで、ほかの端末の変更を上書きしないため）
     showLoading(true, '最新のデータを確認中...');
@@ -505,6 +587,8 @@ async function saveToCloud(isSongUpdate = false, targetUserName = currentUser, c
         const payload = {
             type: isSongUpdate ? "updateSongs" : "updateClears",
             targetUser: targetUserName,
+            force: !!opts.replaceSongs,
+            ...clientInfo(),
             songs: isSongUpdate ? songs : [], 
             clearRecords: targetClear,
             scoreRecords: targetScore,
@@ -574,7 +658,8 @@ async function uploadImageToCloud(dataUrl, fileNameHint = 'banner') {
             body: JSON.stringify({
                 type: 'uploadBanner',
                 imageData: dataUrl,
-                fileName: fileNameHint
+                fileName: fileNameHint,
+                ...clientInfo()
             })
         });
         const result = await response.json();

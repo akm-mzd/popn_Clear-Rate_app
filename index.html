@@ -6,7 +6,7 @@
     <title>Pop’n Clear Rate app</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
-    <link rel="stylesheet" href="style.css?v=3.48.0.0">
+    <link rel="stylesheet" href="style.css?v=3.49.0.0">
 </head>
 <body>
     <!-- 新しいデザイン（ver 3）の上部バーとナビ。以前の見た目では隠れる（js/ui-new.js） -->
@@ -353,6 +353,9 @@
                         <input type="file" id="history-import-file" accept=".json,application/json" style="display: none;" onchange="importHistoryFromFile(event)">
                         <button type="button" class="admin-btn" onclick="openHistoryGapModal()">過去の記録が足りない曲</button>
                         <button type="button" class="admin-btn" onclick="applyHistoryBads()">履歴の BAD をまとめて反映</button>
+                        <div class="admin-sub-title">前の状態に戻す</div>
+                        <div class="admin-desc">クラウドのバックアップ（1日1回と、丸ごと保存の前）と、この端末の控え（1日1回・7日分）から選んで、今との違いを見てから戻せます。保存の記録も見られます。</div>
+                        <button type="button" class="admin-btn admin-btn-main" onclick="openBackupRestoreModal()">前の状態に戻す・保存の記録</button>
                         <div class="admin-sub-title">消えた記録・バナーを戻す</div>
                         <div class="admin-desc">更新履歴にあるのに今の記録に入っていない分や、消えてしまったバナーを戻します。今の記録・バナーより悪くはしません。</div>
                         <button type="button" class="admin-btn" onclick="applyHistoryBestAll()">履歴の一番良い記録をまとめて反映</button>
@@ -782,6 +785,17 @@
         </div>
     </div>
 
+    <!-- 前の状態に戻す（js/backup.js） -->
+    <div id="backup-restore-modal" class="modal-overlay" data-close="closeBackupRestoreModal" style="display: none;">
+        <div class="modal-content daily-summary-content">
+            <h3 style="margin: 0 0 6px;">前の状態に戻す</h3>
+            <div id="backup-restore-body" style="flex: 1; min-height: 0; overflow-y: auto;"></div>
+            <div class="modal-actions" style="justify-content: flex-end; margin-top: 10px;">
+                <button onclick="closeBackupRestoreModal()" style="border: 1px solid #ccc; background: #eee;">閉じる</button>
+            </div>
+        </div>
+    </div>
+
     <div id="eagate-import-modal" class="modal-overlay" data-close="closeEagateImportModal" data-close-confirm="取り込みをやめますか？（反映していない分は消えます）" style="display: none;">
         <div class="modal-content" style="max-width: 560px;">
             <h3>📥 公式データの取り込み</h3>
@@ -880,26 +894,27 @@
     <button id="back-to-top" onclick="scrollToTop()" title="トップに戻る">↑</button>
 
     <!-- 読み込み順に意味があります（config が最初、app が最後） -->
-    <script src="js/config.js?v=3.48.0.0"></script>
-    <script src="js/utils.js?v=3.48.0.0"></script>
-    <script src="js/cloud.js?v=3.48.0.0"></script>
-    <script src="js/users.js?v=3.48.0.0"></script>
-    <script src="js/knock-data.js?v=3.48.0.0"></script>
-    <script src="js/table.js?v=3.48.0.0"></script>
-    <script src="js/modals.js?v=3.48.0.0"></script>
-    <script src="js/memo.js?v=3.48.0.0"></script>
-    <script src="js/history.js?v=3.48.0.0"></script>
-    <script src="js/growth.js?v=3.48.0.0"></script>
-    <script src="js/goals.js?v=3.48.0.0"></script>
-    <script src="js/next.js?v=3.48.0.0"></script>
-    <script src="js/admin.js?v=3.48.0.0"></script>
-    <script src="js/image-export.js?v=3.48.0.0"></script>
-    <script src="js/eagate-import.js?v=3.48.0.0"></script>
-    <script src="js/wiki-import.js?v=3.48.0.0"></script>
-    <script src="js/fc-import.js?v=3.48.0.0"></script>
-    <script src="js/menu.js?v=3.48.0.0"></script>
-    <script src="js/ui-new.js?v=3.48.0.0"></script>
-    <script src="js/app.js?v=3.48.0.0"></script>
+    <script src="js/config.js?v=3.49.0.0"></script>
+    <script src="js/utils.js?v=3.49.0.0"></script>
+    <script src="js/cloud.js?v=3.49.0.0"></script>
+    <script src="js/users.js?v=3.49.0.0"></script>
+    <script src="js/knock-data.js?v=3.49.0.0"></script>
+    <script src="js/table.js?v=3.49.0.0"></script>
+    <script src="js/modals.js?v=3.49.0.0"></script>
+    <script src="js/memo.js?v=3.49.0.0"></script>
+    <script src="js/history.js?v=3.49.0.0"></script>
+    <script src="js/growth.js?v=3.49.0.0"></script>
+    <script src="js/goals.js?v=3.49.0.0"></script>
+    <script src="js/next.js?v=3.49.0.0"></script>
+    <script src="js/admin.js?v=3.49.0.0"></script>
+    <script src="js/backup.js?v=3.49.0.0"></script>
+    <script src="js/image-export.js?v=3.49.0.0"></script>
+    <script src="js/eagate-import.js?v=3.49.0.0"></script>
+    <script src="js/wiki-import.js?v=3.49.0.0"></script>
+    <script src="js/fc-import.js?v=3.49.0.0"></script>
+    <script src="js/menu.js?v=3.49.0.0"></script>
+    <script src="js/ui-new.js?v=3.49.0.0"></script>
+    <script src="js/app.js?v=3.49.0.0"></script>
 
 </body>
 </html>
