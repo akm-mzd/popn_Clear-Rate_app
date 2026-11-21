@@ -715,7 +715,8 @@ function buildDailySummaryHtml(sum, pk) {
     if (sum.songsUp && sum.songsUp.length > 0) {
         html += `<div class="ds-sub">更新した曲</div>` + sum.songsUp.map(c => {
             const sub = [];
-            if (c.score) sub.push(`<span class="ds-score">${c.ns.toLocaleString('ja-JP')}${c.diff !== null ? `<small>+${c.diff.toLocaleString('ja-JP')}</small>` : '<small>初</small>'}</span>`);
+            // スコアは「変わる前→変わった後 +差」（初めては「変わった後 初」）
+            if (c.score) sub.push(`<span class="ds-score">${c.os !== null ? `${c.os.toLocaleString('ja-JP')}→` : ''}${c.ns.toLocaleString('ja-JP')}${c.diff !== null ? `<small>+${c.diff.toLocaleString('ja-JP')}</small>` : '<small>初</small>'}</span>`);
             if (c.bad) sub.push(`<span class="ds-score ds-bad">BAD ${c.ob !== null ? `${c.ob}→` : ''}${c.nb}</span>`);
             const medal = c.medal ? `<span class="hist-change">${historyMedalHtml(c.om)}<span class="hist-arrow">→</span>${historyMedalHtml(c.nm)}</span>` : '';
             return `<div class="ds-row"><span class="level-badge">${escapeHtml(c.lv)}</span><span class="ds-main"><span class="ds-title">${escapeHtml(c.ti)}</span>${sub.length ? `<span class="ds-subline">${sub.join('')}</span>` : ''}</span>${medal}</div>`;
