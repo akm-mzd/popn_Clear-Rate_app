@@ -596,14 +596,14 @@ function getPeriodChanges(from, to, ids) {
         .map(c => ({ ...c, diff: c.os === null ? null : c.ns - c.os })).sort((a, b) => (lvOf(b) - lvOf(a)) || (b.ns - a.ns));
     const badDown = changes.filter(c => 'nb' in c && c.nb !== null && (c.ob === null || c.nb < c.ob))
         .sort((a, b) => (lvOf(b) - lvOf(a)) || (a.nb - b.nb));
-    // 1曲1行のまとめ（メダル・スコア・BAD のどれかが良くなった曲）。レベルの高い順 → メダルが良い順 → スコアが高い順 → BAD が少ない順
+    // 1曲1行のまとめ（メダル・スコア・BAD のどれかが良くなった曲）。レベルの高い順 → メダルが変わった曲が先 → メダルが良い順 → スコアが高い順 → BAD が少ない順
     const up = new Map();
     medalUp.forEach(c => up.set(c.id, { ...c, medal: true }));
     scoreUp.forEach(c => up.set(c.id, { ...(up.get(c.id) || c), diff: c.diff, score: true }));
     badDown.forEach(c => up.set(c.id, { ...(up.get(c.id) || c), bad: true }));
     const medalNow = c => ('nm' in c ? c.nm : clearRecords[c.id]) || '';
     const badNow = c => ('nb' in c && c.nb !== null ? c.nb : (typeof getSongBad === 'function' ? getSongBad(c.id) : null));
-    const songsUp = [...up.values()].sort((a, b) => (lvOf(b) - lvOf(a)) || (rankOf(medalNow(b)) - rankOf(medalNow(a)))
+    const songsUp = [...up.values()].sort((a, b) => (lvOf(b) - lvOf(a)) || ((b.medal ? 1 : 0) - (a.medal ? 1 : 0)) || (rankOf(medalNow(b)) - rankOf(medalNow(a)))
         || (scoreNow(b) - scoreNow(a)) || ((badNow(a) ?? 1e9) - (badNow(b) ?? 1e9)));
     const isNormal = k => !!(MEDAL_TYPES[k] || {}).isNormalClear;
     const isFc = k => rankOf(k) >= MEDAL_TYPES['銀丸'].rank;
@@ -695,7 +695,7 @@ function closeDailySummary() {
 
 // 今日のまとめの数（0 のものは外す）：[[数, 名前]]
 function getDailySummaryTiles(sum) {
-    return [[(sum.goals || []).length, '目標達成'], [sum.medalUp.length, 'メダルが上がった'], [sum.scoreUp.length, 'スコアが上がった'], [sum.badDown.length, 'BADが減った'], [sum.newNormal, '初クリア'], [sum.newFc, '初フルコン']].filter(([n]) => n > 0);
+    return [[(sum.goals || []).length, '目標達成'], [sum.medalUp.length, 'メダル更新'], [sum.scoreUp.length, 'スコア更新'], [sum.badDown.length, 'BAD更新'], [sum.newNormal, '新規クリア'], [sum.newFc, '初フルコン']].filter(([n]) => n > 0);
 }
 
 function buildDailySummaryHtml(sum, pk) {
