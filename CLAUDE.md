@@ -65,6 +65,7 @@ pop'n music のクリア状況を管理する静的サイトです（GitHub Page
 - 曲を並べる向き：表ごとに「右が強い（行ごとに左右反転）」か「左が強い（順位どおり左から右へ）」を選べる（`getGridDirection` / `orderForDirection`、この端末に `popn_dir_表の名前` で保存）。最初は難易度表・メダル表が右が強い、スコア表・ポックラが左が強い。上下も、難易度表・メダル表・スコア表は「上が強い（最初）」か「下が強い」を選べる（`getGridVertical`、この端末に `popn_vdir_表の名前` で保存。下が強いときは行の順番と、行の中の折り返しの順番を逆にする：`orderRowsForVertical` / `orderForDirection` の4つ目の引数）。ポックラは上下を変えない。画像出力も同じ向きにする。表の上には向きの矢印と、入れ替えボタン（右端に ⇄ 左右、左端＝行の見出しの上に ⇅ 上下）を出す（`buildDirectionBar`）。
 - 曲名の UPPER の書き方（Ⓤ・UPPER・(UPPER)・upper・全角）は同じものとして扱う。曲名を比べるときは `normalizeSongText()`（UPPER の表記を消してそろえる）、UPPER かどうかは `isUpperText()` / `songSaysUpper()` を使う（`js/eagate-import.js`）。
 - スマホかどうかの判定は、`isNarrowScreen()`（画面幅）か `isMobileDevice()`（端末）を使う。
+- 画面（`.modal-overlay`）には、閉じる関数の名前を `data-close="closeXxx"` で書く。枠の外（暗い背景）を押しても閉じる（`js/menu.js` の共通の処理。押し始めと離した所が両方とも背景のときだけ）。入れかけのものが消える画面（取り込みの確認・楽曲編集・属性の整理）は `data-close-confirm="確かめの文"` も付ける。「閉じる」「キャンセル」ボタンも残す。
 
 ## 動作確認
 

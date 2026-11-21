@@ -54,3 +54,25 @@ function toggleMenu(force) {
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') toggleMenu(false);
 });
+
+// ==========================================
+// ★ 画面（.modal-overlay）は、枠の外（暗い背景）を押しても閉じる
+//   閉じる関数は overlay の data-close（関数の名前）。data-close-confirm があれば、閉じる前に確かめる（入れかけのものが消える画面）
+//   押し始めと離した所が両方とも背景のときだけ閉じる（枠の中で文字を選んで外で離したときは閉じない）。重なった画面は、押した背景の画面だけ
+// ==========================================
+let modalPressTarget = null;
+document.addEventListener('pointerdown', (e) => {
+    modalPressTarget = (e.target instanceof Element && e.target.classList.contains('modal-overlay')) ? e.target : null;
+}, true);
+document.addEventListener('click', (e) => {
+    const overlay = e.target;
+    const pressed = modalPressTarget;
+    modalPressTarget = null;
+    if (!(overlay instanceof Element) || !overlay.classList.contains('modal-overlay') || pressed !== overlay) return;
+    const fnName = overlay.dataset.close;
+    const fn = fnName && /^close\w+$/.test(fnName) ? window[fnName] : null;
+    if (typeof fn !== 'function') return;
+    const ask = overlay.dataset.closeConfirm;
+    if (ask && !confirm(ask)) return;
+    fn();
+});
