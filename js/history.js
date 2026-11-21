@@ -823,6 +823,14 @@ function addManualHistoryEntry(id, prefix) {
     if (gap) {
         if (gap.after !== null && t <= gap.after) t = gap.after + 60000;
         if (gap.before !== null && t >= gap.before) t = gap.before - 60000;
+    } else {
+        // その日にもう履歴（公式データの取り込みなど）があれば、その後に入れる。
+        //   その日のまとめで、手で足した記録がその日の最後の値になるように（12時だと、夜の取り込みに上書きされて見えなくなる）
+        const sameDay = mine.filter(e => e.t >= dayStart && e.t < dayEnd);
+        if (sameDay.length > 0) {
+            const last = Math.max(...sameDay.map(e => e.t));
+            if (t <= last) t = Math.min(last + 60000, dayEnd - 1);
+        }
     }
     while (mine.some(e => e.t === t)) t++;
 
