@@ -1969,3 +1969,9 @@ button.kl-unlink { display: block; width: 100%; margin: 0; padding: 8px; border:
 .daily-summary-content .ds-nav-today { width: auto; margin: 0; padding: 5px 12px; border: 1px solid #c2185b; border-radius: 14px; background: #fff; color: #c2185b; font-size: 12px; font-weight: bold; cursor: pointer; font-family: inherit; }
 .ds-empty { padding: 24px 8px; text-align: center; color: #888; font-size: 13px; }
 #btn-daily-summary-image:disabled { opacity: 0.5; cursor: default; }
+
+/* 今日のまとめ：1曲1行（曲名の下にスコア・BAD） */
+.ds-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ds-main .ds-title { flex: none; }
+.ds-subline { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; font-size: 12px; }
+.ds-score.ds-bad { color: #1565c0; }
