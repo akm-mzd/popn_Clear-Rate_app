@@ -825,12 +825,14 @@ async function exportAsImage(event) {
 // ★ 今日のまとめ画像（growth.js の getTodayChanges）
 // ==========================================
 async function generateDailySummaryImage(btn) {
-    const sum = getTodayChanges();
-    if (sum.count === 0) { alert('今日はまだ更新がありません。'); return; }
+    // 今日のまとめの画面で見ている日（開いていなければ今日）
+    const day = typeof getDailySummaryDay === 'function' ? getDailySummaryDay() : dayStartOf(Date.now());
+    const sum = getDayChanges(day);
+    if (sum.count === 0) { alert('この日の更新はありません。'); return; }
     closeDailySummary();
     const originalText = await prepareExport(btn);
     if (originalText === null) return;
-    await outputExportImage(buildDailySummaryRoot(sum, getTodayPokkuraChange()), `popn_today_${currentUser}_${exportDateStr()}.png`, btn, originalText);
+    await outputExportImage(buildDailySummaryRoot(sum, getDayPokkuraChange(day)), `popn_today_${currentUser}_${localDateKey(day)}.png`, btn, originalText);
 }
 
 function buildDailySummaryRoot(sum, pk) {
@@ -844,14 +846,14 @@ function buildDailySummaryRoot(sum, pk) {
     const row = (lv, title, right, song) => `<div style="display: flex; align-items: center; gap: 8px; background: #fff; border-radius: 8px; padding: 6px 8px; margin-bottom: 4px;">
         ${lvBox(lv)}${song ? buildBannerBoxHtml(song, 120, 30) : ''}<div style="flex: 1; min-width: 0; font-size: 14px; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">${escapeHtml(title)}</div>${right}</div>`;
     const medal = k => k ? buildMedalIconHtml(k, 26) : `<span style="font-size: 11px; color: #999;">未プレイ</span>`;
-    const now = new Date();
+    const now = new Date(sum.day !== undefined ? sum.day : Date.now());
     let html = `<div style="display: flex; align-items: center; gap: 16px; margin-bottom: 14px;">
         <div style="background: #fff; border: 3px solid ${accent}; border-radius: 12px; width: 104px; height: 84px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0;">
             <div style="font-size: 14px; line-height: 1; font-weight: bold; color: ${accent};">${now.getFullYear()}</div>
             <div style="font-size: 30px; line-height: 1; font-weight: bold; color: ${accent}; margin-top: 6px;">${now.getMonth() + 1}/${now.getDate()}</div>
             <div style="font-size: 12px; line-height: 1; color: ${accent}; margin-top: 4px;">（${HISTORY_WEEKDAYS[now.getDay()]}）</div>
         </div>
-        <div style="flex: 1; ${EXPORT_CENTER} font-size: 28px; line-height: 1.2; font-weight: bold; color: ${accent};">今日のまとめ</div>
+        <div style="flex: 1; ${EXPORT_CENTER} font-size: 28px; line-height: 1.2; font-weight: bold; color: ${accent};">${sum.isToday === false ? 'この日のまとめ' : '今日のまとめ'}</div>
         <div style="text-align: right; color: #555; font-size: 14px; font-weight: bold; flex-shrink: 0;">User: ${escapeHtml(currentUser)}</div>
     </div>`;
     const tiles = getDailySummaryTiles(sum);

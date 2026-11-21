@@ -87,50 +87,66 @@ function isGoalValueDone(goal, song, v) {
 // 今日達成した目標：[{ goal, progress }]。今は達成していて、今日の0時の時点では達成していなかった目標
 //   sum は getPeriodChanges の今日のまとめ（all＝今日変わった曲ごとの最初の変更前と最後の変更後）、since は今日の0時
 //   0時の値は、今日変わった曲だけ今日の最初の変更前（BAD は今日より前の履歴の最小BAD とも比べる）。ほかの曲は今と同じ
-function getGoalsAchievedToday(sum, since) {
-    const goals = Object.values(getGoalRecords()).filter(g => g && typeof g === 'object');
-    if (goals.length === 0) return [];
-    // 今日より前の履歴の最小BAD
+// 時刻 t の時点の値（m＝メダル・s＝スコア・b＝最小BAD）：t より後に変わった曲だけ { 曲ID: 値 }。ほかの曲は今と同じ
+//   t より後の最初の「変更前」がその時点の値。BAD は t より前の履歴の最小BAD とも比べる（getSongBad と同じ決まり）
+function getGoalValuesAt(t) {
+    const out = new Map();
+    if (t === Infinity) return out;
     const histBefore = {};
     Object.values(getHistoryRecords()).forEach(e => {
-        if (!e || typeof e.t !== 'number' || e.t >= since || !('nb' in e)) return;
+        if (!e || typeof e.t !== 'number' || e.t >= t || !('nb' in e)) return;
         [toBadNum(e.nb), toBadNum(e.ob)].forEach(n => { if (n !== null && (histBefore[e.id] === undefined || n < histBefore[e.id])) histBefore[e.id] = n; });
     });
     const silverRank = MEDAL_TYPES['銀丸'].rank;
-    const changed = (sum.all || []).filter(c => c.song).map(c => {
+    (getPeriodChanges(t, Infinity).all || []).forEach(c => {
         const id = c.id;
-        const now = { m: clearRecords[id] || '', s: scoreRecords[id], b: getSongBad(id) };
-        const start = { m: 'nm' in c ? (c.om || '') : now.m, s: 'ns' in c ? c.os : now.s, b: now.b };
+        const v = { m: 'nm' in c ? (c.om || '') : (clearRecords[id] || ''), s: 'ns' in c ? c.os : scoreRecords[id], b: getSongBad(id) };
         if ('nb' in c) {
             const cands = [toBadNum(c.ob), histBefore[id]].filter(n => n !== null && n !== undefined);
-            start.b = cands.length > 0 ? Math.min(...cands) : null;
+            v.b = cands.length > 0 ? Math.min(...cands) : null;
         }
         // BAD の記録が無くフルコンボ以上なら 0（getSongBad と同じ）
-        if ((start.b === null || start.b === undefined) && ((MEDAL_TYPES[start.m] || {}).rank || 0) >= silverRank) start.b = 0;
-        return { song: c.song, now, start };
-    });
-    const pkToday = typeof getTodayPokkuraChange === 'function' ? getTodayPokkuraChange() : null;
-    const out = [];
-    goals.forEach(goal => {
-        const progress = getGoalProgress(goal);
-        if (!progress.complete) return;
-        if (goal.kind === 'pokkura') {
-            // 前の日のポックラが目標に届いていなかったときだけ（前の日の記録が無ければ出さない）
-            if (pkToday && pkToday.prev !== null && pkToday.prev < (goal.pc || 0) - 1e-9) out.push({ goal, progress });
-            return;
-        }
-        const targetIds = new Set(getGoalTargetSongs(goal).map(s => s.id));
-        let startAchieved = progress.achieved;
-        changed.forEach(x => {
-            if (!targetIds.has(x.song.id)) return;
-            const nowDone = isGoalValueDone(goal, x.song, x.now);
-            const startDone = isGoalValueDone(goal, x.song, x.start);
-            if (nowDone && !startDone) startAchieved--;
-            if (!nowDone && startDone) startAchieved++;
-        });
-        if (Math.min(startAchieved, progress.need) < progress.need) out.push({ goal, progress });
+        if ((v.b === null || v.b === undefined) && ((MEDAL_TYPES[v.m] || {}).rank || 0) >= silverRank) v.b = 0;
+        out.set(id, v);
     });
     return out;
+}
+
+// その日（from 以上 to 未満。今日は to＝Infinity）に達成した目標：[{ goal, progress }]
+//   その日の終わり（to）には達成していて、その日の始め（from）には達成していなかった目標。progress は to の時点の進み具合
+function getGoalsAchievedOn(from, to) {
+    const goals = Object.values(getGoalRecords()).filter(g => g && typeof g === 'object');
+    if (goals.length === 0) return [];
+    const atFrom = getGoalValuesAt(from);
+    const atTo = getGoalValuesAt(to);
+    const nowValue = s => ({ m: clearRecords[s.id] || '', s: scoreRecords[s.id], b: getSongBad(s.id) });
+    const pk = typeof getDayPokkuraChange === 'function' ? getDayPokkuraChange(from) : null;
+    const out = [];
+    goals.forEach(goal => {
+        if (goal.kind === 'pokkura') {
+            // その日の値（今日は今の値）が目標に届いていて、前の日の記録が届いていなかったとき（前の日の記録が無ければ出さない）
+            const target = goal.pc || 0;
+            const cur = to === Infinity ? getCurrentPokkuraValue() : (pk ? pk.cur : null);
+            if (cur === null || cur < target - 1e-9 || !pk || pk.prev === null || pk.prev >= target - 1e-9) return;
+            const progress = to === Infinity ? getGoalProgress(goal) : { pokkura: true, cur, target, complete: true, ratio: 1 };
+            out.push({ goal, progress });
+            return;
+        }
+        const targets = getGoalTargetSongs(goal);
+        const need = goal.n ? goal.n : targets.length;
+        if (need <= 0) return;
+        const count = vals => targets.filter(s => isGoalValueDone(goal, s, vals.get(s.id) || nowValue(s))).length;
+        const end = Math.min(count(atTo), need);
+        if (end < need || Math.min(count(atFrom), need) >= need) return;
+        out.push({ goal, progress: { total: targets.length, achieved: end, need, value: end, complete: true, ratio: 1 } });
+    });
+    return out;
+}
+
+// 今日達成した目標（前の版の呼び方）
+function getGoalsAchievedToday() {
+    const d = new Date(); d.setHours(0, 0, 0, 0);
+    return getGoalsAchievedOn(d.getTime(), Infinity);
 }
 
 // 今のポップンクラス（ポックラ画面で大きく出している値：公式の値、なければ計算値）

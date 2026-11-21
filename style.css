@@ -1960,3 +1960,12 @@ button.kl-unlink { display: block; width: 100%; margin: 0; padding: 8px; border:
 #diff-grid-view .sv-chip.on { background: #6a3fb0; border-color: #6a3fb0; color: #fff; }
 .sv-last { font-size: 11px; color: #666; font-weight: bold; }
 .sv-last-date { white-space: nowrap; }
+
+/* 今日のまとめ：日付を選ぶ（‹ 日付 › 今日） */
+.ds-nav { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 0 10px; flex-wrap: wrap; }
+.daily-summary-content .ds-nav-btn { width: 36px; height: 32px; margin: 0; padding: 0; border: 1px solid #ddd; border-radius: 8px; background: #fff; color: #c2185b; font-size: 20px; font-weight: bold; line-height: 1; cursor: pointer; font-family: inherit; }
+.daily-summary-content .ds-nav-btn:disabled { color: #ccc; cursor: default; }
+.daily-summary-content .ds-nav-date { width: auto; margin: 0; padding: 5px 8px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; font-weight: bold; font-family: inherit; color: #333; background: #fff; }
+.daily-summary-content .ds-nav-today { width: auto; margin: 0; padding: 5px 12px; border: 1px solid #c2185b; border-radius: 14px; background: #fff; color: #c2185b; font-size: 12px; font-weight: bold; cursor: pointer; font-family: inherit; }
+.ds-empty { padding: 24px 8px; text-align: center; color: #888; font-size: 13px; }
+#btn-daily-summary-image:disabled { opacity: 0.5; cursor: default; }

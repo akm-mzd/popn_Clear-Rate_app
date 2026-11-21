@@ -551,14 +551,25 @@ function toggleSongHistoryForm(id) {
     renderSongHistoryBox(id);
 }
 
-// ---------- 今日のまとめ ----------
-//   今日（0時から）の更新履歴を曲ごとにまとめる（その日の最初の「変更前」と最後の「変更後」）
-function getTodayChanges() {
-    const since = new Date(); since.setHours(0, 0, 0, 0);
-    const sum = getPeriodChanges(since.getTime(), Infinity);
-    // 今日達成した目標（js/goals.js）
-    sum.goals = typeof getGoalsAchievedToday === 'function' ? getGoalsAchievedToday(sum, since.getTime()) : [];
+// ---------- 今日のまとめ（過去の日も見られる） ----------
+//   その日（0時から次の日の0時まで）の更新履歴を曲ごとにまとめる（その日の最初の「変更前」と最後の「変更後」）
+function dayStartOf(t) { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); }
+function nextDayStart(day) { const d = new Date(day); d.setDate(d.getDate() + 1); return d.getTime(); }
+function isTodayStart(day) { return day === dayStartOf(Date.now()); }
+
+function getDayChanges(day) {
+    const today = isTodayStart(day);
+    const to = today ? Infinity : nextDayStart(day);
+    const sum = getPeriodChanges(day, to);
+    sum.day = day;
+    sum.isToday = today;
+    // その日に達成した目標（js/goals.js）
+    sum.goals = typeof getGoalsAchievedOn === 'function' ? getGoalsAchievedOn(day, to) : [];
     return sum;
+}
+
+function getTodayChanges() {
+    return getDayChanges(dayStartOf(Date.now()));
 }
 
 // 期間（from 以上 to 未満）の更新履歴を曲ごとにまとめる（期間の最初の変更前と最後の変更後）。ids を渡すとその曲だけ
@@ -594,25 +605,79 @@ function getPeriodChanges(from, to, ids) {
     };
 }
 
-// ポックラの今日の値と、その前の記録
-function getTodayPokkuraChange() {
+// ポックラのその日の値と、その前の記録（day を省くと今日）
+function getDayPokkuraChange(day) {
     const list = getPokkuraHistList();
-    const today = localDateKey(Date.now());
-    const cur = list.find(e => e.day === today);
+    const key = localDateKey(day === undefined ? Date.now() : day);
+    const cur = list.find(e => e.day === key);
     if (!cur) return null;
-    const prev = list.filter(e => e.day < today).pop() || null;
+    const prev = list.filter(e => e.day < key).pop() || null;
     const val = e => (e && typeof e.pc === 'number' ? e.pc : e && typeof e.c === 'number' ? e.c : null);
     return { cur: val(cur), prev: val(prev), official: typeof cur.pc === 'number' };
 }
+function getTodayPokkuraChange() { return getDayPokkuraChange(); }
 
+// 見ている日（その日の0時）
+let dailySummaryDay = null;
+function getDailySummaryDay() { return dailySummaryDay === null ? dayStartOf(Date.now()) : dailySummaryDay; }
+
+// 更新履歴のある日（0時の時刻、古い順）
+function getHistoryDays() {
+    const days = new Set();
+    Object.values(getHistoryRecords()).forEach(e => { if (e && typeof e.t === 'number') days.add(dayStartOf(e.t)); });
+    return [...days].sort((a, b) => a - b);
+}
+
+// auto：公式データを反映したあとに自動で開くとき（今日の更新が無ければ開かない）
 function openDailySummary(auto) {
-    const sum = getTodayChanges();
-    if (sum.count === 0) {
-        if (!auto) alert('今日はまだ更新がありません。');
-        return;
-    }
-    document.getElementById('daily-summary-body').innerHTML = buildDailySummaryHtml(sum, getTodayPokkuraChange());
+    dailySummaryDay = dayStartOf(Date.now());
+    if (auto && getTodayChanges().count === 0) return;
+    renderDailySummary();
     document.getElementById('daily-summary-modal').style.display = 'flex';
+}
+
+// ‹ ›：更新のある前の日・次の日へ（次は今日まで）
+function moveDailySummaryDay(step) {
+    const cur = getDailySummaryDay();
+    const days = getHistoryDays();
+    const today = dayStartOf(Date.now());
+    let next = null;
+    if (step < 0) next = days.filter(d => d < cur).pop();
+    else next = days.find(d => d > cur && d <= today);
+    if (next === undefined || next === null) next = step > 0 ? today : null;
+    if (next === null || next === cur || next > today) return;
+    dailySummaryDay = next;
+    renderDailySummary();
+}
+
+// 日付の欄から選ぶ（今日より後は選べない）
+function setDailySummaryDate(value) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '');
+    if (!m) return;
+    const day = new Date(+m[1], +m[2] - 1, +m[3]).getTime();
+    if (day > dayStartOf(Date.now())) return;
+    dailySummaryDay = day;
+    renderDailySummary();
+}
+
+function renderDailySummary() {
+    const day = getDailySummaryDay();
+    const today = dayStartOf(Date.now());
+    const days = getHistoryDays();
+    const sum = getDayChanges(day);
+    const title = document.getElementById('daily-summary-title');
+    if (title) title.textContent = day === today ? '今日のまとめ' : 'この日のまとめ';
+    const nav = `<div class="ds-nav">
+        <button type="button" class="ds-nav-btn" onclick="moveDailySummaryDay(-1)" aria-label="更新のある前の日"${days.some(d => d < day) ? '' : ' disabled'}>‹</button>
+        <input type="date" class="ds-nav-date" value="${localDateKey(day)}" max="${localDateKey(today)}" onchange="setDailySummaryDate(this.value)" aria-label="日付を選ぶ">
+        <button type="button" class="ds-nav-btn" onclick="moveDailySummaryDay(1)" aria-label="更新のある次の日"${day < today ? '' : ' disabled'}>›</button>
+        ${day < today ? '<button type="button" class="ds-nav-today" onclick="setDailySummaryDate(\'' + localDateKey(today) + '\')">今日</button>' : ''}
+    </div>`;
+    const body = sum.count > 0 ? buildDailySummaryHtml(sum, getDayPokkuraChange(day))
+        : `<div class="ds-empty">${day === today ? '今日はまだ更新がありません。' : 'この日の更新はありません。'}‹ で更新のある日に移れます。</div>`;
+    document.getElementById('daily-summary-body').innerHTML = nav + body;
+    const imgBtn = document.getElementById('btn-daily-summary-image');
+    if (imgBtn) imgBtn.disabled = sum.count === 0;
 }
 
 function closeDailySummary() {
@@ -625,7 +690,7 @@ function getDailySummaryTiles(sum) {
 }
 
 function buildDailySummaryHtml(sum, pk) {
-    const d = new Date();
+    const d = new Date(sum.day !== undefined ? sum.day : Date.now());
     // 0 のものは出さない
     const tiles = getDailySummaryTiles(sum).map(([n, label]) => `<div><b>${n}</b><span>${label}</span></div>`).join('');
     let html = `<div class="ds-date">${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}（${HISTORY_WEEKDAYS[d.getDay()]}）</div>
