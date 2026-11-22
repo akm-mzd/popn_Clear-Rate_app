@@ -841,7 +841,7 @@ function buildDailySummaryRoot(sum, pk) {
     const stat = (n, label) => `<div style="flex: 1; background: #fff; border-radius: 10px; padding: 10px 4px; text-align: center;">
         <div style="font-size: 26px; font-weight: bold; color: ${accent}; line-height: 1;">${n}</div>
         <div style="font-size: 12px; color: #666; margin-top: 6px;">${label}</div></div>`;
-    const lvBox = lv => `<div style="width: 34px; height: 22px; flex-shrink: 0; ${EXPORT_CENTER} background: #555; color: #fff; border-radius: 4px; font-size: 12px; font-weight: bold;">${escapeHtml(lv)}</div>`;
+    const lvBox = lv => `<div style="width: 34px; height: 22px; flex-shrink: 0; ${EXPORT_CENTER} background: ${EXPORT_LEVEL_COLORS[String(lv)] || '#555'}; color: #fff; border-radius: 4px; font-size: 12px; font-weight: bold;">${escapeHtml(lv)}</div>`;
     const medal = k => k ? buildMedalIconHtml(k, 26) : `<span style="font-size: 11px; color: #999;">未プレイ</span>`;
     const now = new Date(sum.day !== undefined ? sum.day : Date.now());
     let html = `<div style="display: flex; align-items: center; gap: 16px; margin-bottom: 14px;">
