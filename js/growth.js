@@ -572,6 +572,17 @@ function getDayChanges(day) {
 // メダルの合計（今日のまとめ）：その日に越えた銅丸以上のメダルごとに、そのレベルでそのメダル以上の曲の数 / そのレベルの曲の数
 //   黒星 → 銅星なら銅丸・銅菱・銅星のどれにも入る。数はその日の終わりの時点（to が Infinity なら今）
 //   返す：[{ lv, medal, have, total, up }]（レベルの高い順 → メダルの低い順）
+// レベルごとにまとめる（並びはそのまま）：[{ lv, rows }]
+function groupMedalTotalsByLevel(list) {
+    const groups = [];
+    (list || []).forEach(r => {
+        const last = groups[groups.length - 1];
+        if (last && last.lv === r.lv) last.rows.push(r);
+        else groups.push({ lv: r.lv, rows: [r] });
+    });
+    return groups;
+}
+
 function getDayMedalTotals(sum, to) {
     const rankOf = k => (MEDAL_TYPES[k] || MEDAL_TYPES['']).rank;
     const minRank = MEDAL_TYPES['銅丸'].rank;
@@ -782,8 +793,10 @@ function buildDailySummaryHtml(sum, pk) {
         ${tiles ? `<div class="ds-stats">${tiles}</div>` : ''}`;
     // メダルの合計（ポップンクラスの上）
     if (sum.medalTotals && sum.medalTotals.length > 0) {
-        html += `<div class="ds-sub">メダルの合計</div><div class="ds-mtotal">` + sum.medalTotals.map(r =>
-            `<div class="ds-mtotal-row"><span class="level-badge">${escapeHtml(r.lv)}</span>${historyMedalHtml(r.medal)}<span class="ds-mtotal-num"><b>${r.have}</b> / ${r.total}</span><span class="ds-mtotal-up">+${r.up}</span></div>`
+        // 1レベル1行で、メダルを横に並べる（入りきらなければ折り返す）
+        html += `<div class="ds-sub">メダルの合計</div><div class="ds-mtotal">` + groupMedalTotalsByLevel(sum.medalTotals).map(g =>
+            `<div class="ds-mtotal-row"><span class="level-badge">${escapeHtml(g.lv)}</span><span class="ds-mtotal-items">${g.rows.map(r =>
+                `<span class="ds-mtotal-item">${historyMedalHtml(r.medal)}<span class="ds-mtotal-num"><b>${r.have}</b>/${r.total}</span><span class="ds-mtotal-up">+${r.up}</span></span>`).join('')}</span></div>`
         ).join('') + `</div>`;
     }
     if (pk && pk.cur !== null) {
