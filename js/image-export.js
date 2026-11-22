@@ -855,6 +855,14 @@ function buildDailySummaryRoot(sum, pk) {
     </div>`;
     const tiles = getDailySummaryTiles(sum);
     if (tiles.length > 0) html += `<div style="display: flex; gap: 8px; margin-bottom: 12px;">${tiles.map(([n, label]) => stat(n, label)).join('')}</div>`;
+    // メダルの合計（ポップンクラスの上）：レベル・メダル・そのメダル以上の曲の数 / 曲の数・その日に越えた数
+    if (sum.medalTotals && sum.medalTotals.length > 0) {
+        html += `<div style="font-size: 13px; font-weight: bold; color: #666; margin: 6px 0 4px;">メダルの合計</div>`;
+        html += `<div style="background: #fff; border-radius: 10px; padding: 6px 12px; margin-bottom: 12px;">` + sum.medalTotals.map((r, i) => `<div style="display: flex; align-items: center; gap: 10px; padding: 4px 0;${i > 0 ? ' border-top: 1px solid #eee;' : ''}">
+            ${lvBox(r.lv)}${medal(r.medal)}
+            <div style="flex: 1; font-size: 15px; font-weight: bold; color: #333;"><span style="font-size: 20px; color: ${accent};">${r.have}</span> / ${r.total}</div>
+            <div style="font-size: 13px; font-weight: bold; color: #2e7d32; flex-shrink: 0;">+${r.up}</div></div>`).join('') + `</div>`;
+    }
     if (pk && pk.cur !== null) {
         const diff = pk.prev !== null ? pk.cur - pk.prev : null;
         html += `<div style="background: #fff; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; font-size: 15px; font-weight: bold;">ポップンクラス <span style="font-size: 22px; color: #7b1fa2;">${pk.cur.toFixed(2)}</span>${diff !== null ? ` <span style="color: ${diff >= 0 ? '#2e7d32' : '#c62828'};">（${diff >= 0 ? '+' : '−'}${Math.abs(diff).toFixed(2)}）</span>` : ''}</div>`;
