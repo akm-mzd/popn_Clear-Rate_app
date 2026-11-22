@@ -864,7 +864,7 @@ function buildDailySummaryRoot(sum, pk) {
             <div style="flex: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px;">${g.rows.map(r => `<div style="display: flex; align-items: center; gap: 4px;">
                 ${medal(r.medal)}
                 <span style="font-size: 14px; font-weight: bold; color: #333;"><span style="font-size: 19px; color: ${accent};">${r.have}</span>/${r.total}</span>
-                ${r.up > 0 ? `<span style="font-size: 12px; font-weight: bold; color: #2e7d32;">+${r.up}</span>` : ''}${r.skip > 0 ? `<span style="font-size: 12px; font-weight: bold; color: #ef6c00;">+${r.skip}</span>` : ''}</div>`).join('')}</div></div>`).join('') + `</div>`;
+                ${r.up > 0 ? `<span style="font-size: 12px; font-weight: bold; color: #2e7d32;">+${r.up}</span>` : ''}${r.skip > 0 ? `<span style="font-size: 12px; font-weight: bold; color: #222;">+${r.skip}</span>` : ''}</div>`).join('')}</div></div>`).join('') + `</div>`;
     }
     if (pk && pk.cur !== null) {
         const diff = pk.prev !== null ? pk.cur - pk.prev : null;

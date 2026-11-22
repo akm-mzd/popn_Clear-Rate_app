@@ -584,7 +584,7 @@ function groupMedalTotalsByLevel(list) {
 //   黒星 → 銅星なら銅丸・銅菱・銅星のどれにも入る。数はその日の終わりの時点（to が Infinity なら今）
 //   返す：[{ lv, medal, have, total, up, skip }]（レベルの高い順 → メダルの低い順）
 //   up＝そのメダルをちょうど取った曲の数、skip＝もっと上のメダルを取って越えた曲の数（「+6+1」の後ろ）
-// 増えた数：ちょうど取った数を緑で、上のメダルで越えた数をオレンジで「+6+1」（0 の方は出さない）
+// 増えた数：ちょうど取った数を緑で、上のメダルで越えた数を黒で「+6+1」（0 の方は出さない）
 function medalTotalUpHtml(r) {
     return (r.up > 0 ? `<span class="ds-mtotal-up">+${r.up}</span>` : '') + (r.skip > 0 ? `<span class="ds-mtotal-skip" title="上のメダルを取って越えた数">+${r.skip}</span>` : '');
 }
