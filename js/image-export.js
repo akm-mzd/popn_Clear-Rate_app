@@ -855,6 +855,17 @@ function buildDailySummaryRoot(sum, pk) {
     </div>`;
     const tiles = getDailySummaryTiles(sum);
     if (tiles.length > 0) html += `<div style="display: flex; gap: 8px; margin-bottom: 12px;">${tiles.map(([n, label]) => stat(n, label)).join('')}</div>`;
+    // メダルの合計（ポップンクラスの上）：レベル・メダル・そのメダル以上の曲の数 / 曲の数・その日に越えた数
+    if (sum.medalTotals && sum.medalTotals.length > 0) {
+        html += `<div style="font-size: 13px; font-weight: bold; color: #666; margin: 6px 0 4px;">メダルの合計</div>`;
+        // 1レベル1行で、メダルを横に並べる（入りきらなければ折り返す）
+        html += `<div style="background: #fff; border-radius: 10px; padding: 6px 12px; margin-bottom: 12px;">` + groupMedalTotalsByLevel(sum.medalTotals).map((g, i) => `<div style="display: flex; align-items: center; gap: 10px; padding: 5px 0;${i > 0 ? ' border-top: 1px solid #eee;' : ''}">
+            ${lvBox(g.lv)}
+            <div style="flex: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px;">${g.rows.map(r => `<div style="display: flex; align-items: center; gap: 4px;">
+                ${medal(r.medal)}
+                <span style="font-size: 14px; font-weight: bold; color: #333;"><span style="font-size: 19px; color: ${accent};">${r.have}</span>/${r.total}</span>
+                <span style="font-size: 12px; font-weight: bold; color: #2e7d32;">+${r.up}</span></div>`).join('')}</div></div>`).join('') + `</div>`;
+    }
     if (pk && pk.cur !== null) {
         const diff = pk.prev !== null ? pk.cur - pk.prev : null;
         html += `<div style="background: #fff; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; font-size: 15px; font-weight: bold;">ポップンクラス <span style="font-size: 22px; color: #7b1fa2;">${pk.cur.toFixed(2)}</span>${diff !== null ? ` <span style="color: ${diff >= 0 ? '#2e7d32' : '#c62828'};">（${diff >= 0 ? '+' : '−'}${Math.abs(diff).toFixed(2)}）</span>` : ''}</div>`;

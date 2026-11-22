@@ -416,6 +416,13 @@ button.sh-more { width: 100%; margin: 6px 0 0; padding: 6px; border: 1px solid #
 .ds-pokkura b { font-size: 18px; color: #7b1fa2; margin-left: 4px; }
 .ds-pokkura .up { color: #2e7d32; font-weight: bold; } .ds-pokkura .down { color: #c62828; font-weight: bold; }
 .ds-pokkura small { margin-left: 6px; color: #999; }
+.ds-mtotal { margin-bottom: 8px; padding: 2px 10px; border-radius: 10px; background: #fff; border: 1px solid #eee; }
+.ds-mtotal-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 13px; }
+.ds-mtotal-row + .ds-mtotal-row { border-top: 1px solid #f0f0f0; }
+.ds-mtotal-items { flex: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.ds-mtotal-item { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+.ds-mtotal-num b { font-size: 16px; color: #c2185b; }
+.ds-mtotal-up { color: #2e7d32; font-weight: bold; font-size: 11px; }
 .ds-sub { font-size: 12px; font-weight: bold; color: #666; margin: 8px 0 4px; }
 .ds-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid #f3f3f3; font-size: 13px; }
 .ds-row.ds-goal { background: #fff8e1; border: 1px solid #ffca28; border-radius: 8px; padding: 6px 10px; margin-bottom: 4px; font-weight: bold; }

@@ -565,7 +565,67 @@ function getDayChanges(day) {
     sum.isToday = today;
     // その日に達成した目標（js/goals.js）
     sum.goals = typeof getGoalsAchievedOn === 'function' ? getGoalsAchievedOn(day, to) : [];
+    sum.medalTotals = getDayMedalTotals(sum, to);
     return sum;
+}
+
+// メダルの合計（今日のまとめ）：その日に越えた銅丸以上のメダルごとに、そのレベルでそのメダル以上の曲の数 / そのレベルの曲の数
+//   黒星 → 銅星なら銅丸・銅菱・銅星のどれにも入る。数はその日の終わりの時点（to が Infinity なら今）
+//   返す：[{ lv, medal, have, total, up }]（レベルの高い順 → メダルの低い順）
+// レベルごとにまとめる（並びはそのまま）：[{ lv, rows }]
+function groupMedalTotalsByLevel(list) {
+    const groups = [];
+    (list || []).forEach(r => {
+        const last = groups[groups.length - 1];
+        if (last && last.lv === r.lv) last.rows.push(r);
+        else groups.push({ lv: r.lv, rows: [r] });
+    });
+    return groups;
+}
+
+function getDayMedalTotals(sum, to) {
+    const rankOf = k => (MEDAL_TYPES[k] || MEDAL_TYPES['']).rank;
+    const minRank = MEDAL_TYPES['銅丸'].rank;
+    const tiers = Object.keys(MEDAL_TYPES).filter(k => rankOf(k) >= minRank).sort((a, b) => rankOf(a) - rankOf(b));
+    const crossed = new Map(); // 'レベル|メダル' -> 越えた曲の数
+    (sum.medalUp || []).forEach(c => {
+        if (!c.song) return;
+        tiers.forEach(k => {
+            if (rankOf(k) > rankOf(c.om) && rankOf(k) <= rankOf(c.nm)) {
+                const key = String(c.song.level) + '|' + k;
+                crossed.set(key, (crossed.get(key) || 0) + 1);
+            }
+        });
+    });
+    if (crossed.size === 0) return [];
+    // その日の終わりのメダル：今のメダルから、それより後の更新を新しい順に戻す
+    const medalAt = {};
+    songs.forEach(s => { medalAt[s.id] = clearRecords[s.id] || ''; });
+    if (to !== Infinity) {
+        Object.values(getHistoryRecords())
+            .filter(e => e && typeof e.t === 'number' && e.t >= to && 'nm' in e && e.id in medalAt)
+            .sort((a, b) => b.t - a.t)
+            .forEach(e => { medalAt[e.id] = e.om || ''; });
+    }
+    // 母数は統計と同じ（未解禁は「未解禁を表示」のときだけ、超EX は「超EXを含む」のときだけ）
+    const cb = document.getElementById('show-unreleased');
+    const showUnreleased = !!(cb && cb.checked);
+    const showSuperEx = typeof isSuperExIncluded === 'function' ? isSuperExIncluded() : false;
+    const rows = [...crossed.entries()].map(([key, up]) => {
+        const [lv, medal] = key.split('|');
+        let have = 0, total = 0;
+        songs.forEach(s => {
+            if (String(s.level) !== lv) return;
+            if (!showSuperEx && isSuperExSong(s)) return;
+            const m = medalAt[s.id];
+            if ((MEDAL_TYPES[m] || {}).excludeFromRate && !showUnreleased) return;
+            total++;
+            if (rankOf(m) >= rankOf(medal)) have++;
+        });
+        return { lv, medal, have, total, up };
+    });
+    const lvNum = r => parseInt(r.lv, 10) || 0;
+    return rows.sort((a, b) => (lvNum(b) - lvNum(a)) || (rankOf(a.medal) - rankOf(b.medal)));
 }
 
 function getTodayChanges() {
@@ -731,6 +791,14 @@ function buildDailySummaryHtml(sum, pk) {
     const tiles = getDailySummaryTiles(sum).map(([n, label]) => `<div><b>${n}</b><span>${label}</span></div>`).join('');
     let html = `<div class="ds-date">${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}（${HISTORY_WEEKDAYS[d.getDay()]}）</div>
         ${tiles ? `<div class="ds-stats">${tiles}</div>` : ''}`;
+    // メダルの合計（ポップンクラスの上）
+    if (sum.medalTotals && sum.medalTotals.length > 0) {
+        // 1レベル1行で、メダルを横に並べる（入りきらなければ折り返す）
+        html += `<div class="ds-sub">メダルの合計</div><div class="ds-mtotal">` + groupMedalTotalsByLevel(sum.medalTotals).map(g =>
+            `<div class="ds-mtotal-row"><span class="level-badge">${escapeHtml(g.lv)}</span><span class="ds-mtotal-items">${g.rows.map(r =>
+                `<span class="ds-mtotal-item">${historyMedalHtml(r.medal)}<span class="ds-mtotal-num"><b>${r.have}</b>/${r.total}</span><span class="ds-mtotal-up">+${r.up}</span></span>`).join('')}</span></div>`
+        ).join('') + `</div>`;
+    }
     if (pk && pk.cur !== null) {
         const diff = pk.prev !== null ? pk.cur - pk.prev : null;
         html += `<div class="ds-pokkura">ポップンクラス <b>${pk.cur.toFixed(2)}</b>${diff !== null ? `<span class="${diff >= 0 ? 'up' : 'down'}">（${diff >= 0 ? '+' : '−'}${Math.abs(diff).toFixed(2)}）</span>` : ''}${pk.official ? '' : '<small>計算値</small>'}</div>`;
