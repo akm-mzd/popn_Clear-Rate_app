@@ -423,6 +423,7 @@ button.sh-more { width: 100%; margin: 6px 0 0; padding: 6px; border: 1px solid #
 .ds-mtotal-item { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
 .ds-mtotal-num b { font-size: 16px; color: #c2185b; }
 .ds-mtotal-up { color: #2e7d32; font-weight: bold; font-size: 11px; }
+.ds-mtotal-skip { color: #ef6c00; font-weight: bold; font-size: 11px; }
 .ds-sub { font-size: 12px; font-weight: bold; color: #666; margin: 8px 0 4px; }
 .ds-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid #f3f3f3; font-size: 13px; }
 .ds-row.ds-goal { background: #fff8e1; border: 1px solid #ffca28; border-radius: 8px; padding: 6px 10px; margin-bottom: 4px; font-weight: bold; }
