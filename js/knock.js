@@ -7,7 +7,7 @@
 // マークは knockRecords（ユーザーごと・クラウド保存）{ 'ran:表の書き方' | 'sran:表の書き方': 'c'（クリア）| 'e'（イージークリア） }。未クリアは記録なし
 const KNOCK_MARKS = {
     c: { label: 'クリア', img: 'images/knock/clear.jpg' },
-    e: { label: 'イージークリア', img: 'images/knock/Easyclear.jpg' },
+    e: { label: 'イージークリア', img: 'images/knock/Easyclear.jpg?v=2' },
     '': { label: '未クリア', img: 'images/knock/fail.jpg' }
 };
 const KNOCK_LABEL_COLORS = { ran: [[49, 27, 146], [179, 157, 219]], sran: [[0, 77, 64], [128, 203, 196]] };
