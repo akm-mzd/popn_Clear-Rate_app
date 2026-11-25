@@ -256,16 +256,17 @@ function renderHistoryModal() {
     list.slice(0, historyShowCount).forEach(({ key, e }) => {
         const d = new Date(e.t);
         const day = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}（${HISTORY_WEEKDAYS[d.getDay()]}）`;
-        if (days.length === 0 || days[days.length - 1].day !== day) days.push({ day, items: [] });
+        if (days.length === 0 || days[days.length - 1].day !== day) days.push({ day, start: dayStartOf(e.t), items: [] });
         days[days.length - 1].items.push({ key, e, d });
     });
     // 最初は一番新しい日だけ開く。そのあとは開いた・閉じた状態を画面を閉じるまで覚えておく
     if (historyOpenDays === null) historyOpenDays = new Set(days.length > 0 ? [days[0].day] : []);
 
     let html = '';
-    days.forEach(({ day, items }) => {
+    days.forEach(({ day, start, items }) => {
         html += `<details class="hist-day-group" data-day="${escapeHtml(day)}"${historyOpenDays.has(day) ? ' open' : ''} ontoggle="onHistoryDayToggle(this)">
-            <summary class="hist-day"><span>${day}</span><span class="hist-day-count">${items.length}件</span></summary>`;
+            <summary class="hist-day"><span>${day}</span><span class="hist-day-count">${items.length}件</span></summary>
+            <div class="hist-day-tools"><button type="button" class="hist-day-move" onclick="openHistoryDayMove(${start})" title="この日の記録をまとめて別の日に移す（管理者のみ）">📅 まとめて別の日に移す</button></div>`;
         items.forEach(({ key, e, d }) => {
             const time = `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
             const parts = [];
@@ -961,4 +962,103 @@ function applyHistoryBads() {
     renderTable();
     if (currentDetailSongId) refreshSongHistoryViews(currentDetailSongId);
     showToast('toast-eagate', `${list.length}曲の BAD を反映しました`, '#4caf50', 3000);
+}
+
+// ==========================================
+// 1日分の記録をまとめて別の日に移す（更新履歴の画面の日ごとの「📅 まとめて別の日に移す」。管理者のみ）
+//   取り込みが0時をまたいで次の日になったときなど。時刻（何時何分）はそのままで、日付だけ変える。移す記録は選べる（最初は全部）
+//   その日のポックラの記録（pokkuraHistRecords）も、移す先の日に無ければ一緒に移せる
+// ==========================================
+let historyDayMoveFrom = null; // 移す元の日（0時の時刻）
+
+function getHistoryDayEntries(dayStart) {
+    const end = nextDayStart(dayStart);
+    const records = getHistoryRecords();
+    return Object.keys(records).map(key => ({ key, e: records[key] }))
+        .filter(x => x.e && typeof x.e.t === 'number' && x.e.t >= dayStart && x.e.t < end)
+        .sort((a, b) => a.e.t - b.e.t);
+}
+
+function openHistoryDayMove(dayStart) {
+    if (!checkAdminAuth()) return;
+    const list = getHistoryDayEntries(dayStart);
+    if (list.length === 0) return;
+    historyDayMoveFrom = dayStart;
+    const d = new Date(dayStart);
+    const pk = getPokkuraHistRecords()[localDateKey(dayStart)];
+    const rows = list.map(({ key, e }) => {
+        const t = new Date(e.t);
+        const parts = [];
+        if ('nm' in e) parts.push(`<span class="hist-change">${historyMedalHtml(e.om)}<span class="hist-arrow">→</span>${historyMedalHtml(e.nm)}</span>`);
+        if ('ns' in e) parts.push(historyScoreHtml(e.os, e.ns));
+        if ('nb' in e) parts.push(historyBadHtml(e.ob, e.nb));
+        return `<label class="hdm-row"><input type="checkbox" class="hdm-check" value="${escapeHtml(key)}" checked>
+            <span class="hdm-time">${t.getHours()}:${String(t.getMinutes()).padStart(2, '0')}</span>
+            <span class="level-badge">${escapeHtml(e.lv)}</span><span class="hdm-title">${escapeHtml(e.ti)}</span><span class="hdm-parts">${parts.join('')}</span></label>`;
+    }).join('');
+    document.getElementById('history-day-move-body').innerHTML = `
+        <div class="hdm-from">${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}（${HISTORY_WEEKDAYS[d.getDay()]}）の記録 ${list.length}件</div>
+        <label class="hdm-date">移す先の日付<input type="date" id="hdm-date" value="${localDateKey(dayStart)}" max="${localDateKey(Date.now())}"></label>
+        ${pk ? '<label class="hdm-pk"><input type="checkbox" id="hdm-pokkura" checked> この日のポックラの記録も移す</label>' : ''}
+        <div class="hdm-all"><button type="button" onclick="setHistoryDayMoveAll(true)">全部選ぶ</button><button type="button" onclick="setHistoryDayMoveAll(false)">全部外す</button></div>
+        <div class="hdm-list">${rows}</div>
+        <div class="hi-note">時刻はそのままで、日付だけ変えます。今のメダル・スコア・BAD は変わりません。</div>`;
+    document.getElementById('history-day-move-modal').style.display = 'flex';
+}
+
+function setHistoryDayMoveAll(on) {
+    document.querySelectorAll('#history-day-move-body .hdm-check').forEach(c => { c.checked = on; });
+}
+
+function closeHistoryDayMove() {
+    historyDayMoveFrom = null;
+    document.getElementById('history-day-move-modal').style.display = 'none';
+}
+
+function saveHistoryDayMove() {
+    if (historyDayMoveFrom === null) { closeHistoryDayMove(); return; }
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(document.getElementById('hdm-date').value || '');
+    if (!m) { alert('移す先の日付を入れてください。'); return; }
+    const to = new Date(+m[1], +m[2] - 1, +m[3]).getTime();
+    const today = dayStartOf(Date.now());
+    if (to > today) { alert('今日より後の日付は入れられません。'); return; }
+    const from = historyDayMoveFrom;
+    const keys = [...document.querySelectorAll('#history-day-move-body .hdm-check')].filter(c => c.checked).map(c => c.value);
+    const pkBox = document.getElementById('hdm-pokkura');
+    const movePk = !!(pkBox && pkBox.checked) && to !== from;
+    if (to === from) { alert('移す先が同じ日です。日付を変えてください。'); return; }
+    if (keys.length === 0 && !movePk) { alert('移す記録を選んでください。'); return; }
+    const records = getHistoryRecords();
+    let moved = 0;
+    const ids = new Set();
+    keys.forEach(k => {
+        const e = records[k];
+        if (!e) return;
+        let t = to + (e.t - from);
+        if (to === today && t > Date.now()) t = Date.now();
+        records[k] = { ...e, t };
+        ids.add(e.id);
+        moved++;
+    });
+    // ポックラの記録：移す先の日に無いときだけ移す
+    let pkNote = '';
+    if (movePk) {
+        const pk = getPokkuraHistRecords();
+        const fk = localDateKey(from), tk = localDateKey(to);
+        if (pk[fk] && !pk[tk]) { pk[tk] = { ...pk[fk], t: pk[fk].t ? to + (pk[fk].t - from) : pk[fk].t }; delete pk[fk]; pkNote = '・ポックラの記録も移しました'; }
+        else if (pk[fk]) pkNote = '・移す先の日にポックラの記録があるので、ポックラは移していません';
+    }
+    clearHistoryMinBadCache();
+    closeHistoryDayMove();
+    scheduleAutoSave();
+    renderTable();
+    if (document.getElementById('history-modal').style.display !== 'none') {
+        const body = document.getElementById('history-modal-body');
+        const scrollTop = body.scrollTop;
+        renderHistoryModal();
+        body.scrollTop = scrollTop;
+    }
+    ids.forEach(id => refreshSongHistoryViews(id));
+    const td = new Date(to);
+    showToast('toast-eagate', `${moved}件を ${td.getMonth() + 1}/${td.getDate()} に移しました${pkNote}`, '#4caf50', 3500);
 }
