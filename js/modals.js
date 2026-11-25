@@ -515,6 +515,7 @@ async function saveEditModal() {
     }
 
     const newId = newGenre + "_" + newTitle + "_" + newNotes;
+    let movedUsers = []; // ID が変わって記録を移したユーザー
     const newLevel = document.getElementById('edit-level').value.trim();
     const newVersion = document.getElementById('edit-version').value.trim();
     const newBpm = document.getElementById('edit-bpm').value.trim();
@@ -561,24 +562,13 @@ async function saveEditModal() {
         const songIndex = songs.findIndex(s => s.id === originalId);
         if (songIndex === -1) return;
 
+        if (newId !== originalId && songs.some(s => s.id === newId)) {
+            alert("同じジャンル・曲名・ノーツ数の楽曲が既に存在します。");
+            return;
+        }
         if (newId !== originalId) {
-            for(let u in allUsersData) {
-                if (allUsersData[u].clearRecords[originalId] !== undefined) {
-                    allUsersData[u].clearRecords[newId] = allUsersData[u].clearRecords[originalId];
-                    delete allUsersData[u].clearRecords[originalId];
-                }
-                if (allUsersData[u].scoreRecords && allUsersData[u].scoreRecords[originalId] !== undefined) {
-                    allUsersData[u].scoreRecords[newId] = allUsersData[u].scoreRecords[originalId];
-                    delete allUsersData[u].scoreRecords[originalId];
-                }
-                if (allUsersData[u].memoRecords && allUsersData[u].memoRecords[originalId] !== undefined) {
-                    allUsersData[u].memoRecords[newId] = allUsersData[u].memoRecords[originalId];
-                    delete allUsersData[u].memoRecords[originalId];
-                }
-            }
-            clearRecords = allUsersData[currentUser].clearRecords;
-            scoreRecords = allUsersData[currentUser].scoreRecords;
-            memoRecords = allUsersData[currentUser].memoRecords;
+            // ジャンル名・曲名・ノーツ数を変えると曲の ID が変わるので、全ユーザーの記録（更新履歴・BAD なども）を新しい ID に移す
+            movedUsers = moveSongRecords(originalId, newId);
             songs[songIndex].id = newId;
         }
 
@@ -602,7 +592,13 @@ async function saveEditModal() {
     renderTable();
     closeEditModal();
     // 楽曲リストもクラウドに保存する（しないと、読み込み直したときに元に戻る）
-    await saveToCloud(true);
+    const songsSaved = await saveToCloud(true);
+    // ID が変わって移した記録も、すぐ送る（楽曲リストの保存は記録を送らないので、送らないと読み込み直したときに曲から外れる）
+    if (songsSaved) {
+        for (const u of movedUsers) await saveUserRecordsNow(u);
+    } else if (movedUsers.length > 0) {
+        scheduleAutoSave();
+    }
 }
 
 // 楽曲編集の「フルコン難易度」：値を変えたら、その値の中の一番最後（一番弱い）に入れる
