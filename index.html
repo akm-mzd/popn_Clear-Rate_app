@@ -6,9 +6,9 @@
     <title>Pop’n Clear Rate app</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
-    <link rel="stylesheet" href="style.css?v=3.50.5.1">
-    <link rel="stylesheet" href="css/new-ui.css?v=3.50.5.1">
-    <link rel="stylesheet" href="css/parts.css?v=3.50.5.1">
+    <link rel="stylesheet" href="style.css?v=3.51.0.0">
+    <link rel="stylesheet" href="css/new-ui.css?v=3.51.0.0">
+    <link rel="stylesheet" href="css/parts.css?v=3.51.0.0">
 </head>
 <body>
     <!-- 新しいデザイン（ver 3）の上部バーとナビ。以前の見た目では隠れる（js/ui-new.js） -->
@@ -776,6 +776,18 @@
         </div>
     </div>
 
+    <!-- 1日分の更新履歴をまとめて別の日に移す（更新履歴の画面から。管理者のみ） -->
+    <div id="history-day-move-modal" class="modal-overlay" data-close="closeHistoryDayMove" style="display: none; z-index: 9600;">
+        <div class="modal-content history-import-content" style="max-width: 480px;">
+            <h3 style="margin: 0 0 6px;">まとめて別の日に移す</h3>
+            <div id="history-day-move-body" style="flex: 1; min-height: 0; overflow-y: auto;"></div>
+            <div class="modal-actions" style="justify-content: flex-end; gap: 10px; margin-top: 10px;">
+                <button onclick="closeHistoryDayMove()" style="border: 1px solid #ccc; background: #eee;">キャンセル</button>
+                <button onclick="saveHistoryDayMove()" style="background-color: #c2185b; color: white; font-weight: bold;">移す</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 今日のまとめ（公式データを取り込んだあと・画像シートから） -->
     <div id="daily-summary-modal" class="modal-overlay" data-close="closeDailySummary" style="display: none;">
         <div class="modal-content daily-summary-content">
@@ -897,32 +909,32 @@
     <button id="back-to-top" onclick="scrollToTop()" title="トップに戻る">↑</button>
 
     <!-- 読み込み順に意味があります（config が最初、app が最後） -->
-    <script src="js/config.js?v=3.50.5.1"></script>
-    <script src="js/utils.js?v=3.50.5.1"></script>
-    <script src="js/cloud.js?v=3.50.5.1"></script>
-    <script src="js/users.js?v=3.50.5.1"></script>
-    <script src="js/knock-data.js?v=3.50.5.1"></script>
-    <script src="js/filters.js?v=3.50.5.1"></script>
-    <script src="js/table.js?v=3.50.5.1"></script>
-    <script src="js/stats-sheet.js?v=3.50.5.1"></script>
-    <script src="js/views.js?v=3.50.5.1"></script>
-    <script src="js/pokkura.js?v=3.50.5.1"></script>
-    <script src="js/knock.js?v=3.50.5.1"></script>
-    <script src="js/modals.js?v=3.50.5.1"></script>
-    <script src="js/memo.js?v=3.50.5.1"></script>
-    <script src="js/history.js?v=3.50.5.1"></script>
-    <script src="js/growth.js?v=3.50.5.1"></script>
-    <script src="js/goals.js?v=3.50.5.1"></script>
-    <script src="js/next.js?v=3.50.5.1"></script>
-    <script src="js/admin.js?v=3.50.5.1"></script>
-    <script src="js/backup.js?v=3.50.5.1"></script>
-    <script src="js/image-export.js?v=3.50.5.1"></script>
-    <script src="js/eagate-import.js?v=3.50.5.1"></script>
-    <script src="js/wiki-import.js?v=3.50.5.1"></script>
-    <script src="js/fc-import.js?v=3.50.5.1"></script>
-    <script src="js/menu.js?v=3.50.5.1"></script>
-    <script src="js/ui-new.js?v=3.50.5.1"></script>
-    <script src="js/app.js?v=3.50.5.1"></script>
+    <script src="js/config.js?v=3.51.0.0"></script>
+    <script src="js/utils.js?v=3.51.0.0"></script>
+    <script src="js/cloud.js?v=3.51.0.0"></script>
+    <script src="js/users.js?v=3.51.0.0"></script>
+    <script src="js/knock-data.js?v=3.51.0.0"></script>
+    <script src="js/filters.js?v=3.51.0.0"></script>
+    <script src="js/table.js?v=3.51.0.0"></script>
+    <script src="js/stats-sheet.js?v=3.51.0.0"></script>
+    <script src="js/views.js?v=3.51.0.0"></script>
+    <script src="js/pokkura.js?v=3.51.0.0"></script>
+    <script src="js/knock.js?v=3.51.0.0"></script>
+    <script src="js/modals.js?v=3.51.0.0"></script>
+    <script src="js/memo.js?v=3.51.0.0"></script>
+    <script src="js/history.js?v=3.51.0.0"></script>
+    <script src="js/growth.js?v=3.51.0.0"></script>
+    <script src="js/goals.js?v=3.51.0.0"></script>
+    <script src="js/next.js?v=3.51.0.0"></script>
+    <script src="js/admin.js?v=3.51.0.0"></script>
+    <script src="js/backup.js?v=3.51.0.0"></script>
+    <script src="js/image-export.js?v=3.51.0.0"></script>
+    <script src="js/eagate-import.js?v=3.51.0.0"></script>
+    <script src="js/wiki-import.js?v=3.51.0.0"></script>
+    <script src="js/fc-import.js?v=3.51.0.0"></script>
+    <script src="js/menu.js?v=3.51.0.0"></script>
+    <script src="js/ui-new.js?v=3.51.0.0"></script>
+    <script src="js/app.js?v=3.51.0.0"></script>
 
 </body>
 </html>

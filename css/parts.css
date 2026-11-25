@@ -751,3 +751,18 @@ button.kl-unlink { display: block; width: 100%; margin: 0; padding: 8px; border:
 .br-log { display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
 .br-log-row { display: flex; flex-wrap: wrap; gap: 2px 8px; padding: 4px 0; border-bottom: 1px solid #f3f3f3; }
 .br-log-row small { color: #888; width: 100%; }
+
+/* 更新履歴：1日分をまとめて別の日に移す */
+.hist-day-tools { display: flex; justify-content: flex-end; margin: 4px 0 2px; }
+.hist-day-move { border: 1px solid #cfd8dc; background: #fff; color: #455a64; border-radius: 14px; padding: 3px 10px; font-size: 0.8em; cursor: pointer; }
+.hdm-from { font-weight: bold; margin-bottom: 8px; }
+.hdm-date { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 0.9em; }
+.hdm-date input { font-size: 16px; padding: 4px 6px; }
+.hdm-pk { display: flex; align-items: center; gap: 6px; font-size: 0.85em; margin-bottom: 6px; }
+.hdm-all { display: flex; gap: 6px; margin-bottom: 6px; }
+.hdm-all button { border: 1px solid #ccc; background: #f5f5f5; border-radius: 12px; padding: 2px 10px; font-size: 0.8em; cursor: pointer; }
+.hdm-list { border-top: 1px solid #eee; }
+.hdm-row { display: flex; align-items: center; gap: 6px; padding: 5px 2px; border-bottom: 1px solid #f3f3f3; font-size: 0.85em; cursor: pointer; flex-wrap: wrap; }
+.hdm-time { color: #78909c; min-width: 36px; }
+.hdm-title { font-weight: bold; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hdm-parts { display: flex; align-items: center; gap: 6px; }
