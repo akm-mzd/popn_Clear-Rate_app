@@ -42,9 +42,7 @@ function applyFetchedData(data) {
         s.diffIndex = p.diffIndex;
         const expectedId = s.genre + "_" + s.title + "_" + s.notes;
         if (s.id !== expectedId) {
-            [clearRecords, scoreRecords, memoRecords].forEach(rec => {
-                if (rec[s.id] !== undefined) { rec[expectedId] = rec[s.id]; delete rec[s.id]; }
-            });
+            if (s.id) moveSongRecords(s.id, expectedId, { markDirty: false });
             s.id = expectedId;
         }
     });
@@ -120,6 +118,43 @@ function setSaveStatus(text, color, hideAfterMs) {
     if (typeof updateSaveChip === 'function') updateSaveChip(text, color);
     if (document.body.classList.contains('ui-new')) return;
     showToast('toast-save', text, color, hideAfterMs);
+}
+
+// ---------- 曲の ID が変わったときの記録の引っ越し ----------
+// 曲の ID は「ジャンル_曲名_ノーツ数」。ジャンル名・曲名・ノーツ数を変えると ID が変わるので、記録も新しい ID に移す
+//   曲 ID がキーの記録（SONG_KEYED_RECORD_TYPES）は全ユーザー分を移す（新しい ID にもう値があれば上書きしない）。更新履歴は各記録の id を付け替える
+//   markDirty（最初は true）：変わったユーザーを「保存が必要」にする。返す：変わったユーザーの一覧
+const SONG_KEYED_RECORD_TYPES = ['clearRecords', 'scoreRecords', 'memoRecords', 'badRecords', 'badReachRecords', 'oldMedalRecords', 'nextRecords', 'pokkuraRecords', 'pokkuraFlagRecords'];
+function moveSongRecords(oldId, newId, opts = {}) {
+    const changed = [];
+    if (!oldId || !newId || oldId === newId) return changed;
+    for (const u in allUsersData) {
+        const ud = allUsersData[u];
+        let moved = false;
+        SONG_KEYED_RECORD_TYPES.forEach(type => {
+            const rec = ud[type];
+            if (!rec || !Object.prototype.hasOwnProperty.call(rec, oldId)) return;
+            if (rec[newId] === undefined) rec[newId] = rec[oldId];
+            delete rec[oldId];
+            moved = true;
+        });
+        Object.values(ud.historyRecords || {}).forEach(e => {
+            if (e && e.id === oldId) { e.id = newId; moved = true; }
+        });
+        if (moved) changed.push(u);
+    }
+    if (changed.length === 0) return changed;
+    if (allUsersData[currentUser]) {
+        clearRecords = allUsersData[currentUser].clearRecords;
+        scoreRecords = allUsersData[currentUser].scoreRecords;
+        memoRecords = allUsersData[currentUser].memoRecords;
+    }
+    if (typeof clearHistoryMinBadCache === 'function') clearHistoryMinBadCache();
+    if (opts.markDirty !== false) {
+        changed.forEach(u => dirtyUsers.add(u));
+        localChangeSeq++;
+    }
+    return changed;
 }
 
 // ---------- 変更分の取り出し ----------

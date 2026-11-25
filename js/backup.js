@@ -261,3 +261,95 @@ function buildSaveLogHtml(log) {
         return `<div class="br-log-row"><span>${escapeHtml(formatBackupTime(e.t))}</span><span>${escapeHtml(SAVE_LOG_TYPE_LABELS[e.type] || e.type)}${e.user ? ` [${escapeHtml(e.user)}]` : ''}</span><small>${escapeHtml(detail)}・${escapeHtml(e.device || '?')}・ver ${escapeHtml(e.app || '?')}</small></div>`;
     }).join('')}</div>`;
 }
+
+// ==========================================
+// 曲とつながっていない記録をつなぎ直す（「データの追加・管理」→「バックアップ・復元」）
+//   前の版では、楽曲編集でジャンル名・曲名・ノーツ数を変える（＝曲の ID が変わる）と、記録が前の ID のままクラウドに残ることがあった
+//   前の ID「ジャンル_曲名_ノーツ数」と、3つのうち2つが同じ曲が1曲だけあれば、その曲につなぐ
+// ==========================================
+const ORPHAN_LABELS = { clearRecords: 'メダル', scoreRecords: 'スコア', memoRecords: 'メモ', badRecords: 'BAD', badReachRecords: '到達点BAD', oldMedalRecords: '旧筐体メダル', nextRecords: '次にやる', pokkuraRecords: 'ポックラ用', pokkuraFlagRecords: '裏メダル' };
+
+// 前の ID に合う曲（1曲だけのとき）
+function findOrphanTargetSong(oldId) {
+    const hits = songs.filter(s => {
+        if (s.id === oldId) return false;
+        const n = '_' + s.notes;
+        if (oldId.endsWith('_' + s.title + n)) return true;                                  // 曲名・ノーツ数が同じ（ジャンル名を変えた）
+        if (oldId.startsWith(s.genre + '_') && oldId.endsWith(n)) return true;              // ジャンル・ノーツ数が同じ（曲名を変えた）
+        const head = s.genre + '_' + s.title + '_';
+        return oldId.startsWith(head) && /^\d+$/.test(oldId.slice(head.length));           // ジャンル・曲名が同じ（ノーツ数を変えた）
+    });
+    return hits.length === 1 ? hits[0] : null;
+}
+
+// 残す値を決める：メダルは良い方、スコア・到達点BAD は高い方、BAD は少ない方、そのほかは曲に無いときだけ
+function pickOrphanValue(type, cur, old) {
+    if (cur === undefined || cur === null || cur === '') return old;
+    const rank = k => (MEDAL_TYPES[k] || MEDAL_TYPES['']).rank;
+    if (type === 'clearRecords' || type === 'oldMedalRecords') return rank(old) > rank(cur) ? old : cur;
+    if (type === 'scoreRecords' || type === 'badReachRecords') { const a = toScoreNum(cur), b = toScoreNum(old); return b !== null && (a === null || b > a) ? old : cur; }
+    if (type === 'badRecords') { const a = toBadNum(cur), b = toBadNum(old); return b !== null && (a === null || b < a) ? old : cur; }
+    return cur;
+}
+
+// 返す：[{ user, oldId, song, changes: ['メダル 銅丸→銅菱', …], history: 件数 }]
+function findOrphanSongRecords() {
+    const ids = new Set(songs.map(s => s.id));
+    const out = [];
+    for (const u in allUsersData) {
+        const ud = allUsersData[u];
+        const orphans = new Set();
+        SONG_KEYED_RECORD_TYPES.forEach(type => Object.keys(ud[type] || {}).forEach(k => { if (!k.startsWith('_') && !ids.has(k)) orphans.add(k); }));
+        Object.values(ud.historyRecords || {}).forEach(e => { if (e && e.id && !ids.has(e.id)) orphans.add(e.id); });
+        orphans.forEach(oldId => {
+            const song = findOrphanTargetSong(oldId);
+            if (!song) return;
+            const changes = [];
+            SONG_KEYED_RECORD_TYPES.forEach(type => {
+                const rec = ud[type] || {};
+                if (!(oldId in rec)) return;
+                const cur = rec[song.id];
+                const next = pickOrphanValue(type, cur, rec[oldId]);
+                if (stableStr(next) !== stableStr(cur)) {
+                    const show = v => (v === undefined || v === null || v === '') ? 'なし' : (typeof v === 'object' ? 'あり' : String(v));
+                    changes.push(`${ORPHAN_LABELS[type]} ${show(cur)}→${show(next)}`);
+                }
+            });
+            const history = Object.values(ud.historyRecords || {}).filter(e => e && e.id === oldId).length;
+            out.push({ user: u, oldId, song, changes, history });
+        });
+    }
+    return out;
+}
+
+async function applyOrphanSongRecords() {
+    const list = findOrphanSongRecords();
+    if (list.length === 0) { alert('曲とつながっていない記録はありません（つなぐ曲が見つからない記録は、そのままにしています）。'); return; }
+    const line = x => `[${x.user}] ${x.oldId.replace(/_\d+$/, '')} → ${x.song.genre} / ${x.song.title}：${[...x.changes, x.history ? `更新履歴 ${x.history}件` : ''].filter(Boolean).join('、') || '今の記録と同じ（外れた方を消すだけ）'}`;
+    const sample = list.slice(0, 15).map(line).join('\n');
+    if (!confirm(`曲とつながっていない記録が ${list.length}件あります。今の曲につなぎ直しますか？\n（曲にもう記録があるときは良い方を残し、外れていた方は消します）\n\n${sample}${list.length > 15 ? `\n…ほか ${list.length - 15}件` : ''}`)) return;
+    const users = new Set();
+    list.forEach(x => {
+        const ud = allUsersData[x.user];
+        SONG_KEYED_RECORD_TYPES.forEach(type => {
+            const rec = ud[type];
+            if (!rec || !(x.oldId in rec)) return;
+            rec[x.song.id] = pickOrphanValue(type, rec[x.song.id], rec[x.oldId]);
+            delete rec[x.oldId];
+        });
+        Object.values(ud.historyRecords || {}).forEach(e => { if (e && e.id === x.oldId) e.id = x.song.id; });
+        users.add(x.user);
+    });
+    clearRecords = allUsersData[currentUser].clearRecords;
+    scoreRecords = allUsersData[currentUser].scoreRecords;
+    memoRecords = allUsersData[currentUser].memoRecords;
+    if (typeof clearHistoryMinBadCache === 'function') clearHistoryMinBadCache();
+    refreshUI();
+    showLoading(true, 'クラウドに保存中...');
+    let ok = true;
+    users.forEach(u => dirtyUsers.add(u));
+    localChangeSeq++;
+    for (const u of users) { if (!(await saveUserRecordsNow(u))) ok = false; }
+    showLoading(false);
+    alert(ok ? `${list.length}件の記録を曲につなぎ直して、保存しました。` : `${list.length}件の記録を曲につなぎ直しました。保存は自動で続けます（通信を確かめてください）。`);
+}
